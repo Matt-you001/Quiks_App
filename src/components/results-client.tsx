@@ -11,11 +11,12 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Button } from "./ui/button";
-import { Award, Coins, Home, Repeat, Timer, Trophy } from "lucide-react";
+import { Award, CheckCircle, Coins, Home, Repeat, Timer, Trophy, XCircle } from "lucide-react";
 import { Progress } from "./ui/progress";
-import { generateFeedback, textToSpeech } from "@/ai/flows";
+import { generateFeedback } from "@/ai/flows";
 import { useEffect, useRef, useState } from "react";
 import type { TestResult } from "@/types";
+import { Skeleton } from "./ui/skeleton";
 
 export default function ResultsClient() {
   const searchParams = useSearchParams();
@@ -33,7 +34,6 @@ export default function ResultsClient() {
   
   const [feedback, setFeedback] = useState("");
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(true);
-  const audioRef = useRef<HTMLAudioElement>(null);
   const hasSavedResult = useRef(false);
 
   useEffect(() => {
@@ -71,11 +71,6 @@ export default function ResultsClient() {
           grade,
         });
         setFeedback(feedbackText);
-        const { media } = await textToSpeech(feedbackText);
-        if (audioRef.current && media) {
-          audioRef.current.src = media;
-          audioRef.current.play().catch(e => console.error("Error playing feedback audio:", e));
-        }
       } catch (error) {
         console.error("Failed to generate feedback:", error);
         setFeedback("Great job on completing the level!");
@@ -115,16 +110,14 @@ export default function ResultsClient() {
 
         {isGeneratingFeedback ? (
            <div className="p-4 bg-muted rounded-lg text-center">
-             <p className="text-sm animate-pulse">Generating feedback...</p>
+             <Skeleton className="h-5 w-3/4 mx-auto" />
            </div>
         ) : (
            <div className="p-4 bg-muted rounded-lg text-center">
               <p className="font-semibold text-foreground italic">"{feedback}"</p>
            </div>
         )}
-        <audio ref={audioRef} className="hidden" />
-
-
+        
         <div className="grid grid-cols-2 gap-4 text-center">
             <div className="p-4 bg-muted/50 rounded-lg">
                 <div className="flex justify-center items-center mb-1 text-primary">

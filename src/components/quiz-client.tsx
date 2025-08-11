@@ -7,9 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   generateTestQuestions,
   adaptiveDifficultyAdjustment,
-  textToSpeech,
 } from "@/ai/flows/index";
-import type { TextToSpeechOutput } from "@/ai/flows/text-to-speech";
 import {
   Card,
   CardContent,
@@ -36,14 +34,13 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight,
   Check,
-  CheckCircle2,
+  CheckCircle,
   ChevronLeft,
   Coins,
   Cpu,
   Repeat,
   Sparkles,
   Timer,
-  Volume2,
   X,
   XCircle,
 } from "lucide-react";
@@ -77,16 +74,22 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     reasoning: string;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
-
-  const audioCache = useRef<Record<number, string>>({});
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   const router = useRouter();
   const { toast } = useToast();
   const Icon = SUBJECTS.find(s => s.slug === subject.slug)!.icon;
   
   const totalTimeForLevel = QUESTIONS_PER_LEVEL * TIME_PER_QUESTION;
+
+  const reviewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (reviewTimeoutRef.current) {
+        clearTimeout(reviewTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (quizState !== "ACTIVE" || timeLeft <= 0) return;
@@ -102,57 +105,6 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
   }, [timeLeft, quizState]);
 
-  const playAudio = (audioDataUri: string) => {
-    if (audioRef.current) {
-      audioRef.current.src = audioDataUri;
-      audioRef.current.play().catch(e => console.error("Error playing audio:", e));
-    }
-  };
-
-  const handlePlayAudioForQuestion = async (questionIndex: number, text: string, isCurrent: boolean) => {
-    if (audioCache.current[questionIndex]) {
-      if (isCurrent) playAudio(audioCache.current[questionIndex]);
-      return;
-    }
-
-    if (isCurrent) setIsGeneratingAudio(true);
-    try {
-        const { media }: TextToSpeechOutput = await textToSpeech(text);
-        if (media) {
-            audioCache.current[questionIndex] = media;
-            if (isCurrent) {
-              playAudio(media);
-            }
-        }
-    } catch(error) {
-        console.error("Audio generation failed:", error);
-        if (isCurrent) {
-            toast({
-                title: "Audio Error",
-                description: "Could not generate audio for this question.",
-                variant: "destructive",
-            });
-        }
-    } finally {
-        if (isCurrent) setIsGeneratingAudio(false);
-    }
-  };
-
-  useEffect(() => {
-    if (quizState === 'ACTIVE' && questions.length > 0) {
-      const currentQ = questions[currentQuestionIndex];
-      // Play audio for the current question immediately.
-      handlePlayAudioForQuestion(currentQuestionIndex, currentQ.question, true);
-      
-      // Pre-fetch audio for the next question.
-      const nextQuestionIndex = currentQuestionIndex + 1;
-      if (nextQuestionIndex < questions.length && !audioCache.current[nextQuestionIndex]) {
-        const nextQ = questions[nextQuestionIndex];
-        handlePlayAudioForQuestion(nextQuestionIndex, nextQ.question, false);
-      }
-    }
-  }, [currentQuestionIndex, quizState, questions]);
-
 
   const fetchQuestions = async (currentDifficulty: string) => {
     if (!grade) return;
@@ -165,7 +117,6 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
         grade: grade,
       });
       setQuestions(generatedQuestions);
-      audioCache.current = {}; // Clear audio cache for new questions
       setQuizState("CONFIG");
     } catch (error) {
       console.error(error);
@@ -192,24 +143,17 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   };
 
   const handleAnswerSelect = (answer: string) => {
+    if (quizState !== 'ACTIVE') return;
+
     const newAnswers = [...userAnswers];
     newAnswers[currentQuestionIndex] = answer;
     setUserAnswers(newAnswers);
-  };
-  
-  const handleSubmitAnswer = () => {
-    if (!userAnswers[currentQuestionIndex]) return;
-    const isCorrect = userAnswers[currentQuestionIndex] === questions[currentQuestionIndex].correctAnswer;
-    
-    toast({
-        title: isCorrect ? "Correct!" : "Wrong!",
-        description: isCorrect ? "Great job!" : "That's not quite right.",
-        variant: isCorrect ? "default" : "destructive",
-        duration: 2000,
-    });
-    
     setQuizState("REVIEW");
-  }
+
+    reviewTimeoutRef.current = setTimeout(() => {
+        handleNextQuestion();
+    }, 1500);
+  };
 
   const finishLevel = () => {
     setQuizState("LEVEL_COMPLETE");
@@ -245,9 +189,8 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   };
 
   const handleNextQuestion = () => {
-    if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+    if (reviewTimeoutRef.current) {
+        clearTimeout(reviewTimeoutRef.current);
     }
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -388,61 +331,48 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
           <Progress value={progress} className="w-full mt-2" />
         </CardHeader>
         <CardContent>
-          <div className="text-lg font-medium mb-6 text-center min-h-[6rem] flex items-center justify-center relative">
-            <p className="flex-grow">{currentQuestion.question}</p>
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handlePlayAudioForQuestion(currentQuestionIndex, currentQuestion.question, true)}
-                disabled={isGeneratingAudio}
-                className="ml-4"
-              >
-                <Volume2 className={`h-6 w-6 ${isGeneratingAudio ? 'animate-pulse' : ''}`} />
-                <span className="sr-only">Read question aloud</span>
-            </Button>
-            <audio ref={audioRef} className="hidden" />
-          </div>
-          <RadioGroup onValueChange={handleAnswerSelect} value={userAnswer} disabled={isReviewing}>
-            <div className="space-y-3">
-              {currentQuestion.options.map((option, index) => {
-                const isThisOptionCorrect = option === correctAnswer;
-                const isThisOptionSelected = option === userAnswer;
-                
-                let optionStyle = "";
-                if (isReviewing && isThisOptionCorrect) {
-                    optionStyle = "bg-green-100 border-green-500 text-green-800 dark:bg-green-900/50 dark:border-green-700 dark:text-green-300";
-                } else if (isReviewing && isThisOptionSelected && !isAnswerCorrect) {
-                    optionStyle = "bg-red-100 border-red-500 text-red-800 dark:bg-red-900/50 dark:border-red-700 dark:text-red-300";
-                }
-                
-                return (
-                    <Label key={index} htmlFor={`option-${index}`} className={cn(
-                        "flex items-center p-4 rounded-lg border cursor-pointer has-[:checked]:bg-accent/20 has-[:checked]:border-accent transition-all",
-                         optionStyle,
-                         isReviewing ? "cursor-default" : ""
-                    )}>
-                      <RadioGroupItem value={option} id={`option-${index}`} className="h-5 w-5 mr-4" disabled={isReviewing} />
-                      <span className="flex-grow">{option}</span>
-                      {isReviewing && isThisOptionCorrect && <Check className="h-6 w-6 text-green-600" />}
-                      {isReviewing && isThisOptionSelected && !isAnswerCorrect && <X className="h-6 w-6 text-red-600" />}
-                    </Label>
-                );
-              })}
+            <div className="text-lg font-medium mb-4 text-center min-h-[6rem] flex items-center justify-center">
+                <p>{currentQuestion.question}</p>
             </div>
-          </RadioGroup>
-        </CardContent>
-        <CardFooter className="flex justify-end">
-            {isReviewing ? (
-                 <Button onClick={handleNextQuestion}>
-                    {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish Level"}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                 </Button>
-            ) : (
-                <Button onClick={handleSubmitAnswer} disabled={!userAnswers[currentQuestionIndex]}>
-                    Submit Answer
-                </Button>
+
+            {isReviewing && (
+                 <div className={cn(
+                    "flex items-center justify-center gap-2 mb-4 p-2 rounded-md text-white",
+                    isAnswerCorrect ? "bg-green-500" : "bg-red-500"
+                 )}>
+                    {isAnswerCorrect ? <CheckCircle className="h-5 w-5"/> : <XCircle className="h-5 w-5"/>}
+                    <span className="font-semibold text-sm">{isAnswerCorrect ? "Correct!" : "Incorrect!"}</span>
+                 </div>
             )}
-        </CardFooter>
+
+            <RadioGroup onValueChange={handleAnswerSelect} value={userAnswer} disabled={isReviewing}>
+                <div className="space-y-3">
+                {currentQuestion.options.map((option, index) => {
+                    const isThisOptionCorrect = option === correctAnswer;
+                    const isThisOptionSelected = option === userAnswer;
+                    
+                    let optionStyle = "";
+                    if (isReviewing && isThisOptionCorrect) {
+                        optionStyle = "bg-green-100 border-green-500 text-green-800 dark:bg-green-900/50 dark:border-green-700 dark:text-green-300";
+                    } else if (isReviewing && isThisOptionSelected && !isAnswerCorrect) {
+                        optionStyle = "bg-red-100 border-red-500 text-red-800 dark:bg-red-900/50 dark:border-red-700 dark:text-red-300";
+                    }
+                    
+                    return (
+                        <Label key={index} htmlFor={`option-${index}`} className={cn(
+                            "flex items-center p-4 rounded-lg border transition-all",
+                            isReviewing ? "cursor-default" : "cursor-pointer hover:bg-accent/50 has-[:checked]:bg-accent/20 has-[:checked]:border-accent"
+                        )}>
+                        <RadioGroupItem value={option} id={`option-${index}`} className="h-5 w-5 mr-4" disabled={isReviewing} />
+                        <span className="flex-grow">{option}</span>
+                        {isReviewing && isThisOptionCorrect && <Check className="h-6 w-6 text-green-600" />}
+                        {isReviewing && isThisOptionSelected && !isAnswerCorrect && <X className="h-6 w-6 text-red-600" />}
+                        </Label>
+                    );
+                })}
+                </div>
+            </RadioGroup>
+        </CardContent>
       </Card>
     );
   }
@@ -469,7 +399,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
               <div className="py-4 text-center">
                   <div className="flex items-center justify-center mb-4">
                       {levelResult.score >= SCORE_THRESHOLD ? (
-                          <CheckCircle2 className="h-16 w-16 text-green-500" />
+                          <CheckCircle className="h-16 w-16 text-green-500" />
                       ) : (
                           <XCircle className="h-16 w-16 text-destructive" />
                       )}
@@ -497,7 +427,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                       Repeat Level
                       <Repeat className="ml-2 h-4 w-4" />
                    </Button>
-                   <Button onClick={handleProceedToNextLevel}>
+                   <Button onClick={handleProceedToNextLevel} disabled={levelResult.newDifficulty === difficulty}>
                       Next Level: {levelResult.newDifficulty}
                       <ArrowRight className="ml-2 h-4 w-4" />
                    </Button>
