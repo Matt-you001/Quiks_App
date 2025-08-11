@@ -1,11 +1,12 @@
 "use client";
 
 import type { Question, SerializableSubject } from "@/types";
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   generateTestQuestions,
   adaptiveDifficultyAdjustment,
+  textToSpeech
 } from "@/ai/flows/index";
 import {
   Card,
@@ -39,6 +40,7 @@ import {
   Repeat,
   Sparkles,
   Timer,
+  Volume2,
   XCircle,
 } from "lucide-react";
 import {
@@ -49,6 +51,7 @@ import {
   TIME_PER_QUESTION,
 } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import type { TextToSpeechOutput } from "@/ai/flows/text-to-speech";
 
 type QuizState = "GRADE_SELECT" | "CONFIG" | "LOADING" | "ACTIVE" | "LEVEL_COMPLETE";
 
@@ -69,6 +72,9 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     reasoning: string;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const router = useRouter();
   const { toast } = useToast();
   const Icon = SUBJECTS.find(s => s.slug === subject.slug)!.icon;
@@ -88,6 +94,10 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       finishLevel();
     }
   }, [timeLeft, quizState]);
+  
+  useEffect(() => {
+    setAudioUrl(null);
+  }, [currentQuestionIndex]);
 
   const fetchQuestions = async (currentDifficulty: string) => {
     if (!grade) return;
@@ -123,6 +133,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     setUserAnswers(Array(questions.length).fill(null));
     setTimeLeft(totalTimeForLevel);
     setQuizState("ACTIVE");
+    setAudioUrl(null);
   };
 
   const handleAnswerSelect = (answer: string) => {
@@ -172,27 +183,60 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
   };
 
-  const handleProceed = () => {
+  const handleProceedToNextLevel = () => {
     if (!levelResult) return;
-    const passed = levelResult.score >= SCORE_THRESHOLD;
-    if (passed) {
-      setLevel(level + 1);
-      setDifficulty(levelResult.newDifficulty);
-      fetchQuestions(levelResult.newDifficulty);
-    } else {
-      fetchQuestions(difficulty);
-    }
+    setLevel(level + 1);
+    setDifficulty(levelResult.newDifficulty);
+    fetchQuestions(levelResult.newDifficulty);
+    setLevelResult(null);
+  };
+  
+  const handleRepeatLevel = () => {
+    fetchQuestions(difficulty);
     setLevelResult(null);
   };
 
   const handleEndSession = () => {
     if (!levelResult) return;
     const timeTaken = totalTimeForLevel - timeLeft;
-    const coins = Math.max(0, timeLeft * 10);
+    let coins = Math.max(0, timeLeft * 10);
+    if(levelResult.score === 100 && timeLeft > 0) {
+        coins += 100; // Bonus for perfect score
+    }
     router.push(
       `/results?score=${Math.round(levelResult.score)}&time=${timeTaken}&coins=${coins}&subject=${subject.name}&level=${level}&difficulty=${difficulty}&grade=${grade}`
     );
   };
+
+  const handlePlayAudio = async () => {
+    if(audioUrl) {
+        audioRef.current?.play();
+        return;
+    }
+
+    setIsGeneratingAudio(true);
+    try {
+        const { media }: TextToSpeechOutput = await textToSpeech(currentQuestion.question);
+        setAudioUrl(media);
+    } catch(error) {
+        console.error("Audio generation failed:", error);
+        toast({
+            title: "Audio Error",
+            description: "Could not generate audio for this question.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsGeneratingAudio(false);
+    }
+  };
+  
+  useEffect(() => {
+    if(audioUrl && audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.play();
+    }
+  }, [audioUrl]);
+
 
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
@@ -295,9 +339,20 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
           <Progress value={progress} className="w-full mt-2" />
         </CardHeader>
         <CardContent>
-          <p className="text-lg font-medium mb-6 text-center h-24 flex items-center justify-center">
-            {currentQuestion.question}
-          </p>
+          <div className="text-lg font-medium mb-6 text-center min-h-24 flex items-center justify-center relative">
+            <p className="flex-grow">{currentQuestion.question}</p>
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePlayAudio}
+                disabled={isGeneratingAudio}
+                className="ml-4"
+              >
+                <Volume2 className={`h-6 w-6 ${isGeneratingAudio ? 'animate-pulse' : ''}`} />
+                <span className="sr-only">Read question aloud</span>
+            </Button>
+            <audio ref={audioRef} className="hidden" />
+          </div>
           <RadioGroup onValueChange={handleAnswerSelect} value={userAnswers[currentQuestionIndex]}>
             <div className="space-y-3">
               {currentQuestion.options.map((option, index) => (
@@ -332,7 +387,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-center text-3xl font-extrabold font-headline">
-                  Level {level} Complete!
+                   {grade} - Level {level} Complete!
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-center text-lg">
                   You scored <span className="font-bold text-primary">{Math.round(levelResult.score)}%</span>
@@ -346,6 +401,13 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                           <XCircle className="h-16 w-16 text-destructive" />
                       )}
                   </div>
+                   {levelResult.score === 100 && timeLeft > 0 && (
+                      <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
+                          <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
+                            <Coins className="h-5 w-5"/> Congratulations! You earned 100 bonus coins for a perfect score!
+                          </p>
+                      </div>
+                  )}
                   <div className="p-4 bg-muted rounded-lg">
                       <p className="font-semibold text-sm text-foreground">
                         <span className="font-bold text-primary">AI Coach:</span> "{levelResult.reasoning}"
@@ -357,12 +419,18 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                   End Session
                 </Button>
                 {levelResult.score >= SCORE_THRESHOLD ? (
-                   <Button onClick={handleProceed}>
+                   <>
+                    <Button variant="outline" onClick={handleRepeatLevel}>
+                      Repeat Level
+                      <Repeat className="ml-2 h-4 w-4" />
+                   </Button>
+                   <Button onClick={handleProceedToNextLevel}>
                       Next Level: {levelResult.newDifficulty}
                       <ArrowRight className="ml-2 h-4 w-4" />
                    </Button>
+                   </>
                 ) : (
-                  <Button onClick={handleProceed}>
+                  <Button onClick={handleRepeatLevel}>
                       Try Again
                       <Repeat className="ml-2 h-4 w-4" />
                   </Button>
