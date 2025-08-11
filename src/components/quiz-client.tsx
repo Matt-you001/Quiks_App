@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   generateTestQuestions,
   adaptiveDifficultyAdjustment,
-  textToSpeech
+  textToSpeech,
 } from "@/ai/flows/index";
 import {
   Card,
@@ -97,24 +97,26 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
   }, [timeLeft, quizState]);
 
+  const playAudio = (audioDataUri: string) => {
+    if (audioRef.current) {
+      audioRef.current.src = audioDataUri;
+      audioRef.current.play().catch(e => console.error("Error playing audio:", e));
+    }
+  };
+
   const handlePlayAudio = async (questionIndex: number, text: string) => {
     if (audioCache.current[questionIndex]) {
-      if (audioRef.current) {
-        audioRef.current.src = audioCache.current[questionIndex];
-        audioRef.current.play().catch(e => console.error("Error playing audio:", e));
-      }
+      playAudio(audioCache.current[questionIndex]);
       return;
     }
 
     if (isGeneratingAudio) return;
-
     setIsGeneratingAudio(true);
     try {
         const { media }: TextToSpeechOutput = await textToSpeech(text);
         audioCache.current[questionIndex] = media;
-        if (questionIndex === currentQuestionIndex && audioRef.current) {
-          audioRef.current.src = media;
-          audioRef.current.play().catch(e => console.error("Error playing audio:", e));
+        if (questionIndex === currentQuestionIndex) {
+          playAudio(media);
         }
     } catch(error) {
         console.error("Audio generation failed:", error);
@@ -139,7 +141,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
         textToSpeech(nextQ.question).then(output => {
           audioCache.current[nextQuestionIndex] = output.media;
         }).catch(error => {
-            console.error("Failed to pre-fetch audio:", error);
+            console.error("Failed to pre-fetch audio for next question:", error);
         });
       }
     }
@@ -425,7 +427,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                    {levelResult.score === 100 && timeLeft > 0 && (
                       <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
                           <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
-                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.floor(Math.max(0, timeLeft) / 2)} bonus coins for a perfect score and finishing early!
+                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.max(0, timeLeft)} bonus coins for a perfect score and finishing early!
                           </p>
                       </div>
                   )}

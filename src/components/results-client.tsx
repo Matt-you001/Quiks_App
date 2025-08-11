@@ -66,11 +66,11 @@ export default function ResultsClient() {
         </div>
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row gap-2 p-6 bg-muted/50 border-t">
-        <Button variant="outline" className="flex-1" onClick={() => router.push("/")}>
+        <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push("/")}>
           <Home className="mr-2 h-4 w-4" />
           Home
         </Button>
-        <Button className="flex-1" onClick={() => router.back()}>
+        <Button className="w-full sm:w-auto" onClick={() => router.back()}>
           <Repeat className="mr-2 h-4 w-4" />
           Play Again
         </Button>
