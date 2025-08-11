@@ -53,6 +53,8 @@ import { cn } from "@/lib/utils";
 
 type QuizState = "GRADE_SELECT" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPLETE";
 
+const CALCULATION_SUBJECTS = ['arithmetic', 'physics', 'chemistry', 'sciences', 'computer', 'electricity', 'economics'];
+
 export function QuizClient({ subject, mode }: { subject: SerializableSubject, mode: TestMode }) {
   const [quizState, setQuizState] = useState<QuizState>("GRADE_SELECT");
   const [level, setLevel] = useState(1);
@@ -103,7 +105,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
   }, [timeLeft, quizState, mode, userAnswers]);
 
 
-  const fetchQuestions = async (currentDifficulty: string) => {
+  const fetchQuestions = async (currentDifficulty: string, currentLevel: number) => {
     if (!grade) return;
     setQuizState("LOADING");
     try {
@@ -115,7 +117,14 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
       });
       setQuestions(generatedQuestions);
       setUserAnswers(Array(generatedQuestions.length).fill(null));
-      const time = mode === 'quiz' ? Math.floor(recommendedTime * 0.9) : 0;
+
+      let time = 0;
+      if (mode === 'quiz') {
+        const baseTime = Math.floor(recommendedTime * 0.81);
+        const levelBonus = (currentLevel - 1) * (CALCULATION_SUBJECTS.includes(subject.slug) ? 10 : 5);
+        time = baseTime + levelBonus;
+      }
+
       setTotalTimeForLevel(time);
       setTimeLeft(time);
       setTimeElapsed(0);
@@ -134,7 +143,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
   
   const handleGradeSelected = () => {
     if (grade) {
-      fetchQuestions(difficulty);
+      fetchQuestions(difficulty, level);
     }
   }
 
@@ -191,14 +200,15 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
   const handleProceedToNextLevel = () => {
     if (!levelResult) return;
     const newDifficulty = getNextDifficulty(difficulty);
-    setLevel(level + 1);
+    const newLevel = level + 1;
+    setLevel(newLevel);
     setDifficulty(newDifficulty);
-    fetchQuestions(newDifficulty);
+    fetchQuestions(newDifficulty, newLevel);
     setLevelResult(null);
   };
   
   const handleRepeatLevel = () => {
-    fetchQuestions(difficulty);
+    fetchQuestions(difficulty, level);
     setLevelResult(null);
   };
 
@@ -449,3 +459,5 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
     </>
   );
 }
+
+    
