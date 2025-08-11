@@ -381,21 +381,27 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     <>
       <AlertDialog open={quizState === "LEVEL_COMPLETE"} onOpenChange={(open) => !open && setQuizState("CONFIG")}>
         <AlertDialogContent>
-          {isPending || !levelResult ? (
-             <div className="flex flex-col items-center justify-center p-8 space-y-4">
-                <Sparkles className="h-12 w-12 text-primary animate-pulse" />
-                <p className="text-lg font-medium text-muted-foreground">Calculating your results...</p>
-             </div>
-          ) : (
-            <>
-              <AlertDialogHeader>
+          <AlertDialogHeader>
+            {isPending || !levelResult ? (
+              <AlertDialogTitle className="text-center text-xl font-bold">Calculating Results...</AlertDialogTitle>
+            ) : (
+              <>
                 <AlertDialogTitle className="text-center text-3xl font-extrabold font-headline">
-                   {grade} - Level {level} Complete!
+                  {grade} - Level {level} Complete!
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-center text-lg">
                   You scored <span className="font-bold text-primary">{Math.round(levelResult.score)}%</span>
                 </AlertDialogDescription>
-              </AlertDialogHeader>
+              </>
+            )}
+          </AlertDialogHeader>
+          {isPending || !levelResult ? (
+             <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                <Sparkles className="h-12 w-12 text-primary animate-pulse" />
+                <p className="text-lg font-medium text-muted-foreground">The AI is analyzing your performance...</p>
+             </div>
+          ) : (
+            <>
               <div className="py-4 text-center">
                   <div className="flex items-center justify-center mb-4">
                       {levelResult.score >= SCORE_THRESHOLD ? (
