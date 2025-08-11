@@ -2,7 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import Link from 'next/link';
-import { Users } from 'lucide-react';
+import { Home, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
@@ -23,7 +23,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
-        <header className="absolute top-0 right-0 p-4">
+        <header className="absolute top-0 right-0 p-4 flex gap-2">
+          <Button asChild variant="ghost" size="icon">
+            <Link href="/">
+              <Home className="h-6 w-6" />
+              <span className="sr-only">Home</span>
+            </Link>
+          </Button>
           <Button asChild variant="ghost" size="icon">
             <Link href="/profile">
               <Users className="h-6 w-6" />
