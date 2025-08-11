@@ -33,7 +33,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile, TestResult } from "@/types";
-import { Home, UserCog, UserPlus } from "lucide-react";
+import { Coins, Home, UserCog, UserPlus } from "lucide-react";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(50),
@@ -154,6 +154,7 @@ export default function ProfileClient() {
   }
 
   const currentProfile = profiles.find(p => p.id === currentProfileId);
+  const totalCoins = testHistory.reduce((sum, result) => sum + result.coinsEarned, 0);
 
   return (
     <div className="w-full max-w-4xl space-y-8 p-4">
@@ -252,9 +253,15 @@ export default function ProfileClient() {
 
         {isEditing && currentProfile && (
             <Card className="shadow-lg">
-                <CardHeader>
-                    <CardTitle>Test History for {currentProfile.name}</CardTitle>
-                    <CardDescription>Here are the results from previous test sessions.</CardDescription>
+                <CardHeader className="flex flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Test History for {currentProfile.name}</CardTitle>
+                        <CardDescription>Here are the results from previous test sessions.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-300">
+                        <Coins className="h-6 w-6"/>
+                        <span className="font-bold text-xl">{totalCoins}</span>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -264,6 +271,7 @@ export default function ProfileClient() {
                                 <TableHead>Subject</TableHead>
                                 <TableHead>Level</TableHead>
                                 <TableHead>Score</TableHead>
+                                <TableHead>Coins</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -274,11 +282,12 @@ export default function ProfileClient() {
                                         <TableCell>{result.subject}</TableCell>
                                         <TableCell>{result.level} ({result.difficulty})</TableCell>
                                         <TableCell className="font-bold">{result.score}%</TableCell>
+                                        <TableCell className="font-bold text-yellow-500">{result.coinsEarned}</TableCell>
                                     </TableRow>
                                 ))
                            ) : (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                                <TableCell colSpan={5} className="text-center text-muted-foreground">
                                     No tests completed yet for this profile.
                                 </TableCell>
                             </TableRow>

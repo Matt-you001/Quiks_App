@@ -2,11 +2,10 @@
 "use client";
 
 import type { Question, SerializableSubject } from "@/types";
-import { useState, useEffect, useTransition, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   generateTestQuestions,
-  adaptiveDifficultyAdjustment,
 } from "@/ai/flows/index";
 import {
   Card,
@@ -23,7 +22,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -39,7 +37,6 @@ import {
   Coins,
   Cpu,
   Repeat,
-  Sparkles,
   Timer,
   X,
   XCircle,
@@ -55,7 +52,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { cn } from "@/lib/utils";
 
 
-type QuizState = "GRADE_SELECT" | "CONFIG" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPLETE";
+type QuizState = "GRADE_SELECT" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPLETE";
 
 export function QuizClient({ subject }: { subject: SerializableSubject }) {
   const [quizState, setQuizState] = useState<QuizState>("GRADE_SELECT");
@@ -68,12 +65,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   const [timeLeft, setTimeLeft] = useState(
     QUESTIONS_PER_LEVEL * TIME_PER_QUESTION
   );
-  const [levelResult, setLevelResult] = useState<{
-    score: number;
-    newDifficulty: string;
-    reasoning: string;
-  } | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [levelResult, setLevelResult] = useState<{ score: number } | null>(null);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -118,7 +110,9 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       });
       setQuestions(generatedQuestions);
       setUserAnswers(Array(generatedQuestions.length).fill(null));
-      setQuizState("CONFIG");
+      setQuizState("ACTIVE");
+      setTimeLeft(totalTimeForLevel);
+      setCurrentQuestionIndex(0);
     } catch (error) {
       console.error(error);
       toast({
@@ -135,12 +129,6 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       fetchQuestions(difficulty);
     }
   }
-
-  const startLevel = () => {
-    setCurrentQuestionIndex(0);
-    setTimeLeft(totalTimeForLevel);
-    setQuizState("ACTIVE");
-  };
 
   const handleAnswerSelect = (answer: string) => {
     if (quizState !== 'ACTIVE') return;
@@ -164,27 +152,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       }
     });
     const score = (correctAnswers / questions.length) * 100;
-    
-    startTransition(async () => {
-      try {
-        const adjustment = await adaptiveDifficultyAdjustment({
-          currentScore: score,
-          currentDifficulty: difficulty,
-          subject: subject.name,
-          grade: grade,
-        });
-        setLevelResult({ score, ...adjustment });
-      } catch (error) {
-        console.error(error);
-        toast({
-            title: "AI Error",
-            description: "Could not get difficulty adjustment from AI.",
-            variant: "destructive",
-        });
-        const newDifficulty = score >= SCORE_THRESHOLD ? "next level" : difficulty;
-        setLevelResult({ score, newDifficulty, reasoning: "AI adjustment failed, using standard progression." });
-      }
-    });
+    setLevelResult({ score });
   };
 
   const handleNextQuestion = (currentAnswers: (string | null)[]) => {
@@ -199,11 +167,21 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
   };
 
+  const getNextDifficulty = (currentDifficulty: string): string => {
+    const difficulties = ["Beginner", "Intermediate", "Advanced", "Expert"];
+    const currentIndex = difficulties.indexOf(currentDifficulty);
+    if (currentIndex < difficulties.length - 1) {
+        return difficulties[currentIndex + 1];
+    }
+    return "Expert"; // Stay at expert
+  }
+
   const handleProceedToNextLevel = () => {
     if (!levelResult) return;
+    const newDifficulty = getNextDifficulty(difficulty);
     setLevel(level + 1);
-    setDifficulty(levelResult.newDifficulty);
-    fetchQuestions(levelResult.newDifficulty);
+    setDifficulty(newDifficulty);
+    fetchQuestions(newDifficulty);
     setLevelResult(null);
   };
   
@@ -216,8 +194,24 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     if (!levelResult) return;
     const timeTaken = totalTimeForLevel - timeLeft;
     let coins = 0;
-    if(levelResult.score === 100 && timeLeft > 0) {
-        coins = Math.floor(timeLeft * 0.1);
+
+    const currentProfileId = localStorage.getItem('currentProfileId');
+    if (!currentProfileId) return;
+
+    const historyKey = `testHistory_${currentProfileId}`;
+    const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]') as any[];
+    
+    const hasPerfectedLevelBefore = existingHistory.some(
+        (result: any) =>
+          result.subject === subject.name &&
+          result.level === level &&
+          result.difficulty === difficulty &&
+          result.grade === grade &&
+          result.score === 100
+    );
+
+    if(levelResult.score === 100 && timeLeft > 0 && !hasPerfectedLevelBefore) {
+        coins = Math.floor(timeLeft * 0.05);
     }
     router.push(
       `/results?score=${Math.round(levelResult.score)}&time=${timeTaken}&coins=${coins}&subject=${subject.name}&level=${level}&difficulty=${difficulty}&grade=${grade}`
@@ -284,31 +278,6 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     );
   }
 
-  if (quizState === "CONFIG") {
-     return (
-        <Card className="w-full max-w-2xl text-center shadow-lg">
-          <CardHeader>
-            <div className="flex justify-center mb-4">
-                <div className="p-4 rounded-full bg-primary/10 text-primary">
-                    <Icon className="h-10 w-10" />
-                </div>
-            </div>
-            <CardTitle className="text-3xl font-extrabold font-headline text-primary">{subject.name} Test</CardTitle>
-            <CardDescription className="text-lg">{grade} - Level {level} - {difficulty}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>You have <span className="font-bold text-accent">{totalTimeForLevel} seconds</span> to answer <span className="font-bold text-accent">{QUESTIONS_PER_LEVEL} questions</span>.</p>
-            <p>Ready to test your knowledge?</p>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full text-lg py-6" onClick={startLevel} size="lg">
-              Start Level {level}
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </CardFooter>
-        </Card>
-     );
-  }
   
   if ((quizState === "ACTIVE" || quizState === "REVIEW") && currentQuestion) {
     const isReviewing = quizState === "REVIEW";
@@ -379,11 +348,11 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
 
   return (
     <>
-      <AlertDialog open={quizState === "LEVEL_COMPLETE"} onOpenChange={(open) => !open && setQuizState("CONFIG")}>
+      <AlertDialog open={quizState === "LEVEL_COMPLETE"} onOpenChange={(open) => !open && router.push('/')}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-center text-xl font-bold">
-              {isPending || !levelResult ? "Calculating Results..." : `${grade} - Level ${level} Complete!`}
+              {levelResult ? `${grade} - Level ${level} Complete!` : "Calculating..."}
             </AlertDialogTitle>
             {levelResult && (
               <AlertDialogDescription className="text-center text-lg">
@@ -391,12 +360,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
               </AlertDialogDescription>
             )}
           </AlertDialogHeader>
-          {isPending || !levelResult ? (
-             <div className="flex flex-col items-center justify-center p-8 space-y-4">
-                <Sparkles className="h-12 w-12 text-primary animate-pulse" />
-                <p className="text-lg font-medium text-muted-foreground">The AI is analyzing your performance...</p>
-             </div>
-          ) : (
+          {levelResult && (
             <>
               <div className="py-4 text-center">
                   <div className="flex items-center justify-center mb-4">
@@ -409,13 +373,16 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                    {levelResult.score === 100 && timeLeft > 0 && (
                       <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
                           <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
-                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.floor(timeLeft * 0.1)} bonus coins for finishing early!
+                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.floor(timeLeft * 0.05)} bonus coins for finishing early!
                           </p>
                       </div>
                   )}
                   <div className="p-4 bg-muted rounded-lg">
                       <p className="font-semibold text-sm text-foreground">
-                        <span className="font-bold text-primary">AI Coach:</span> "{levelResult.reasoning}"
+                        {levelResult.score >= SCORE_THRESHOLD 
+                            ? `Congratulations, You scored ${Math.round(levelResult.score)}% and can now proceed to the next level.` 
+                            : `Well done, you made a great effort, but your score of ${Math.round(levelResult.score)}% fell short of the requirement to proceed to the next level. Keep trying to gain perfection.`
+                        }
                       </p>
                   </div>
               </div>
@@ -437,10 +404,10 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                      </Button>
                      <Button 
                        onClick={handleProceedToNextLevel} 
-                       disabled={levelResult.newDifficulty === difficulty}
+                       disabled={difficulty === 'Expert'}
                        className="sm:col-span-2 font-bold py-6 text-base text-white bg-green-500 hover:bg-green-600 shadow-[0_4px_0_0_#16a34a] hover:shadow-[0_4px_0_0_#15803d] active:translate-y-1 active:shadow-none transition-all"
                      >
-                       Next Level: {levelResult.newDifficulty} <ArrowRight className="ml-2 h-4 w-4" />
+                       Next Level: {getNextDifficulty(difficulty)} <ArrowRight className="ml-2 h-4 w-4" />
                      </Button>
                    </>
                 ) : (
