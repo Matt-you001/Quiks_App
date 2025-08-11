@@ -28,5 +28,5 @@ export const GRADES = [
 ];
 
 export const QUESTIONS_PER_LEVEL = 10;
-export const TIME_PER_QUESTION = 30; // in seconds
+export const TIME_PER_QUESTION = 15; // in seconds
 export const SCORE_THRESHOLD = 70;

@@ -40,11 +40,16 @@ const generateTestQuestionsPrompt = ai.definePrompt({
   name: 'generateTestQuestionsPrompt',
   input: {schema: GenerateTestQuestionsInputSchema},
   output: {schema: GenerateTestQuestionsOutputSchema},
-  prompt: `You are an expert in generating multiple-choice questions for various subjects and grade levels.
+  prompt: `You are an expert in generating high-quality, age-appropriate multiple-choice questions for educational purposes.
 
-  Generate {{numberOfQuestions}} multiple-choice questions for the subject of {{subject}} at a {{difficultyLevel}} difficulty level, tailored for a student in {{grade}}.
+  Generate {{numberOfQuestions}} multiple-choice questions for the subject of {{subject}} at a {{difficultyLevel}} difficulty, specifically tailored for a student in {{grade}}.
 
-  Each question should have 4 options, with one correct answer. The questions must be appropriate for the specified grade level.
+  Each question must:
+  1.  Be directly relevant to the core curriculum for a {{grade}} student in the subject of {{subject}}.
+  2.  Have exactly 4 distinct options.
+  3.  Have one, and only one, unambiguously correct answer.
+  4.  Have plausible distractors (incorrect options) that are common mistakes or misconceptions for students at the {{grade}} level.
+  5.  Be clearly worded and easy to understand for the specified grade level.
 
   Return the questions in the following JSON format:
   {

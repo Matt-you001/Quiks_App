@@ -97,7 +97,10 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   
   useEffect(() => {
     setAudioUrl(null);
-  }, [currentQuestionIndex]);
+    if(quizState === 'ACTIVE' && questions.length > 0) {
+      handlePlayAudio(questions[currentQuestionIndex].question);
+    }
+  }, [currentQuestionIndex, quizState, questions]);
 
   const fetchQuestions = async (currentDifficulty: string) => {
     if (!grade) return;
@@ -199,16 +202,16 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   const handleEndSession = () => {
     if (!levelResult) return;
     const timeTaken = totalTimeForLevel - timeLeft;
-    let coins = Math.max(0, timeLeft * 10);
+    let coins = 0;
     if(levelResult.score === 100 && timeLeft > 0) {
-        coins += 100; // Bonus for perfect score
+        coins = Math.max(0, timeLeft * 10);
     }
     router.push(
       `/results?score=${Math.round(levelResult.score)}&time=${timeTaken}&coins=${coins}&subject=${subject.name}&level=${level}&difficulty=${difficulty}&grade=${grade}`
     );
   };
 
-  const handlePlayAudio = async () => {
+  const handlePlayAudio = async (questionText: string) => {
     if(audioUrl) {
         audioRef.current?.play();
         return;
@@ -216,7 +219,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
 
     setIsGeneratingAudio(true);
     try {
-        const { media }: TextToSpeechOutput = await textToSpeech(currentQuestion.question);
+        const { media }: TextToSpeechOutput = await textToSpeech(questionText);
         setAudioUrl(media);
     } catch(error) {
         console.error("Audio generation failed:", error);
@@ -344,7 +347,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             <Button
                 variant="ghost"
                 size="icon"
-                onClick={handlePlayAudio}
+                onClick={() => handlePlayAudio(currentQuestion.question)}
                 disabled={isGeneratingAudio}
                 className="ml-4"
               >
@@ -404,7 +407,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                    {levelResult.score === 100 && timeLeft > 0 && (
                       <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
                           <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
-                            <Coins className="h-5 w-5"/> Congratulations! You earned 100 bonus coins for a perfect score!
+                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.max(0, timeLeft * 10)} bonus coins for a perfect score and finishing early!
                           </p>
                       </div>
                   )}
