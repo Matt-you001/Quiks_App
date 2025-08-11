@@ -62,6 +62,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<(string | null)[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [timeElapsed, setTimeElapsed] = useState(0);
   const [levelResult, setLevelResult] = useState<{ score: number } | null>(null);
   const [totalTimeForLevel, setTotalTimeForLevel] = useState(0);
 
@@ -80,10 +81,18 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
   }, []);
 
   useEffect(() => {
-    if (quizState !== "ACTIVE" || timeLeft <= 0 || mode !== 'quiz') return;
+    if (quizState !== "ACTIVE") return;
+
     const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
+        if (mode === 'quiz') {
+            if (timeLeft > 0) {
+                setTimeLeft((prev) => prev - 1);
+            }
+        } else if (mode === 'training') {
+            setTimeElapsed((prev) => prev + 1);
+        }
     }, 1000);
+
     return () => clearInterval(timer);
   }, [quizState, timeLeft, mode]);
 
@@ -109,6 +118,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
       const time = mode === 'quiz' ? recommendedTime : 0;
       setTotalTimeForLevel(time);
       setTimeLeft(time);
+      setTimeElapsed(0);
       setQuizState("ACTIVE");
       setCurrentQuestionIndex(0);
     } catch (error) {
@@ -192,7 +202,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
 
   const handleEndSession = () => {
     if (!levelResult) return;
-    const timeTaken = totalTimeForLevel - timeLeft;
+    const timeTaken = mode === 'quiz' ? totalTimeForLevel - timeLeft : timeElapsed;
     let coins = 0;
 
     const currentProfileId = localStorage.getItem('currentProfileId');
@@ -290,12 +300,10 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
         <CardHeader>
           <div className="flex justify-between items-center mb-2">
             <CardTitle className="text-xl font-bold font-headline">{subject.name} - {grade} - Level {level}</CardTitle>
-            {mode === 'quiz' && (
-              <div className="flex items-center gap-2 text-lg font-semibold text-destructive">
-                  <Timer className="h-6 w-6" />
-                  <span>{timeLeft}s</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-lg font-semibold text-destructive">
+                <Timer className="h-6 w-6" />
+                {mode === 'quiz' ? <span>{timeLeft}s</span> : <span>{timeElapsed}s</span>}
+            </div>
           </div>
           <CardDescription>Question {currentQuestionIndex + 1} of {questions.length}</CardDescription>
           <Progress value={progress} className="w-full mt-2" />
