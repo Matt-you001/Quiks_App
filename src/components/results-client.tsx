@@ -15,6 +15,7 @@ import { Award, Coins, Home, Repeat, Timer, Trophy } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { generateFeedback, textToSpeech } from "@/ai/flows";
 import { useEffect, useRef, useState } from "react";
+import type { TestResult } from "@/types";
 
 export default function ResultsClient() {
   const searchParams = useSearchParams();
@@ -33,6 +34,28 @@ export default function ResultsClient() {
   const [feedback, setFeedback] = useState("");
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const hasSavedResult = useRef(false);
+
+  useEffect(() => {
+    if (hasSavedResult.current) return;
+    
+    const newResult: TestResult = {
+        date: new Date().toISOString(),
+        subject,
+        level: parseInt(level),
+        difficulty,
+        grade,
+        score: scoreValue,
+        timeTaken: parseInt(time),
+        coinsEarned: parseInt(coins),
+    };
+
+    const existingHistory = JSON.parse(localStorage.getItem('testHistory') || '[]');
+    const updatedHistory = [newResult, ...existingHistory];
+    localStorage.setItem('testHistory', JSON.stringify(updatedHistory));
+    hasSavedResult.current = true;
+  }, [scoreValue, subject, grade, level, difficulty, time, coins]);
+
 
   useEffect(() => {
     async function getFeedback() {
