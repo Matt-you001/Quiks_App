@@ -1,6 +1,6 @@
 "use client";
 
-import type { Question, Subject } from "@/types";
+import type { Question, SerializableSubject } from "@/types";
 import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -44,12 +44,13 @@ import {
 import {
   QUESTIONS_PER_LEVEL,
   SCORE_THRESHOLD,
+  SUBJECTS,
   TIME_PER_QUESTION,
 } from "@/lib/constants";
 
 type QuizState = "CONFIG" | "LOADING" | "ACTIVE" | "LEVEL_COMPLETE";
 
-export function QuizClient({ subject }: { subject: Subject }) {
+export function QuizClient({ subject }: { subject: SerializableSubject }) {
   const [quizState, setQuizState] = useState<QuizState>("CONFIG");
   const [level, setLevel] = useState(1);
   const [difficulty, setDifficulty] = useState("Beginner");
@@ -67,7 +68,7 @@ export function QuizClient({ subject }: { subject: Subject }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const { toast } = useToast();
-  const Icon = subject.icon;
+  const Icon = SUBJECTS.find(s => s.slug === subject.slug)!.icon;
   
   const totalTimeForLevel = QUESTIONS_PER_LEVEL * TIME_PER_QUESTION;
 
