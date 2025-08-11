@@ -22,7 +22,7 @@ export function SubjectCard({ subject, iconSlug }: SubjectCardProps) {
   const Icon = SUBJECTS.find(s => s.slug === iconSlug)!.icon;
 
   return (
-    <Link href={`/test/${subject.slug}`} className="group">
+    <Link href={`/select-profile?subject=${subject.slug}`} className="group">
       <Card className="h-full flex flex-col transition-all duration-300 ease-in-out group-hover:shadow-xl group-hover:border-primary/50 group-hover:-translate-y-1">
         <CardHeader className="flex-row items-center gap-4 pb-4">
           <div className="p-3 rounded-full bg-primary/10 text-primary">

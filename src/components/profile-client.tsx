@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -47,6 +47,9 @@ const nanoid = () => Math.random().toString(36).substr(2, 9);
 
 export default function ProfileClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const subject = searchParams.get('subject');
+
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
@@ -118,7 +121,12 @@ export default function ProfileClient() {
     if (profileIdToSetAsCurrent) {
         localStorage.setItem("currentProfileId", profileIdToSetAsCurrent);
     }
-    router.push("/");
+    
+    if (subject) {
+      router.push(`/test/${subject}`);
+    } else {
+      router.push("/");
+    }
   };
   
   const handleCreateNew = () => {
@@ -150,7 +158,11 @@ export default function ProfileClient() {
 
   const handleSwitchProfile = (id: string) => {
     localStorage.setItem('currentProfileId', id);
-    router.push('/');
+    if (subject) {
+        router.push(`/test/${subject}`);
+    } else {
+        router.push('/');
+    }
   }
 
   const currentProfile = profiles.find(p => p.id === currentProfileId);
