@@ -33,65 +33,130 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile, TestResult } from "@/types";
-import { Home, UserCog } from "lucide-react";
-
+import { Home, UserCog, UserPlus } from "lucide-react";
 
 const profileSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
+  name: z.string().min(2, "Name must be at least 2 characters.").max(50),
   age: z.string().refine((val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0, {
     message: "Please select a valid age.",
   }),
 });
 
+// A simple ID generator
+const nanoid = () => Math.random().toString(36).substr(2, 9);
+
 export default function ProfileClient() {
   const router = useRouter();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [testHistory, setTestHistory] = useState<TestResult[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
 
   const {
     handleSubmit,
     control,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-        name: "",
-        age: "",
-    }
+    defaultValues: { name: "", age: "" }
   });
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("userProfile");
-    if (storedProfile) {
-        const parsedProfile = JSON.parse(storedProfile);
-        setProfile(parsedProfile);
-        setValue("name", parsedProfile.name);
-        setValue("age", String(parsedProfile.age));
+    const storedProfiles = JSON.parse(localStorage.getItem("profiles") || "[]");
+    const storedProfileId = localStorage.getItem("currentProfileId");
+    
+    setProfiles(storedProfiles);
+    
+    if (storedProfileId) {
+      setCurrentProfileId(storedProfileId);
+      const currentProfile = storedProfiles.find((p: UserProfile) => p.id === storedProfileId);
+      if (currentProfile) {
+        reset({ name: currentProfile.name, age: String(currentProfile.age) });
+        const storedHistory = JSON.parse(localStorage.getItem(`testHistory_${currentProfile.id}`) || '[]');
+        setTestHistory(storedHistory);
+        setIsEditing(true);
+      } else {
+        // Current ID is invalid, start new profile creation
+        setIsEditing(false);
+        reset({ name: "", age: "" });
+      }
+    } else {
+      // No current ID, start new profile creation
+      setIsEditing(false);
+      reset({ name: "", age: "" });
     }
-    const storedHistory = localStorage.getItem("testHistory");
-    if(storedHistory) {
-        setTestHistory(JSON.parse(storedHistory));
-    }
-  }, [setValue]);
+  }, [reset]);
 
   const onSubmit = (data: z.infer<typeof profileSchema>) => {
-    const newProfile: UserProfile = {
-      name: data.name,
-      age: parseInt(data.age, 10),
-    };
-    localStorage.setItem("userProfile", JSON.stringify(newProfile));
-    setProfile(newProfile);
-    toast({
-      title: "Profile Saved!",
-      description: "Your information has been updated.",
-    });
+    let updatedProfiles = [...profiles];
+    let profileIdToSetAsCurrent;
+
+    if (isEditing && currentProfileId) {
+      // Update existing profile
+      const profileIndex = updatedProfiles.findIndex(p => p.id === currentProfileId);
+      if (profileIndex !== -1) {
+        updatedProfiles[profileIndex] = { ...updatedProfiles[profileIndex], ...data, age: parseInt(data.age, 10) };
+        profileIdToSetAsCurrent = currentProfileId;
+        toast({ title: "Profile Updated!", description: "Your information has been saved." });
+      }
+    } else {
+      // Create new profile
+      const newProfile: UserProfile = {
+        id: nanoid(),
+        name: data.name,
+        age: parseInt(data.age, 10),
+      };
+      updatedProfiles.push(newProfile);
+      profileIdToSetAsCurrent = newProfile.id;
+      toast({ title: "Profile Created!", description: "Welcome! Your profile is ready." });
+    }
+
+    localStorage.setItem("profiles", JSON.stringify(updatedProfiles));
+    if (profileIdToSetAsCurrent) {
+        localStorage.setItem("currentProfileId", profileIdToSetAsCurrent);
+    }
     router.push("/");
   };
+  
+  const handleCreateNew = () => {
+    reset({ name: "", age: "" });
+    setIsEditing(false);
+    setCurrentProfileId(null);
+    localStorage.removeItem('currentProfileId');
+  }
+
+  const handleDeleteProfile = (id: string) => {
+    const updatedProfiles = profiles.filter(p => p.id !== id);
+    setProfiles(updatedProfiles);
+    localStorage.setItem('profiles', JSON.stringify(updatedProfiles));
+    localStorage.removeItem(`testHistory_${id}`);
+    
+    if (id === currentProfileId) {
+        localStorage.removeItem('currentProfileId');
+        setCurrentProfileId(null);
+        reset({ name: "", age: "" });
+        setIsEditing(false);
+    }
+
+    toast({
+        title: "Profile Deleted",
+        description: "The profile has been removed.",
+        variant: "destructive"
+    })
+  }
+
+  const handleSwitchProfile = (id: string) => {
+    localStorage.setItem('currentProfileId', id);
+    router.push('/');
+  }
+
+  const currentProfile = profiles.find(p => p.id === currentProfileId);
 
   return (
-    <div className="w-full max-w-4xl space-y-8">
+    <div className="w-full max-w-4xl space-y-8 p-4">
         <Card className="shadow-lg">
             <CardHeader className="text-center">
                 <div className="flex justify-center mb-4">
@@ -99,9 +164,11 @@ export default function ProfileClient() {
                         <UserCog className="h-10 w-10" />
                     </div>
                 </div>
-                <CardTitle className="text-3xl font-extrabold font-headline text-primary">User Profile</CardTitle>
+                <CardTitle className="text-3xl font-extrabold font-headline text-primary">
+                    {isEditing && currentProfile ? `Editing ${currentProfile.name}'s Profile` : "Create New Profile"}
+                </CardTitle>
                 <CardDescription className="text-lg">
-                    {profile ? "Update your information or view your test history." : "Please create your profile to get started."}
+                    {isEditing && currentProfile ? "Update your information below." : "Please enter the new user's details."}
                 </CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit(onSubmit)}>
@@ -110,9 +177,9 @@ export default function ProfileClient() {
                         <div className="space-y-2">
                             <Label htmlFor="name">Name</Label>
                             <Controller
-                            name="name"
-                            control={control}
-                            render={({ field }) => <Input id="name" placeholder="Enter your name" {...field} />}
+                                name="name"
+                                control={control}
+                                render={({ field }) => <Input id="name" placeholder="Enter user's name" {...field} />}
                             />
                             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
                         </div>
@@ -124,7 +191,7 @@ export default function ProfileClient() {
                                 render={({ field }) => (
                                     <Select onValueChange={field.onChange} value={field.value}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select your age" />
+                                        <SelectValue placeholder="Select user's age" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {Array.from({ length: 100 }, (_, i) => i + 1).map((age) => (
@@ -140,22 +207,54 @@ export default function ProfileClient() {
                         </div>
                     </div>
                 </CardContent>
-                <CardFooter className="flex flex-col sm:flex-row gap-2 border-t pt-6">
-                    <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
-                        {isSubmitting ? "Saving..." : "Save Profile"}
-                    </Button>
-                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push('/')} type="button">
-                        <Home className="mr-2 h-4 w-4" /> Go to Homepage
+                <CardFooter className="flex flex-col sm:flex-row justify-between gap-2 border-t pt-6">
+                   <div className="flex gap-2">
+                     <Button type="submit" disabled={isSubmitting}>
+                         {isSubmitting ? "Saving..." : (isEditing ? "Save Changes" : "Create Profile")}
+                     </Button>
+                     <Button variant="outline" type="button" onClick={() => router.push('/')}>
+                         <Home className="mr-2 h-4 w-4" /> Go to Homepage
+                     </Button>
+                   </div>
+                   <Button variant="secondary" type="button" onClick={handleCreateNew}>
+                        <UserPlus className="mr-2 h-4 w-4" /> Create New Profile
                     </Button>
                 </CardFooter>
             </form>
         </Card>
 
-        {profile && (
+        <Card className="shadow-lg">
+            <CardHeader>
+                <CardTitle>All Profiles</CardTitle>
+                <CardDescription>Manage and switch between user profiles.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {profiles.length > 0 ? (
+                    <ul className="space-y-2">
+                        {profiles.map(profile => (
+                            <li key={profile.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                                <div>
+                                    <p className="font-bold">{profile.name} <span className="text-sm font-normal text-muted-foreground">(Age: {profile.age})</span></p>
+                                    {profile.id === currentProfileId && <span className="text-xs text-primary font-semibold">(Current)</span>}
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => handleSwitchProfile(profile.id)} disabled={profile.id === currentProfileId}>Switch To</Button>
+                                    <Button size="sm" variant="destructive" onClick={() => handleDeleteProfile(profile.id)}>Delete</Button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-center text-muted-foreground">No profiles created yet.</p>
+                )}
+            </CardContent>
+        </Card>
+
+        {isEditing && currentProfile && (
             <Card className="shadow-lg">
                 <CardHeader>
-                    <CardTitle>Test History</CardTitle>
-                    <CardDescription>Here are the results from your previous test sessions.</CardDescription>
+                    <CardTitle>Test History for {currentProfile.name}</CardTitle>
+                    <CardDescription>Here are the results from previous test sessions.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -180,7 +279,7 @@ export default function ProfileClient() {
                            ) : (
                             <TableRow>
                                 <TableCell colSpan={4} className="text-center text-muted-foreground">
-                                    You haven't completed any tests yet.
+                                    No tests completed yet for this profile.
                                 </TableCell>
                             </TableRow>
                            )}

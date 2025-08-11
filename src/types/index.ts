@@ -16,6 +16,7 @@ export interface Question {
 export type SerializableSubject = Omit<Subject, 'icon'>;
 
 export interface UserProfile {
+  id: string;
   name: string;
   age: number;
 }

@@ -39,6 +39,9 @@ export default function ResultsClient() {
   useEffect(() => {
     if (hasSavedResult.current) return;
     
+    const currentProfileId = localStorage.getItem('currentProfileId');
+    if (!currentProfileId) return; // Should not happen, but good practice
+
     const newResult: TestResult = {
         date: new Date().toISOString(),
         subject,
@@ -50,9 +53,10 @@ export default function ResultsClient() {
         coinsEarned: parseInt(coins),
     };
 
-    const existingHistory = JSON.parse(localStorage.getItem('testHistory') || '[]');
+    const historyKey = `testHistory_${currentProfileId}`;
+    const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
     const updatedHistory = [newResult, ...existingHistory];
-    localStorage.setItem('testHistory', JSON.stringify(updatedHistory));
+    localStorage.setItem(historyKey, JSON.stringify(updatedHistory));
     hasSavedResult.current = true;
   }, [scoreValue, subject, grade, level, difficulty, time, coins]);
 
@@ -139,11 +143,11 @@ export default function ResultsClient() {
         </div>
       </CardContent>
       <CardFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-6 bg-muted/50 border-t">
-        <Button variant="outline" onClick={() => router.push("/")}>
+        <Button variant="outline" className="w-full" onClick={() => router.push("/")}>
           <Home className="mr-2 h-4 w-4" />
           Home
         </Button>
-        <Button onClick={() => router.back()}>
+        <Button className="w-full" onClick={() => router.back()}>
           <Repeat className="mr-2 h-4 w-4" />
           Play Again
         </Button>

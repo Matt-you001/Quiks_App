@@ -2,7 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import Link from 'next/link';
-import { User } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
@@ -26,8 +26,8 @@ export default function RootLayout({
         <header className="absolute top-0 right-0 p-4">
           <Button asChild variant="ghost" size="icon">
             <Link href="/profile">
-              <User className="h-6 w-6" />
-              <span className="sr-only">Profile</span>
+              <Users className="h-6 w-6" />
+              <span className="sr-only">Profiles</span>
             </Link>
           </Button>
         </header>
