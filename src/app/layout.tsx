@@ -6,7 +6,7 @@ import { Home, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
-  title: 'Synapse Trainer',
+  title: 'Quiks',
   description: 'An educational app that helps train students to think fast and smart.',
 };
 
