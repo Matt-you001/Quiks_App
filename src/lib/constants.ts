@@ -27,6 +27,6 @@ export const GRADES = [
   "High School", "University"
 ];
 
-export const QUESTIONS_PER_LEVEL = 5;
+export const QUESTIONS_PER_LEVEL = 10;
 export const TIME_PER_QUESTION = 20; // in seconds
 export const SCORE_THRESHOLD = 70;
