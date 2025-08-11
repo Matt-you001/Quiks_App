@@ -64,7 +64,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   const [grade, setGrade] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<string[]>([]);
+  const [userAnswers, setUserAnswers] = useState<(string | null)[]>([]);
   const [timeLeft, setTimeLeft] = useState(
     QUESTIONS_PER_LEVEL * TIME_PER_QUESTION
   );
@@ -101,7 +101,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
 
   useEffect(() => {
     if (timeLeft === 0 && quizState === "ACTIVE") {
-      finishLevel();
+      finishLevel(userAnswers);
     }
   }, [timeLeft, quizState]);
 
@@ -117,6 +117,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
         grade: grade,
       });
       setQuestions(generatedQuestions);
+      setUserAnswers(Array(generatedQuestions.length).fill(null));
       setQuizState("CONFIG");
     } catch (error) {
       console.error(error);
@@ -137,7 +138,6 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
 
   const startLevel = () => {
     setCurrentQuestionIndex(0);
-    setUserAnswers(Array(questions.length).fill(null));
     setTimeLeft(totalTimeForLevel);
     setQuizState("ACTIVE");
   };
@@ -151,15 +151,15 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     setQuizState("REVIEW");
 
     reviewTimeoutRef.current = setTimeout(() => {
-        handleNextQuestion();
+        handleNextQuestion(newAnswers);
     }, 1500);
   };
 
-  const finishLevel = () => {
+  const finishLevel = (finalAnswers: (string | null)[]) => {
     setQuizState("LEVEL_COMPLETE");
     let correctAnswers = 0;
     questions.forEach((q, i) => {
-      if (userAnswers[i] === q.correctAnswer) {
+      if (finalAnswers[i] === q.correctAnswer) {
         correctAnswers++;
       }
     });
@@ -181,14 +181,13 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             description: "Could not get difficulty adjustment from AI.",
             variant: "destructive",
         });
-        // Fallback logic
         const newDifficulty = score >= SCORE_THRESHOLD ? "next level" : difficulty;
         setLevelResult({ score, newDifficulty, reasoning: "AI adjustment failed, using standard progression." });
       }
     });
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = (currentAnswers: (string | null)[]) => {
     if (reviewTimeoutRef.current) {
         clearTimeout(reviewTimeoutRef.current);
     }
@@ -196,7 +195,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setQuizState("ACTIVE");
     } else {
-      finishLevel();
+      finishLevel(currentAnswers);
     }
   };
 
@@ -245,7 +244,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             <SelectTrigger className="w-full text-lg py-6">
               <SelectValue placeholder="Select Grade" />
             </SelectTrigger>
-            <SelectContent position="popper" side="bottom">
+            <SelectContent position="popper" side="bottom" className="max-h-60">
               {GRADES.map((g) => (
                 <SelectItem key={g} value={g} className="text-lg">{g}</SelectItem>
               ))}
@@ -345,7 +344,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                  </div>
             )}
 
-            <RadioGroup onValueChange={handleAnswerSelect} value={userAnswer} disabled={isReviewing}>
+            <RadioGroup onValueChange={handleAnswerSelect} value={userAnswer || ""} disabled={isReviewing}>
                 <div className="space-y-3">
                 {currentQuestion.options.map((option, index) => {
                     const isThisOptionCorrect = option === correctAnswer;
@@ -361,6 +360,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                     return (
                         <Label key={index} htmlFor={`option-${index}`} className={cn(
                             "flex items-center p-4 rounded-lg border transition-all",
+                            optionStyle,
                             isReviewing ? "cursor-default" : "cursor-pointer hover:bg-accent/50 has-[:checked]:bg-accent/20 has-[:checked]:border-accent"
                         )}>
                         <RadioGroupItem value={option} id={`option-${index}`} className="h-5 w-5 mr-4" disabled={isReviewing} />
@@ -382,17 +382,13 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       <AlertDialog open={quizState === "LEVEL_COMPLETE"} onOpenChange={(open) => !open && setQuizState("CONFIG")}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            {isPending || !levelResult ? (
-              <AlertDialogTitle className="text-center text-xl font-bold">Calculating Results...</AlertDialogTitle>
-            ) : (
-              <>
-                <AlertDialogTitle className="text-center text-3xl font-extrabold font-headline">
-                  {grade} - Level {level} Complete!
-                </AlertDialogTitle>
-                <AlertDialogDescription className="text-center text-lg">
-                  You scored <span className="font-bold text-primary">{Math.round(levelResult.score)}%</span>
-                </AlertDialogDescription>
-              </>
+            <AlertDialogTitle className="text-center text-xl font-bold">
+              {isPending || !levelResult ? "Calculating Results..." : `${grade} - Level ${level} Complete!`}
+            </AlertDialogTitle>
+            {levelResult && (
+              <AlertDialogDescription className="text-center text-lg">
+                You scored <span className="font-bold text-primary">{Math.round(levelResult.score)}%</span>
+              </AlertDialogDescription>
             )}
           </AlertDialogHeader>
           {isPending || !levelResult ? (
@@ -423,25 +419,36 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                       </p>
                   </div>
               </div>
-              <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" onClick={handleEndSession}>
-                  End Session
-                </Button>
+              <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                 <Button 
+                   variant="outline" 
+                   onClick={handleEndSession}
+                   className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600"
+                 >
+                   End Session
+                 </Button>
                 {levelResult.score >= SCORE_THRESHOLD ? (
                    <>
-                    <Button variant="outline" onClick={handleRepeatLevel}>
-                      Repeat Level
-                      <Repeat className="ml-2 h-4 w-4" />
-                   </Button>
-                   <Button onClick={handleProceedToNextLevel} disabled={levelResult.newDifficulty === difficulty}>
-                      Next Level: {levelResult.newDifficulty}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                   </Button>
+                     <Button 
+                       onClick={handleRepeatLevel}
+                       className="font-bold py-6 text-base text-white bg-yellow-500 hover:bg-yellow-600 shadow-[0_4px_0_0_#ca8a04] hover:shadow-[0_4px_0_0_#a16207] active:translate-y-1 active:shadow-none transition-all"
+                     >
+                       Repeat Level <Repeat className="ml-2 h-4 w-4" />
+                     </Button>
+                     <Button 
+                       onClick={handleProceedToNextLevel} 
+                       disabled={levelResult.newDifficulty === difficulty}
+                       className="sm:col-span-2 font-bold py-6 text-base text-white bg-green-500 hover:bg-green-600 shadow-[0_4px_0_0_#16a34a] hover:shadow-[0_4px_0_0_#15803d] active:translate-y-1 active:shadow-none transition-all"
+                     >
+                       Next Level: {levelResult.newDifficulty} <ArrowRight className="ml-2 h-4 w-4" />
+                     </Button>
                    </>
                 ) : (
-                  <Button onClick={handleRepeatLevel}>
-                      Try Again
-                      <Repeat className="ml-2 h-4 w-4" />
+                  <Button 
+                    onClick={handleRepeatLevel}
+                    className="font-bold py-6 text-base text-white bg-blue-500 hover:bg-blue-600 shadow-[0_4px_0_0_#2563eb] hover:shadow-[0_4px_0_0_#1d4ed8] active:translate-y-1 active:shadow-none transition-all"
+                  >
+                      Try Again <Repeat className="ml-2 h-4 w-4" />
                   </Button>
                 )}
               </AlertDialogFooter>

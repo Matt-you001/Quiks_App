@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Button } from "./ui/button";
-import { Award, CheckCircle, Coins, Home, Repeat, Timer, Trophy, XCircle } from "lucide-react";
+import { Award, Home, Repeat, Timer, Trophy, Coins } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { generateFeedback } from "@/ai/flows";
 import { useEffect, useRef, useState } from "react";
