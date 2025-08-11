@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Question, SerializableSubject } from "@/types";
+import type { Question, SerializableSubject, TestMode } from "@/types";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -46,7 +46,6 @@ import {
   QUESTIONS_PER_LEVEL,
   SCORE_THRESHOLD,
   SUBJECTS,
-  TIME_PER_QUESTION,
 } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { cn } from "@/lib/utils";
@@ -54,7 +53,7 @@ import { cn } from "@/lib/utils";
 
 type QuizState = "GRADE_SELECT" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPLETE";
 
-export function QuizClient({ subject }: { subject: SerializableSubject }) {
+export function QuizClient({ subject, mode }: { subject: SerializableSubject, mode: TestMode }) {
   const [quizState, setQuizState] = useState<QuizState>("GRADE_SELECT");
   const [level, setLevel] = useState(1);
   const [difficulty, setDifficulty] = useState("Beginner");
@@ -62,17 +61,14 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<(string | null)[]>([]);
-  const [timeLeft, setTimeLeft] = useState(
-    QUESTIONS_PER_LEVEL * TIME_PER_QUESTION
-  );
+  const [timeLeft, setTimeLeft] = useState(0);
   const [levelResult, setLevelResult] = useState<{ score: number } | null>(null);
+  const [totalTimeForLevel, setTotalTimeForLevel] = useState(0);
 
   const router = useRouter();
   const { toast } = useToast();
   const Icon = SUBJECTS.find(s => s.slug === subject.slug)!.icon;
   
-  const totalTimeForLevel = QUESTIONS_PER_LEVEL * TIME_PER_QUESTION;
-
   const reviewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -84,25 +80,25 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   }, []);
 
   useEffect(() => {
-    if (quizState !== "ACTIVE" || timeLeft <= 0) return;
+    if (quizState !== "ACTIVE" || timeLeft <= 0 || mode !== 'quiz') return;
     const timer = setInterval(() => {
       setTimeLeft((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [quizState, timeLeft]);
+  }, [quizState, timeLeft, mode]);
 
   useEffect(() => {
-    if (timeLeft === 0 && quizState === "ACTIVE") {
+    if (timeLeft === 0 && quizState === "ACTIVE" && mode === 'quiz') {
       finishLevel(userAnswers);
     }
-  }, [timeLeft, quizState]);
+  }, [timeLeft, quizState, mode, userAnswers]);
 
 
   const fetchQuestions = async (currentDifficulty: string) => {
     if (!grade) return;
     setQuizState("LOADING");
     try {
-      const { questions: generatedQuestions } = await generateTestQuestions({
+      const { questions: generatedQuestions, recommendedTime } = await generateTestQuestions({
         subject: subject.name,
         difficultyLevel: currentDifficulty,
         numberOfQuestions: QUESTIONS_PER_LEVEL,
@@ -110,8 +106,10 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       });
       setQuestions(generatedQuestions);
       setUserAnswers(Array(generatedQuestions.length).fill(null));
+      const time = mode === 'quiz' ? recommendedTime : 0;
+      setTotalTimeForLevel(time);
+      setTimeLeft(time);
       setQuizState("ACTIVE");
-      setTimeLeft(totalTimeForLevel);
       setCurrentQuestionIndex(0);
     } catch (error) {
       console.error(error);
@@ -137,22 +135,24 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     newAnswers[currentQuestionIndex] = answer;
     setUserAnswers(newAnswers);
     setQuizState("REVIEW");
-
-    reviewTimeoutRef.current = setTimeout(() => {
-        handleNextQuestion(newAnswers);
-    }, 1500);
+    
+    if (mode === 'quiz') {
+      reviewTimeoutRef.current = setTimeout(() => {
+          handleNextQuestion(newAnswers);
+      }, 2000);
+    }
   };
 
   const finishLevel = (finalAnswers: (string | null)[]) => {
-    setQuizState("LEVEL_COMPLETE");
     let correctAnswers = 0;
     questions.forEach((q, i) => {
       if (finalAnswers[i] === q.correctAnswer) {
         correctAnswers++;
       }
     });
-    const score = (correctAnswers / questions.length) * 100;
+    const score = Math.round((correctAnswers / questions.length) * 100);
     setLevelResult({ score });
+    setQuizState("LEVEL_COMPLETE");
   };
 
   const handleNextQuestion = (currentAnswers: (string | null)[]) => {
@@ -210,7 +210,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
           result.score === 100
     );
 
-    if(levelResult.score === 100 && timeLeft > 0 && !hasPerfectedLevelBefore) {
+    if(levelResult.score === 100 && timeLeft > 0 && !hasPerfectedLevelBefore && mode === 'quiz') {
         coins = Math.floor(timeLeft * 0.05);
     }
     router.push(
@@ -230,7 +230,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
               <Icon className="h-10 w-10" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-extrabold font-headline text-primary">{subject.name} Test</CardTitle>
+          <CardTitle className="text-3xl font-extrabold font-headline text-primary">{subject.name} {mode === 'quiz' ? 'Quiz' : 'Training'}</CardTitle>
           <CardDescription className="text-lg">Please select your grade level to begin.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -290,10 +290,12 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
         <CardHeader>
           <div className="flex justify-between items-center mb-2">
             <CardTitle className="text-xl font-bold font-headline">{subject.name} - {grade} - Level {level}</CardTitle>
-            <div className="flex items-center gap-2 text-lg font-semibold text-destructive">
-                <Timer className="h-6 w-6" />
-                <span>{timeLeft}s</span>
-            </div>
+            {mode === 'quiz' && (
+              <div className="flex items-center gap-2 text-lg font-semibold text-destructive">
+                  <Timer className="h-6 w-6" />
+                  <span>{timeLeft}s</span>
+              </div>
+            )}
           </div>
           <CardDescription>Question {currentQuestionIndex + 1} of {questions.length}</CardDescription>
           <Progress value={progress} className="w-full mt-2" />
@@ -342,13 +344,20 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                 </div>
             </RadioGroup>
         </CardContent>
+        {mode === 'training' && isReviewing && (
+           <CardFooter>
+             <Button className="w-full" onClick={() => handleNextQuestion(userAnswers)}>
+               Next Question <ArrowRight className="ml-2 h-4 w-4" />
+             </Button>
+           </CardFooter>
+        )}
       </Card>
     );
   }
 
   return (
     <>
-      <AlertDialog open={quizState === "LEVEL_COMPLETE"} onOpenChange={(open) => !open && router.push('/')}>
+      <AlertDialog open={quizState === "LEVEL_COMPLETE"}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-center text-xl font-bold">
@@ -370,7 +379,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                           <XCircle className="h-16 w-16 text-destructive" />
                       )}
                   </div>
-                   {levelResult.score === 100 && timeLeft > 0 && (
+                   {levelResult.score === 100 && timeLeft > 0 && mode === 'quiz' && (
                       <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
                           <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
                             <Coins className="h-5 w-5"/> Congratulations! You earned {Math.floor(timeLeft * 0.05)} bonus coins for finishing early!
@@ -390,7 +399,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                  <Button 
                    variant="outline" 
                    onClick={handleEndSession}
-                   className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600"
+                   className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600 flex-1"
                  >
                    End Session
                  </Button>
@@ -398,7 +407,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                    <>
                      <Button 
                        onClick={handleRepeatLevel}
-                       className="font-bold py-6 text-base text-white bg-yellow-500 hover:bg-yellow-600 shadow-[0_4px_0_0_#ca8a04] hover:shadow-[0_4px_0_0_#a16207] active:translate-y-1 active:shadow-none transition-all"
+                       className="font-bold py-6 text-base text-white bg-yellow-500 hover:bg-yellow-600 shadow-[0_4px_0_0_#ca8a04] hover:shadow-[0_4px_0_0_#a16207] active:translate-y-1 active:shadow-none transition-all flex-1"
                      >
                        Repeat Level <Repeat className="ml-2 h-4 w-4" />
                      </Button>
@@ -413,7 +422,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                 ) : (
                   <Button 
                     onClick={handleRepeatLevel}
-                    className="font-bold py-6 text-base text-white bg-blue-500 hover:bg-blue-600 shadow-[0_4px_0_0_#2563eb] hover:shadow-[0_4px_0_0_#1d4ed8] active:translate-y-1 active:shadow-none transition-all"
+                    className="font-bold py-6 text-base text-white bg-blue-500 hover:bg-blue-600 shadow-[0_4px_0_0_#2563eb] hover:shadow-[0_4px_0_0_#1d4ed8] active:translate-y-1 active:shadow-none transition-all flex-1"
                   >
                       Try Again <Repeat className="ml-2 h-4 w-4" />
                   </Button>

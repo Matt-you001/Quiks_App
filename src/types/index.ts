@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 
 export interface Subject {
@@ -6,6 +7,8 @@ export interface Subject {
   icon: LucideIcon;
   description: string;
 }
+
+export type TestMode = 'quiz' | 'training';
 
 export interface Question {
   question: string;

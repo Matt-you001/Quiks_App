@@ -1,6 +1,9 @@
+
+"use client";
+
 import { QuizClient } from "@/components/quiz-client";
 import { SUBJECTS } from "@/lib/constants";
-import { notFound } from "next/navigation";
+import { notFound, useSearchParams } from "next/navigation";
 
 interface TestPageProps {
   params: {
@@ -9,9 +12,12 @@ interface TestPageProps {
 }
 
 export default function TestPage({ params }: TestPageProps) {
+  const searchParams = useSearchParams();
+  const mode = searchParams.get('mode');
+
   const subject = SUBJECTS.find((s) => s.slug === params.subject);
 
-  if (!subject) {
+  if (!subject || (mode !== 'quiz' && mode !== 'training')) {
     notFound();
   }
   
@@ -19,13 +25,7 @@ export default function TestPage({ params }: TestPageProps) {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
-      <QuizClient subject={serializableSubject} />
+      <QuizClient subject={serializableSubject} mode={mode as 'quiz' | 'training'} />
     </main>
   );
-}
-
-export function generateStaticParams() {
-  return SUBJECTS.map((subject) => ({
-    subject: subject.slug,
-  }));
 }

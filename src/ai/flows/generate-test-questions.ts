@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -28,6 +29,7 @@ const GenerateTestQuestionsOutputSchema = z.object({
       correctAnswer: z.string().describe('The correct answer to the question.'),
     })
   ).describe('An array of generated questions with their options and correct answers.'),
+  recommendedTime: z.number().describe('The recommended time in seconds to complete the entire test, based on the question complexity.'),
 });
 
 export type GenerateTestQuestionsOutput = z.infer<typeof GenerateTestQuestionsOutputSchema>;
@@ -44,6 +46,8 @@ const generateTestQuestionsPrompt = ai.definePrompt({
 
   Generate {{numberOfQuestions}} multiple-choice questions for the subject of {{subject}} at a {{difficultyLevel}} difficulty, specifically tailored for a student in {{grade}}.
 
+  Based on the complexity and subject matter, also provide a recommended completion time in seconds for the entire set of questions. A simple arithmetic question might take 15 seconds, while a complex physics problem might take 60 seconds. Calculate the total recommended time for all questions.
+
   Each question must:
   1.  Be directly relevant to the core curriculum for a {{grade}} student in the subject of {{subject}}.
   2.  Have exactly 4 distinct options.
@@ -51,7 +55,7 @@ const generateTestQuestionsPrompt = ai.definePrompt({
   4.  Have plausible distractors (incorrect options) that are common mistakes or misconceptions for students at the {{grade}} level.
   5.  Be clearly worded and easy to understand for the specified grade level.
 
-  Return the questions in the following JSON format:
+  Return the questions and recommended time in the following JSON format:
   {
     "questions": [
       {
@@ -60,7 +64,8 @@ const generateTestQuestionsPrompt = ai.definePrompt({
         "correctAnswer": "[The correct answer]"
       },
       ...
-    ]
+    ],
+    "recommendedTime": [Total time in seconds]
   }
   `,
 });

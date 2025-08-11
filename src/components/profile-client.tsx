@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -42,13 +43,13 @@ const profileSchema = z.object({
   }),
 });
 
-// A simple ID generator
 const nanoid = () => Math.random().toString(36).substr(2, 9);
 
 export default function ProfileClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const subject = searchParams.get('subject');
+  const shouldRedirect = searchParams.get('redirect') === 'true';
 
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -82,12 +83,10 @@ export default function ProfileClient() {
         setTestHistory(storedHistory);
         setIsEditing(true);
       } else {
-        // Current ID is invalid, start new profile creation
         setIsEditing(false);
         reset({ name: "", age: "" });
       }
     } else {
-      // No current ID, start new profile creation
       setIsEditing(false);
       reset({ name: "", age: "" });
     }
@@ -96,9 +95,9 @@ export default function ProfileClient() {
   const onSubmit = (data: z.infer<typeof profileSchema>) => {
     let updatedProfiles = [...profiles];
     let profileIdToSetAsCurrent;
+    let isNewUser = false;
 
     if (isEditing && currentProfileId) {
-      // Update existing profile
       const profileIndex = updatedProfiles.findIndex(p => p.id === currentProfileId);
       if (profileIndex !== -1) {
         updatedProfiles[profileIndex] = { ...updatedProfiles[profileIndex], ...data, age: parseInt(data.age, 10) };
@@ -106,7 +105,7 @@ export default function ProfileClient() {
         toast({ title: "Profile Updated!", description: "Your information has been saved." });
       }
     } else {
-      // Create new profile
+      isNewUser = true;
       const newProfile: UserProfile = {
         id: nanoid(),
         name: data.name,
@@ -122,8 +121,12 @@ export default function ProfileClient() {
         localStorage.setItem("currentProfileId", profileIdToSetAsCurrent);
     }
     
-    if (subject) {
-      router.push(`/test/${subject}`);
+    if (shouldRedirect && subject) {
+        if (isNewUser || profiles.length === 1) {
+            router.push(`/mode-select?subject=${subject}`);
+        } else {
+            router.push(`/select-profile?subject=${subject}`);
+        }
     } else {
       router.push("/");
     }
@@ -158,8 +161,8 @@ export default function ProfileClient() {
 
   const handleSwitchProfile = (id: string) => {
     localStorage.setItem('currentProfileId', id);
-    if (subject) {
-        router.push(`/test/${subject}`);
+    if (shouldRedirect && subject) {
+        router.push(`/mode-select?subject=${subject}`);
     } else {
         router.push('/');
     }
