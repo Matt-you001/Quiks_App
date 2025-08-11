@@ -97,11 +97,11 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
   }, [timeLeft, quizState]);
 
-  const handlePlayAudio = async (questionIndex: number) => {
+  const handlePlayAudio = async (questionIndex: number, text: string) => {
     if (audioCache.current[questionIndex]) {
       if (audioRef.current) {
         audioRef.current.src = audioCache.current[questionIndex];
-        audioRef.current.play();
+        audioRef.current.play().catch(e => console.error("Error playing audio:", e));
       }
       return;
     }
@@ -110,11 +110,11 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
 
     setIsGeneratingAudio(true);
     try {
-        const { media }: TextToSpeechOutput = await textToSpeech(questions[questionIndex].question);
+        const { media }: TextToSpeechOutput = await textToSpeech(text);
         audioCache.current[questionIndex] = media;
         if (questionIndex === currentQuestionIndex && audioRef.current) {
           audioRef.current.src = media;
-          audioRef.current.play();
+          audioRef.current.play().catch(e => console.error("Error playing audio:", e));
         }
     } catch(error) {
         console.error("Audio generation failed:", error);
@@ -130,14 +130,13 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
 
   useEffect(() => {
     if (quizState === 'ACTIVE' && questions.length > 0) {
-      // Play audio for the current question
-      handlePlayAudio(currentQuestionIndex);
+      const currentQ = questions[currentQuestionIndex];
+      handlePlayAudio(currentQuestionIndex, currentQ.question);
       
-      // Pre-fetch audio for the next question
       const nextQuestionIndex = currentQuestionIndex + 1;
       if (nextQuestionIndex < questions.length && !audioCache.current[nextQuestionIndex]) {
-        // Don't await, let it run in the background
-        textToSpeech(questions[nextQuestionIndex].question).then(output => {
+        const nextQ = questions[nextQuestionIndex];
+        textToSpeech(nextQ.question).then(output => {
           audioCache.current[nextQuestionIndex] = output.media;
         }).catch(error => {
             console.error("Failed to pre-fetch audio:", error);
@@ -366,11 +365,11 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handlePlayAudio(currentQuestionIndex)}
-                disabled={isGeneratingAudio && !audioCache.current[currentQuestionIndex]}
+                onClick={() => handlePlayAudio(currentQuestionIndex, currentQuestion.question)}
+                disabled={isGeneratingAudio}
                 className="ml-4"
               >
-                <Volume2 className={`h-6 w-6 ${(isGeneratingAudio && !audioCache.current[currentQuestionIndex]) ? 'animate-pulse' : ''}`} />
+                <Volume2 className={`h-6 w-6 ${isGeneratingAudio ? 'animate-pulse' : ''}`} />
                 <span className="sr-only">Read question aloud</span>
             </Button>
             <audio ref={audioRef} className="hidden" />
@@ -426,7 +425,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                    {levelResult.score === 100 && timeLeft > 0 && (
                       <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
                           <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
-                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.max(0, timeLeft)} bonus coins for a perfect score and finishing early!
+                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.floor(Math.max(0, timeLeft) / 2)} bonus coins for a perfect score and finishing early!
                           </p>
                       </div>
                   )}
