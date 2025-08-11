@@ -14,7 +14,7 @@ import wav from 'wav';
 import {googleAI} from '@genkit-ai/googleai';
 
 const TextToSpeechOutputSchema = z.object({
-  media: z.string().describe('The base64 encoded audio data URI in WAV format.'),
+  media: z.string().optional().describe('The base64 encoded audio data URI in WAV format.'),
 });
 
 export type TextToSpeechOutput = z.infer<typeof TextToSpeechOutputSchema>;
@@ -71,7 +71,8 @@ const textToSpeechFlow = ai.defineFlow(
     });
 
     if (!media) {
-      throw new Error('No media returned from TTS model.');
+      console.warn('No media returned from TTS model.');
+      return { media: undefined };
     }
 
     const audioBuffer = Buffer.from(

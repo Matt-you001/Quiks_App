@@ -72,7 +72,7 @@ export default function ResultsClient() {
         });
         setFeedback(feedbackText);
         const { media } = await textToSpeech(feedbackText);
-        if (audioRef.current) {
+        if (audioRef.current && media) {
           audioRef.current.src = media;
           audioRef.current.play().catch(e => console.error("Error playing feedback audio:", e));
         }

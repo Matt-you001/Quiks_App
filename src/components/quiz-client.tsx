@@ -35,6 +35,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   ChevronLeft,
   Coins,
@@ -43,6 +44,7 @@ import {
   Sparkles,
   Timer,
   Volume2,
+  X,
   XCircle,
 } from "lucide-react";
 import {
@@ -53,9 +55,10 @@ import {
   TIME_PER_QUESTION,
 } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { cn } from "@/lib/utils";
 
 
-type QuizState = "GRADE_SELECT" | "CONFIG" | "LOADING" | "ACTIVE" | "LEVEL_COMPLETE";
+type QuizState = "GRADE_SELECT" | "CONFIG" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPLETE";
 
 export function QuizClient({ subject }: { subject: SerializableSubject }) {
   const [quizState, setQuizState] = useState<QuizState>("GRADE_SELECT");
@@ -115,9 +118,11 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     if (isCurrent) setIsGeneratingAudio(true);
     try {
         const { media }: TextToSpeechOutput = await textToSpeech(text);
-        audioCache.current[questionIndex] = media;
-        if (isCurrent) {
-          playAudio(media);
+        if (media) {
+            audioCache.current[questionIndex] = media;
+            if (isCurrent) {
+              playAudio(media);
+            }
         }
     } catch(error) {
         console.error("Audio generation failed:", error);
@@ -191,6 +196,20 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     newAnswers[currentQuestionIndex] = answer;
     setUserAnswers(newAnswers);
   };
+  
+  const handleSubmitAnswer = () => {
+    if (!userAnswers[currentQuestionIndex]) return;
+    const isCorrect = userAnswers[currentQuestionIndex] === questions[currentQuestionIndex].correctAnswer;
+    
+    toast({
+        title: isCorrect ? "Correct!" : "Wrong!",
+        description: isCorrect ? "Great job!" : "That's not quite right.",
+        variant: isCorrect ? "default" : "destructive",
+        duration: 2000,
+    });
+    
+    setQuizState("REVIEW");
+  }
 
   const finishLevel = () => {
     setQuizState("LEVEL_COMPLETE");
@@ -232,6 +251,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setQuizState("ACTIVE");
     } else {
       finishLevel();
     }
@@ -348,7 +368,12 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
      );
   }
   
-  if (quizState === "ACTIVE" && currentQuestion) {
+  if ((quizState === "ACTIVE" || quizState === "REVIEW") && currentQuestion) {
+    const isReviewing = quizState === "REVIEW";
+    const userAnswer = userAnswers[currentQuestionIndex];
+    const correctAnswer = currentQuestion.correctAnswer;
+    const isAnswerCorrect = userAnswer === correctAnswer;
+    
     return (
       <Card className="w-full max-w-2xl shadow-xl">
         <CardHeader>
@@ -363,7 +388,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
           <Progress value={progress} className="w-full mt-2" />
         </CardHeader>
         <CardContent>
-          <div className="text-lg font-medium mb-6 text-center min-h-24 flex items-center justify-center relative">
+          <div className="text-lg font-medium mb-6 text-center min-h-[6rem] flex items-center justify-center relative">
             <p className="flex-grow">{currentQuestion.question}</p>
             <Button
                 variant="ghost"
@@ -377,22 +402,46 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             </Button>
             <audio ref={audioRef} className="hidden" />
           </div>
-          <RadioGroup onValueChange={handleAnswerSelect} value={userAnswers[currentQuestionIndex]}>
+          <RadioGroup onValueChange={handleAnswerSelect} value={userAnswer} disabled={isReviewing}>
             <div className="space-y-3">
-              {currentQuestion.options.map((option, index) => (
-                <Label key={index} htmlFor={`option-${index}`} className="flex items-center p-4 rounded-lg border cursor-pointer has-[:checked]:bg-accent/20 has-[:checked]:border-accent transition-all">
-                  <RadioGroupItem value={option} id={`option-${index}`} className="h-5 w-5 mr-4" />
-                  <span>{option}</span>
-                </Label>
-              ))}
+              {currentQuestion.options.map((option, index) => {
+                const isThisOptionCorrect = option === correctAnswer;
+                const isThisOptionSelected = option === userAnswer;
+                
+                let optionStyle = "";
+                if (isReviewing && isThisOptionCorrect) {
+                    optionStyle = "bg-green-100 border-green-500 text-green-800 dark:bg-green-900/50 dark:border-green-700 dark:text-green-300";
+                } else if (isReviewing && isThisOptionSelected && !isAnswerCorrect) {
+                    optionStyle = "bg-red-100 border-red-500 text-red-800 dark:bg-red-900/50 dark:border-red-700 dark:text-red-300";
+                }
+                
+                return (
+                    <Label key={index} htmlFor={`option-${index}`} className={cn(
+                        "flex items-center p-4 rounded-lg border cursor-pointer has-[:checked]:bg-accent/20 has-[:checked]:border-accent transition-all",
+                         optionStyle,
+                         isReviewing ? "cursor-default" : ""
+                    )}>
+                      <RadioGroupItem value={option} id={`option-${index}`} className="h-5 w-5 mr-4" disabled={isReviewing} />
+                      <span className="flex-grow">{option}</span>
+                      {isReviewing && isThisOptionCorrect && <Check className="h-6 w-6 text-green-600" />}
+                      {isReviewing && isThisOptionSelected && !isAnswerCorrect && <X className="h-6 w-6 text-red-600" />}
+                    </Label>
+                );
+              })}
             </div>
           </RadioGroup>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button onClick={handleNextQuestion} disabled={!userAnswers[currentQuestionIndex]}>
-            {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish Level"}
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+            {isReviewing ? (
+                 <Button onClick={handleNextQuestion}>
+                    {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish Level"}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                 </Button>
+            ) : (
+                <Button onClick={handleSubmitAnswer} disabled={!userAnswers[currentQuestionIndex]}>
+                    Submit Answer
+                </Button>
+            )}
         </CardFooter>
       </Card>
     );
