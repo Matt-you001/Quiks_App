@@ -115,7 +115,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
       });
       setQuestions(generatedQuestions);
       setUserAnswers(Array(generatedQuestions.length).fill(null));
-      const time = mode === 'quiz' ? recommendedTime : 0;
+      const time = mode === 'quiz' ? Math.floor(recommendedTime * 0.9) : 0;
       setTotalTimeForLevel(time);
       setTimeLeft(time);
       setTimeElapsed(0);
@@ -146,10 +146,12 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
     setUserAnswers(newAnswers);
     setQuizState("REVIEW");
     
+    const timeoutDuration = mode === 'quiz' ? 2000 : 0;
+
     if (mode === 'quiz') {
       reviewTimeoutRef.current = setTimeout(() => {
-          handleNextQuestion(newAnswers);
-      }, 2000);
+        handleNextQuestion(newAnswers);
+      }, timeoutDuration);
     }
   };
 
@@ -369,15 +371,10 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-center text-xl font-bold">
-              {levelResult ? `${grade} - Level ${level} Complete!` : "Calculating..."}
+               {levelResult ? `${grade} - Level ${level} Complete!` : "Calculating Results..."}
             </AlertDialogTitle>
-            {levelResult && (
-              <AlertDialogDescription className="text-center text-lg">
-                You scored <span className="font-bold text-primary">{Math.round(levelResult.score)}%</span>
-              </AlertDialogDescription>
-            )}
           </AlertDialogHeader>
-          {levelResult && (
+          {levelResult ? (
             <>
               <div className="py-4 text-center">
                   <div className="flex items-center justify-center mb-4">
@@ -437,6 +434,10 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
                 )}
               </AlertDialogFooter>
             </>
+          ) : (
+             <AlertDialogDescription className="text-center text-lg">
+                Please wait...
+             </AlertDialogDescription>
           )}
         </AlertDialogContent>
       </AlertDialog>
