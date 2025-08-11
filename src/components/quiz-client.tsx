@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Question, SerializableSubject } from "@/types";
@@ -8,6 +9,7 @@ import {
   adaptiveDifficultyAdjustment,
   textToSpeech,
 } from "@/ai/flows/index";
+import type { TextToSpeechOutput } from "@/ai/flows/text-to-speech";
 import {
   Card,
   CardContent,
@@ -51,7 +53,7 @@ import {
   TIME_PER_QUESTION,
 } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import type { TextToSpeechOutput } from "@/ai/flows/text-to-speech";
+
 
 type QuizState = "GRADE_SELECT" | "CONFIG" | "LOADING" | "ACTIVE" | "LEVEL_COMPLETE";
 
@@ -104,45 +106,44 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
   };
 
-  const handlePlayAudio = async (questionIndex: number, text: string) => {
+  const handlePlayAudioForQuestion = async (questionIndex: number, text: string, isCurrent: boolean) => {
     if (audioCache.current[questionIndex]) {
-      playAudio(audioCache.current[questionIndex]);
+      if (isCurrent) playAudio(audioCache.current[questionIndex]);
       return;
     }
 
-    if (isGeneratingAudio) return;
-    setIsGeneratingAudio(true);
+    if (isCurrent) setIsGeneratingAudio(true);
     try {
         const { media }: TextToSpeechOutput = await textToSpeech(text);
         audioCache.current[questionIndex] = media;
-        if (questionIndex === currentQuestionIndex) {
+        if (isCurrent) {
           playAudio(media);
         }
     } catch(error) {
         console.error("Audio generation failed:", error);
-        toast({
-            title: "Audio Error",
-            description: "Could not generate audio for this question.",
-            variant: "destructive",
-        });
+        if (isCurrent) {
+            toast({
+                title: "Audio Error",
+                description: "Could not generate audio for this question.",
+                variant: "destructive",
+            });
+        }
     } finally {
-        setIsGeneratingAudio(false);
+        if (isCurrent) setIsGeneratingAudio(false);
     }
   };
 
   useEffect(() => {
     if (quizState === 'ACTIVE' && questions.length > 0) {
       const currentQ = questions[currentQuestionIndex];
-      handlePlayAudio(currentQuestionIndex, currentQ.question);
+      // Play audio for the current question immediately.
+      handlePlayAudioForQuestion(currentQuestionIndex, currentQ.question, true);
       
+      // Pre-fetch audio for the next question.
       const nextQuestionIndex = currentQuestionIndex + 1;
       if (nextQuestionIndex < questions.length && !audioCache.current[nextQuestionIndex]) {
         const nextQ = questions[nextQuestionIndex];
-        textToSpeech(nextQ.question).then(output => {
-          audioCache.current[nextQuestionIndex] = output.media;
-        }).catch(error => {
-            console.error("Failed to pre-fetch audio for next question:", error);
-        });
+        handlePlayAudioForQuestion(nextQuestionIndex, nextQ.question, false);
       }
     }
   }, [currentQuestionIndex, quizState, questions]);
@@ -254,7 +255,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     const timeTaken = totalTimeForLevel - timeLeft;
     let coins = 0;
     if(levelResult.score === 100 && timeLeft > 0) {
-        coins = Math.max(0, timeLeft);
+        coins = Math.floor(timeLeft * 0.1);
     }
     router.push(
       `/results?score=${Math.round(levelResult.score)}&time=${timeTaken}&coins=${coins}&subject=${subject.name}&level=${level}&difficulty=${difficulty}&grade=${grade}`
@@ -367,7 +368,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handlePlayAudio(currentQuestionIndex, currentQuestion.question)}
+                onClick={() => handlePlayAudioForQuestion(currentQuestionIndex, currentQuestion.question, true)}
                 disabled={isGeneratingAudio}
                 className="ml-4"
               >
@@ -427,7 +428,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                    {levelResult.score === 100 && timeLeft > 0 && (
                       <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
                           <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
-                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.max(0, timeLeft)} bonus coins for a perfect score and finishing early!
+                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.floor(timeLeft * 0.1)} bonus coins for finishing early!
                           </p>
                       </div>
                   )}
