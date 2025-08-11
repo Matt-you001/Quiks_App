@@ -282,7 +282,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             <SelectTrigger className="w-full text-lg py-6">
               <SelectValue placeholder="Select Grade" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper" side="bottom">
               {GRADES.map((g) => (
                 <SelectItem key={g} value={g} className="text-lg">{g}</SelectItem>
               ))}
