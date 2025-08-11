@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   generateTestQuestions,
   adaptiveDifficultyAdjustment,
-} from "@/ai/flows";
+} from "@/ai/flows/index";
 import {
   Card,
   CardContent,
