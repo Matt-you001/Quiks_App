@@ -29,7 +29,7 @@ export default function ResultsClient() {
 
   return (
     <Card className="w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95">
-      <CardHeader className="text-center">
+      <CardHeader className="text-center p-6">
         <div className="flex justify-center mb-4">
             <CheckCircle2 className="h-16 w-16 text-green-500" />
         </div>
@@ -38,7 +38,7 @@ export default function ResultsClient() {
           {subject} - {grade} - Level {level} ({difficulty})
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 px-6 pb-6">
         <div className="flex flex-col items-center space-y-2">
             <div className="flex items-baseline text-6xl font-bold text-accent">
                 {score}
@@ -65,7 +65,7 @@ export default function ResultsClient() {
             </div>
         </div>
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row gap-2">
+      <CardFooter className="flex flex-col sm:flex-row gap-2 p-6 bg-muted/50 border-t">
         <Button variant="outline" className="w-full" onClick={() => router.push("/")}>
           <Home className="mr-2 h-4 w-4" />
           Home

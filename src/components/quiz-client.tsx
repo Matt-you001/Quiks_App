@@ -73,8 +73,10 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+
+  const audioCache = useRef<Record<number, string>>({});
   const audioRef = useRef<HTMLAudioElement>(null);
+
   const router = useRouter();
   const { toast } = useToast();
   const Icon = SUBJECTS.find(s => s.slug === subject.slug)!.icon;
@@ -94,13 +96,56 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       finishLevel();
     }
   }, [timeLeft, quizState]);
-  
+
+  const handlePlayAudio = async (questionIndex: number) => {
+    if (audioCache.current[questionIndex]) {
+      if (audioRef.current) {
+        audioRef.current.src = audioCache.current[questionIndex];
+        audioRef.current.play();
+      }
+      return;
+    }
+
+    if (isGeneratingAudio) return;
+
+    setIsGeneratingAudio(true);
+    try {
+        const { media }: TextToSpeechOutput = await textToSpeech(questions[questionIndex].question);
+        audioCache.current[questionIndex] = media;
+        if (questionIndex === currentQuestionIndex && audioRef.current) {
+          audioRef.current.src = media;
+          audioRef.current.play();
+        }
+    } catch(error) {
+        console.error("Audio generation failed:", error);
+        toast({
+            title: "Audio Error",
+            description: "Could not generate audio for this question.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsGeneratingAudio(false);
+    }
+  };
+
   useEffect(() => {
-    setAudioUrl(null);
-    if(quizState === 'ACTIVE' && questions.length > 0) {
-      handlePlayAudio(questions[currentQuestionIndex].question);
+    if (quizState === 'ACTIVE' && questions.length > 0) {
+      // Play audio for the current question
+      handlePlayAudio(currentQuestionIndex);
+      
+      // Pre-fetch audio for the next question
+      const nextQuestionIndex = currentQuestionIndex + 1;
+      if (nextQuestionIndex < questions.length && !audioCache.current[nextQuestionIndex]) {
+        // Don't await, let it run in the background
+        textToSpeech(questions[nextQuestionIndex].question).then(output => {
+          audioCache.current[nextQuestionIndex] = output.media;
+        }).catch(error => {
+            console.error("Failed to pre-fetch audio:", error);
+        });
+      }
     }
   }, [currentQuestionIndex, quizState, questions]);
+
 
   const fetchQuestions = async (currentDifficulty: string) => {
     if (!grade) return;
@@ -113,6 +158,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
         grade: grade,
       });
       setQuestions(generatedQuestions);
+      audioCache.current = {}; // Clear audio cache for new questions
       setQuizState("CONFIG");
     } catch (error) {
       console.error(error);
@@ -136,7 +182,6 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     setUserAnswers(Array(questions.length).fill(null));
     setTimeLeft(totalTimeForLevel);
     setQuizState("ACTIVE");
-    setAudioUrl(null);
   };
 
   const handleAnswerSelect = (answer: string) => {
@@ -179,6 +224,10 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   };
 
   const handleNextQuestion = () => {
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+    }
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
@@ -204,42 +253,12 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     const timeTaken = totalTimeForLevel - timeLeft;
     let coins = 0;
     if(levelResult.score === 100 && timeLeft > 0) {
-        coins = Math.max(0, timeLeft * 10);
+        coins = Math.max(0, timeLeft);
     }
     router.push(
       `/results?score=${Math.round(levelResult.score)}&time=${timeTaken}&coins=${coins}&subject=${subject.name}&level=${level}&difficulty=${difficulty}&grade=${grade}`
     );
   };
-
-  const handlePlayAudio = async (questionText: string) => {
-    if(audioUrl) {
-        audioRef.current?.play();
-        return;
-    }
-
-    setIsGeneratingAudio(true);
-    try {
-        const { media }: TextToSpeechOutput = await textToSpeech(questionText);
-        setAudioUrl(media);
-    } catch(error) {
-        console.error("Audio generation failed:", error);
-        toast({
-            title: "Audio Error",
-            description: "Could not generate audio for this question.",
-            variant: "destructive",
-        });
-    } finally {
-        setIsGeneratingAudio(false);
-    }
-  };
-  
-  useEffect(() => {
-    if(audioUrl && audioRef.current) {
-        audioRef.current.src = audioUrl;
-        audioRef.current.play();
-    }
-  }, [audioUrl]);
-
 
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
@@ -347,11 +366,11 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
             <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handlePlayAudio(currentQuestion.question)}
-                disabled={isGeneratingAudio}
+                onClick={() => handlePlayAudio(currentQuestionIndex)}
+                disabled={isGeneratingAudio && !audioCache.current[currentQuestionIndex]}
                 className="ml-4"
               >
-                <Volume2 className={`h-6 w-6 ${isGeneratingAudio ? 'animate-pulse' : ''}`} />
+                <Volume2 className={`h-6 w-6 ${(isGeneratingAudio && !audioCache.current[currentQuestionIndex]) ? 'animate-pulse' : ''}`} />
                 <span className="sr-only">Read question aloud</span>
             </Button>
             <audio ref={audioRef} className="hidden" />
@@ -407,7 +426,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                    {levelResult.score === 100 && timeLeft > 0 && (
                       <div className="p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg mb-4 text-center">
                           <p className="font-semibold text-sm text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
-                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.max(0, timeLeft * 10)} bonus coins for a perfect score and finishing early!
+                            <Coins className="h-5 w-5"/> Congratulations! You earned {Math.max(0, timeLeft)} bonus coins for a perfect score and finishing early!
                           </p>
                       </div>
                   )}
