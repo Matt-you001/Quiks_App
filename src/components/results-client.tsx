@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Button } from "./ui/button";
-import { Award, Coins, Home, Repeat, Trophy, Volume2 } from "lucide-react";
+import { Award, Coins, Home, Repeat, Timer, Trophy } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { generateFeedback, textToSpeech } from "@/ai/flows";
 import { useEffect, useRef, useState } from "react";
