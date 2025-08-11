@@ -15,6 +15,7 @@ const GenerateTestQuestionsInputSchema = z.object({
   subject: z.string().describe('The subject for which to generate questions (e.g., Arithmetic, English, Physics).'),
   difficultyLevel: z.string().describe('The difficulty level of the questions (e.g., easy, medium, hard).'),
   numberOfQuestions: z.number().describe('The number of questions to generate.'),
+  grade: z.string().describe("The user's selected grade level (e.g., Grade 1, Grade 5, High School)."),
 });
 
 export type GenerateTestQuestionsInput = z.infer<typeof GenerateTestQuestionsInputSchema>;
@@ -39,11 +40,11 @@ const generateTestQuestionsPrompt = ai.definePrompt({
   name: 'generateTestQuestionsPrompt',
   input: {schema: GenerateTestQuestionsInputSchema},
   output: {schema: GenerateTestQuestionsOutputSchema},
-  prompt: `You are an expert in generating multiple-choice questions for various subjects.
+  prompt: `You are an expert in generating multiple-choice questions for various subjects and grade levels.
 
-  Generate {{numberOfQuestions}} multiple-choice questions for the subject of {{subject}} at a {{difficultyLevel}} difficulty level.
+  Generate {{numberOfQuestions}} multiple-choice questions for the subject of {{subject}} at a {{difficultyLevel}} difficulty level, tailored for a student in {{grade}}.
 
-  Each question should have 4 options, with one correct answer.
+  Each question should have 4 options, with one correct answer. The questions must be appropriate for the specified grade level.
 
   Return the questions in the following JSON format:
   {

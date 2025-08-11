@@ -23,6 +23,7 @@ export default function ResultsClient() {
   const subject = searchParams.get("subject") || "Unknown Subject";
   const level = searchParams.get("level") || "1";
   const difficulty = searchParams.get("difficulty") || "Beginner";
+  const grade = searchParams.get("grade") || "Not specified";
 
   const scoreValue = parseInt(score, 10);
 
@@ -34,7 +35,7 @@ export default function ResultsClient() {
         </div>
         <CardTitle className="text-3xl font-extrabold font-headline text-primary">Session Results</CardTitle>
         <CardDescription className="text-lg">
-          {subject} - Level {level} ({difficulty})
+          {subject} - {grade} - Level {level} ({difficulty})
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

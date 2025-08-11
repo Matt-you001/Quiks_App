@@ -19,6 +19,7 @@ const AdaptiveDifficultyInputSchema = z.object({
     .string()
     .describe('The current difficulty level of the questions.'),
   subject: z.string().describe('The subject of the questions.'),
+  grade: z.string().describe("The user's selected grade level."),
 });
 export type AdaptiveDifficultyInput = z.infer<typeof AdaptiveDifficultyInputSchema>;
 
@@ -46,18 +47,19 @@ const prompt = ai.definePrompt({
   name: 'adaptiveDifficultyPrompt',
   input: {schema: AdaptiveDifficultyInputSchema},
   output: {schema: AdaptiveDifficultyOutputSchema},
-  prompt: `You are an AI that adjusts the difficulty of questions for a user based on their performance.
+  prompt: `You are an AI that adjusts the difficulty of questions for a user based on their performance for a specific grade level.
 
-The user has a score of {{currentScore}} on the {{currentDifficulty}} level in {{subject}}.
+The user is in {{grade}} and has a score of {{currentScore}} on the {{currentDifficulty}} level in {{subject}}.
 
-Based on the user's score, determine the new difficulty level. Possible difficulty levels are: Beginner, Intermediate, Advanced, Expert
+Based on the user's score, determine the new difficulty level. The difficulty must remain appropriate for the user's grade level.
+Possible difficulty levels are: Beginner, Intermediate, Advanced, Expert.
 
 If the user's score is less than 70, keep the difficulty at the same level and let them repeat.
 If the user's score is 70 or higher, increase the difficulty to the next level.
 
 Difficulty levels are Beginner < Intermediate < Advanced < Expert.
 
-Return the new difficulty level and your reasoning for why you chose that difficulty. Always start with beginner difficulty level.
+Return the new difficulty level and your reasoning for why you chose that difficulty, keeping the grade level in mind. Always start with beginner difficulty level.
 
 Output the difficulty and reasoning in JSON format.`,
 });

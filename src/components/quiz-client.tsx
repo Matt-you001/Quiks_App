@@ -42,18 +42,21 @@ import {
   XCircle,
 } from "lucide-react";
 import {
+  GRADES,
   QUESTIONS_PER_LEVEL,
   SCORE_THRESHOLD,
   SUBJECTS,
   TIME_PER_QUESTION,
 } from "@/lib/constants";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-type QuizState = "CONFIG" | "LOADING" | "ACTIVE" | "LEVEL_COMPLETE";
+type QuizState = "GRADE_SELECT" | "CONFIG" | "LOADING" | "ACTIVE" | "LEVEL_COMPLETE";
 
 export function QuizClient({ subject }: { subject: SerializableSubject }) {
-  const [quizState, setQuizState] = useState<QuizState>("CONFIG");
+  const [quizState, setQuizState] = useState<QuizState>("GRADE_SELECT");
   const [level, setLevel] = useState(1);
   const [difficulty, setDifficulty] = useState("Beginner");
+  const [grade, setGrade] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<string[]>([]);
@@ -87,12 +90,14 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
   }, [timeLeft, quizState]);
 
   const fetchQuestions = async (currentDifficulty: string) => {
+    if (!grade) return;
     setQuizState("LOADING");
     try {
       const { questions: generatedQuestions } = await generateTestQuestions({
         subject: subject.name,
         difficultyLevel: currentDifficulty,
         numberOfQuestions: QUESTIONS_PER_LEVEL,
+        grade: grade,
       });
       setQuestions(generatedQuestions);
       setQuizState("CONFIG");
@@ -107,9 +112,11 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     }
   };
   
-  useEffect(() => {
-    fetchQuestions(difficulty);
-  }, []);
+  const handleGradeSelected = () => {
+    if (grade) {
+      fetchQuestions(difficulty);
+    }
+  }
 
   const startLevel = () => {
     setCurrentQuestionIndex(0);
@@ -140,6 +147,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
           currentScore: score,
           currentDifficulty: difficulty,
           subject: subject.name,
+          grade: grade,
         });
         setLevelResult({ score, ...adjustment });
       } catch (error) {
@@ -182,19 +190,53 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
     const timeTaken = totalTimeForLevel - timeLeft;
     const coins = Math.max(0, timeLeft * 10);
     router.push(
-      `/results?score=${Math.round(levelResult.score)}&time=${timeTaken}&coins=${coins}&subject=${subject.name}&level=${level}&difficulty=${difficulty}`
+      `/results?score=${Math.round(levelResult.score)}&time=${timeTaken}&coins=${coins}&subject=${subject.name}&level=${level}&difficulty=${difficulty}&grade=${grade}`
     );
   };
 
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
+  if (quizState === "GRADE_SELECT") {
+    return (
+      <Card className="w-full max-w-2xl text-center shadow-lg">
+        <CardHeader>
+          <div className="flex justify-center mb-4">
+            <div className="p-4 rounded-full bg-primary/10 text-primary">
+              <Icon className="h-10 w-10" />
+            </div>
+          </div>
+          <CardTitle className="text-3xl font-extrabold font-headline text-primary">{subject.name} Test</CardTitle>
+          <CardDescription className="text-lg">Please select your grade level to begin.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Select onValueChange={setGrade} value={grade}>
+            <SelectTrigger className="w-full text-lg py-6">
+              <SelectValue placeholder="Select Grade" />
+            </SelectTrigger>
+            <SelectContent>
+              {GRADES.map((g) => (
+                <SelectItem key={g} value={g} className="text-lg">{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+        <CardFooter>
+          <Button className="w-full text-lg py-6" onClick={handleGradeSelected} disabled={!grade}>
+            Confirm Grade
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
   if (quizState === "LOADING") {
     return (
       <Card className="w-full max-w-2xl text-center">
         <CardHeader>
           <CardTitle className="text-3xl font-bold">Loading Questions...</CardTitle>
-          <CardDescription>The AI is preparing your next challenge!</CardDescription>
+          <CardDescription>The AI is preparing your questions for {grade}!</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-10">
             <div className="flex justify-center">
@@ -222,7 +264,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
                 </div>
             </div>
             <CardTitle className="text-3xl font-extrabold font-headline text-primary">{subject.name} Test</CardTitle>
-            <CardDescription className="text-lg">Level {level} - {difficulty}</CardDescription>
+            <CardDescription className="text-lg">{grade} - Level {level} - {difficulty}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p>You have <span className="font-bold text-accent">{totalTimeForLevel} seconds</span> to answer <span className="font-bold text-accent">{QUESTIONS_PER_LEVEL} questions</span>.</p>
@@ -243,7 +285,7 @@ export function QuizClient({ subject }: { subject: SerializableSubject }) {
       <Card className="w-full max-w-2xl shadow-xl">
         <CardHeader>
           <div className="flex justify-between items-center mb-2">
-            <CardTitle className="text-xl font-bold font-headline">{subject.name} - Level {level}</CardTitle>
+            <CardTitle className="text-xl font-bold font-headline">{subject.name} - {grade} - Level {level}</CardTitle>
             <div className="flex items-center gap-2 text-lg font-semibold text-destructive">
                 <Timer className="h-6 w-6" />
                 <span>{timeLeft}s</span>
