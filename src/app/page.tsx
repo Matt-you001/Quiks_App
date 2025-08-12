@@ -8,12 +8,12 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 md:p-12 lg:p-24">
-      <div className="text-center mb-12 flex flex-col items-center">
+      <div className="text-center mb-8 flex flex-col items-center">
         <Logo />
-        <h1 className="text-5xl font-extrabold tracking-tight text-primary font-headline mt-4">
+        <h1 className="text-5xl font-extrabold tracking-tight text-primary font-headline mt-2">
           Quiks
         </h1>
-        <p className="mt-4 text-lg text-muted-foreground">
+        <p className="mt-2 text-lg text-muted-foreground">
           Welcome! Choose a subject to begin your training.
         </p>
       </div>

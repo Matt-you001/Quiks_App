@@ -4,23 +4,43 @@ import { cn } from "@/lib/utils";
 export function Logo({ className, ...props }: React.SVGProps<SVGSVGElement>) {
     return (
         <svg
-            width="64"
-            height="64"
-            viewBox="0 0 64 64"
+            width="80"
+            height="80"
+            viewBox="0 0 100 100"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className={cn("h-16 w-16", className)}
+            className={cn("h-20 w-20", className)}
             {...props}
         >
-            <path
-                d="M32 58C46.3594 58 58 46.3594 58 32C58 17.6406 46.3594 6 32 6C17.6406 6 6 17.6406 6 32C6 46.3594 17.6406 58 32 58Z"
-                className="fill-primary"
-            />
-            <path
-                d="M33.9181 44.3438L36.4314 36.9375H28.8533L26.3399 44.3438H20.0714L30.9181 19.6562H37.0626L47.9093 44.3438H41.6407L39.1273 36.9375H33.9181ZM30.7093 32.5312H37.2751L33.9923 23.4688L30.7093 32.5312Z"
-                className="fill-primary-foreground"
-            />
-        </svg>
+            <defs>
+                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{ stopColor: '#00AEEF', stopOpacity: 1 }} />
+                    <stop offset="100%" style={{ stopColor: '#2D3E9A', stopOpacity: 1 }} />
+                </linearGradient>
+                <linearGradient id="grad2" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#F7931E', stopOpacity: 1 }} />
+                    <stop offset="100%" style={{ stopColor: '#FBB03B', stopOpacity: 1 }} />
+                </linearGradient>
+                <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#2D3E9A', stopOpacity: 1 }} />
+                    <stop offset="100%" style={{ stopColor: '#00AEEF', stopOpacity: 1 }} />
+                </linearGradient>
+                <linearGradient id="arrow" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#F7931E', stopOpacity: 1 }} />
+                    <stop offset="100%" style={{ stopColor: '#FBB03B', stopOpacity: 1 }} />
+                </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="40" fill="url(#grad1)" />
+            <path d="M50 10 A 40 40 0 0 1 90 50" stroke="url(#grad3)" strokeWidth="20" fill="none" strokeLinecap="round" />
+            <path d="M50 90 A 40 40 0 0 1 10 50" stroke="url(#grad2)" strokeWidth="20" fill="none" strokeLinecap="round" />
+            
+            <circle cx="50" cy="50" r="22" fill="none" stroke="white" strokeWidth="1" strokeDasharray="2 10.5" strokeDashoffset="1.5"/>
 
+            <circle cx="50" cy="50" r="10" fill="none" stroke="#00AEEF" strokeWidth="2" />
+            <line x1="50" y1="50" x2="50" y2="42" stroke="#00AEEF" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="50" y1="50" x2="55" y2="50" stroke="#00AEEF" strokeWidth="1.5" strokeLinecap="round"/>
+
+            <path d="M25 75 L48 52 L42 58 L75 25 L52 48 L58 42 L25 75Z" fill="url(#arrow)" />
+        </svg>
     )
 }
