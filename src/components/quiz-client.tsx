@@ -91,33 +91,7 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
 
   useEffect(() => {
     const profileId = localStorage.getItem('currentProfileId');
-    if (profileId) {
-        const profiles: UserProfile[] = JSON.parse(localStorage.getItem('profiles') || '[]');
-        const currentProfile = profiles.find(p => p.id === profileId);
-        if (currentProfile) {
-            const userGrade = GRADES.find(g => g.toLowerCase().includes(String(currentProfile.age)));
-            // A simple logic to map age to grade
-            let foundGrade = "";
-            if (currentProfile.age <= 6) foundGrade = "Grade 1";
-            else if (currentProfile.age <= 7) foundGrade = "Grade 2";
-            else if (currentProfile.age <= 8) foundGrade = "Grade 3";
-            else if (currentProfile.age <= 9) foundGrade = "Grade 4";
-            else if (currentProfile.age <= 10) foundGrade = "Grade 5";
-            else if (currentProfile.age <= 11) foundGrade = "Grade 6";
-            else if (currentProfile.age <= 12) foundGrade = "Grade 7";
-            else if (currentProfile.age <= 13) foundGrade = "Grade 8";
-            else if (currentProfile.age <= 14) foundGrade = "Grade 9";
-            else if (currentProfile.age <= 15) foundGrade = "Grade 10";
-            else if (currentProfile.age <= 16) foundGrade = "Grade 11";
-            else if (currentProfile.age <= 17) foundGrade = "Grade 12";
-            else if (currentProfile.age >= 18) foundGrade = "University";
-            
-            if (foundGrade) {
-                setGrade(foundGrade);
-                fetchQuestions(difficulty, level, foundGrade);
-            }
-        }
-    } else {
+    if (!profileId) {
         setQuizState("GRADE_SELECT");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
