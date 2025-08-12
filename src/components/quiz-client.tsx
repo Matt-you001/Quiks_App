@@ -468,42 +468,49 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
                   </div>
               </div>
               <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                 <Button 
-                   variant="outline" 
-                   onClick={handleEndSession}
-                   className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600 flex-1"
-                 >
-                   End Session
-                 </Button>
                 {levelResult.score >= SCORE_THRESHOLD ? (
                    <>
-                    <Button 
+                     <Button 
+                       variant="outline" 
+                       onClick={handleEndSession}
+                       className="font-bold py-6 text-base"
+                     >
+                       End Session
+                     </Button>
+                     <Button 
                        variant="secondary"
                        onClick={() => router.push('/')}
-                       className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600 flex-1"
+                       className="font-bold py-6 text-base"
                     >
                        <Library className="mr-2 h-4 w-4" /> Change Subject
                     </Button>
                      <Button 
                        onClick={handleRepeatLevel}
-                       className="font-bold py-6 text-base text-white bg-yellow-500 hover:bg-yellow-600 shadow-[0_4px_0_0_#ca8a04] hover:shadow-[0_4px_0_0_#a16207] active:translate-y-1 active:shadow-none transition-all flex-1"
+                       className="font-bold py-6 text-base text-white bg-yellow-500 hover:bg-yellow-600 shadow-[0_4px_0_0_#ca8a04] hover:shadow-[0_4px_0_0_#a16207] active:translate-y-1 active:shadow-none transition-all"
                      >
                        Repeat Level <Repeat className="ml-2 h-4 w-4" />
                      </Button>
                      <Button 
                        onClick={handleProceedToNextLevel} 
                        disabled={difficulty === 'Expert'}
-                       className="sm:col-span-2 font-bold py-6 text-base text-white bg-green-500 hover:bg-green-600 shadow-[0_4px_0_0_#16a34a] hover:shadow-[0_4px_0_0_#15803d] active:translate-y-1 active:shadow-none transition-all"
+                       className="font-bold py-6 text-base text-white bg-green-500 hover:bg-green-600 shadow-[0_4px_0_0_#16a34a] hover:shadow-[0_4px_0_0_#15803d] active:translate-y-1 active:shadow-none transition-all"
                      >
-                       Next Level: {getNextDifficulty(difficulty)} <ArrowRight className="ml-2 h-4 w-4" />
+                       Next Level <ArrowRight className="ml-2 h-4 w-4" />
                      </Button>
                    </>
                 ) : (
                   <>
                     <Button 
+                      variant="outline" 
+                      onClick={handleEndSession}
+                      className="font-bold py-6 text-base"
+                    >
+                      End Session
+                    </Button>
+                    <Button 
                       variant="secondary"
                       onClick={() => router.push('/')}
-                      className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600 flex-1"
+                      className="font-bold py-6 text-base"
                     >
                         <Library className="mr-2 h-4 w-4" /> Change Subject
                     </Button>
