@@ -55,7 +55,8 @@ import type { UserProfile } from "@/types";
 
 type QuizState = "GRADE_SELECT" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPLETE";
 
-const CALCULATION_SUBJECTS = ['arithmetic', 'physics', 'chemistry', 'sciences', 'computer', 'electricity', 'economics'];
+const BASE_TIME_SECONDS = 120; // 2 minutes base time for all quizzes
+const TIME_INCREMENT_PER_LEVEL = 5; // 5 seconds added per level
 
 // Fisher-Yates (aka Knuth) Shuffle algorithm
 const shuffleArray = (array: any[]) => {
@@ -133,7 +134,7 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
     if (!selectedGrade) return;
     setQuizState("LOADING");
     try {
-      const { questions: generatedQuestions, recommendedTime } = await generateTestQuestions({
+      const { questions: generatedQuestions } = await generateTestQuestions({
         subject: subject.name,
         difficultyLevel: currentDifficulty,
         numberOfQuestions: QUESTIONS_PER_LEVEL,
@@ -151,9 +152,8 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
 
       let time = 0;
       if (mode === 'quiz') {
-        const baseTime = Math.floor(recommendedTime * 0.81);
-        const levelBonus = (currentLevel - 1) * (CALCULATION_SUBJECTS.includes(subject.slug) ? 15 : 5);
-        time = baseTime + levelBonus;
+        const levelBonus = (currentLevel - 1) * TIME_INCREMENT_PER_LEVEL;
+        time = BASE_TIME_SECONDS + levelBonus;
       }
 
       setTotalTimeForLevel(time);
