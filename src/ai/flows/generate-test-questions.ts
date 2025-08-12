@@ -42,9 +42,11 @@ const generateTestQuestionsPrompt = ai.definePrompt({
   name: 'generateTestQuestionsPrompt',
   input: {schema: GenerateTestQuestionsInputSchema},
   output: {schema: GenerateTestQuestionsOutputSchema},
-  prompt: `You are an expert in generating high-quality, age-appropriate multiple-choice questions for educational purposes.
+  prompt: `You are an expert in generating a diverse and high-quality set of age-appropriate multiple-choice questions for educational purposes. Your primary goal is to ensure that the user receives a fresh, unique set of questions each time they take a test, drawing from a vast pool of knowledge.
 
   Generate {{numberOfQuestions}} multiple-choice questions for the subject of {{subject}} at a {{difficultyLevel}} difficulty, specifically tailored for a student in {{grade}}.
+
+  **Crucially, do not repeat questions from previous sessions. Every test should feel new and different.**
 
   Based on the complexity and subject matter, also provide a recommended completion time in seconds for the entire set of questions. A simple arithmetic question might take 15 seconds, while a complex physics problem might take 60 seconds. Calculate the total recommended time for all questions.
 
