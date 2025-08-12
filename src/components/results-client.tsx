@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Button } from "./ui/button";
-import { Award, Library, Repeat, Timer, Trophy, Coins } from "lucide-react";
+import { Award, Home, Repeat, Timer, Trophy, Coins } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { generateFeedback } from "@/ai/flows";
 import { useEffect, useRef, useState } from "react";
@@ -137,8 +137,8 @@ export default function ResultsClient() {
       </CardContent>
       <CardFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-6 bg-muted/50 border-t">
         <Button variant="outline" className="w-full" onClick={() => router.push("/")}>
-          <Library className="mr-2 h-4 w-4" />
-          Change Subject
+          <Home className="mr-2 h-4 w-4" />
+          Go to Homepage
         </Button>
         <Button className="w-full" onClick={() => router.back()}>
           <Repeat className="mr-2 h-4 w-4" />

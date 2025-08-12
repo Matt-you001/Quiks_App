@@ -36,6 +36,7 @@ import {
   ChevronLeft,
   Coins,
   Cpu,
+  Library,
   Repeat,
   Timer,
   X,
@@ -440,6 +441,13 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
                  </Button>
                 {levelResult.score >= SCORE_THRESHOLD ? (
                    <>
+                    <Button 
+                       variant="secondary"
+                       onClick={() => router.push('/')}
+                       className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600 flex-1"
+                    >
+                       <Library className="mr-2 h-4 w-4" /> Change Subject
+                    </Button>
                      <Button 
                        onClick={handleRepeatLevel}
                        className="font-bold py-6 text-base text-white bg-yellow-500 hover:bg-yellow-600 shadow-[0_4px_0_0_#ca8a04] hover:shadow-[0_4px_0_0_#a16207] active:translate-y-1 active:shadow-none transition-all flex-1"
@@ -455,12 +463,21 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
                      </Button>
                    </>
                 ) : (
-                  <Button 
-                    onClick={handleRepeatLevel}
-                    className="font-bold py-6 text-base text-white bg-blue-500 hover:bg-blue-600 shadow-[0_4px_0_0_#2563eb] hover:shadow-[0_4px_0_0_#1d4ed8] active:translate-y-1 active:shadow-none transition-all flex-1"
-                  >
-                      Try Again <Repeat className="ml-2 h-4 w-4" />
-                  </Button>
+                  <>
+                    <Button 
+                      variant="secondary"
+                      onClick={() => router.push('/')}
+                      className="font-bold py-6 text-base shadow-md hover:shadow-lg transition-shadow border-2 border-gray-300 dark:border-gray-600 flex-1"
+                    >
+                        <Library className="mr-2 h-4 w-4" /> Change Subject
+                    </Button>
+                    <Button 
+                      onClick={handleRepeatLevel}
+                      className="sm:col-span-2 font-bold py-6 text-base text-white bg-blue-500 hover:bg-blue-600 shadow-[0_4px_0_0_#2563eb] hover:shadow-[0_4px_0_0_#1d4ed8] active:translate-y-1 active:shadow-none transition-all"
+                    >
+                        Try Again <Repeat className="ml-2 h-4 w-4" />
+                    </Button>
+                  </>
                 )}
               </AlertDialogFooter>
             </>
