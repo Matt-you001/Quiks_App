@@ -8,6 +8,7 @@ import { Dumbbell, Brain, ArrowRight } from "lucide-react";
 import { SUBJECTS } from "@/lib/constants";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import type { UserProfile, TestResult } from "@/types";
 
 function ModeSelectClient() {
     const router = useRouter();
@@ -21,7 +22,7 @@ function ModeSelectClient() {
     }
 
     const handleModeSelect = (mode: 'training' | 'quiz') => {
-        router.push(`/test/${subjectSlug}?mode=${mode}`);
+        router.push(`/level-select?subject=${subjectSlug}&mode=${mode}`);
     }
 
     return (

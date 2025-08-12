@@ -50,6 +50,7 @@ import {
 } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { cn } from "@/lib/utils";
+import type { UserProfile } from "@/types";
 
 
 type QuizState = "GRADE_SELECT" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPLETE";
@@ -69,9 +70,9 @@ const shuffleArray = (array: any[]) => {
     return array;
 }
 
-export function QuizClient({ subject, mode }: { subject: SerializableSubject, mode: TestMode }) {
+export function QuizClient({ subject, mode, startLevel = 1 }: { subject: SerializableSubject, mode: TestMode, startLevel?: number }) {
   const [quizState, setQuizState] = useState<QuizState>("GRADE_SELECT");
-  const [level, setLevel] = useState(1);
+  const [level, setLevel] = useState(startLevel);
   const [difficulty, setDifficulty] = useState("Beginner");
   const [grade, setGrade] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -87,6 +88,40 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
   const Icon = SUBJECTS.find(s => s.slug === subject.slug)!.icon;
   
   const reviewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const profileId = localStorage.getItem('currentProfileId');
+    if (profileId) {
+        const profiles: UserProfile[] = JSON.parse(localStorage.getItem('profiles') || '[]');
+        const currentProfile = profiles.find(p => p.id === profileId);
+        if (currentProfile) {
+            const userGrade = GRADES.find(g => g.toLowerCase().includes(String(currentProfile.age)));
+            // A simple logic to map age to grade
+            let foundGrade = "";
+            if (currentProfile.age <= 6) foundGrade = "Grade 1";
+            else if (currentProfile.age <= 7) foundGrade = "Grade 2";
+            else if (currentProfile.age <= 8) foundGrade = "Grade 3";
+            else if (currentProfile.age <= 9) foundGrade = "Grade 4";
+            else if (currentProfile.age <= 10) foundGrade = "Grade 5";
+            else if (currentProfile.age <= 11) foundGrade = "Grade 6";
+            else if (currentProfile.age <= 12) foundGrade = "Grade 7";
+            else if (currentProfile.age <= 13) foundGrade = "Grade 8";
+            else if (currentProfile.age <= 14) foundGrade = "Grade 9";
+            else if (currentProfile.age <= 15) foundGrade = "Grade 10";
+            else if (currentProfile.age <= 16) foundGrade = "Grade 11";
+            else if (currentProfile.age <= 17) foundGrade = "Grade 12";
+            else if (currentProfile.age >= 18) foundGrade = "University";
+            
+            if (foundGrade) {
+                setGrade(foundGrade);
+                fetchQuestions(difficulty, level, foundGrade);
+            }
+        }
+    } else {
+        setQuizState("GRADE_SELECT");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -116,18 +151,19 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
     if (timeLeft === 0 && quizState === "ACTIVE" && mode === 'quiz') {
       finishLevel(userAnswers);
     }
-  }, [timeLeft, quizState, mode, userAnswers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, quizState, mode]);
 
 
-  const fetchQuestions = async (currentDifficulty: string, currentLevel: number) => {
-    if (!grade) return;
+  const fetchQuestions = async (currentDifficulty: string, currentLevel: number, selectedGrade: string) => {
+    if (!selectedGrade) return;
     setQuizState("LOADING");
     try {
       const { questions: generatedQuestions, recommendedTime } = await generateTestQuestions({
         subject: subject.name,
         difficultyLevel: currentDifficulty,
         numberOfQuestions: QUESTIONS_PER_LEVEL,
-        grade: grade,
+        grade: selectedGrade,
       });
 
       // Shuffle options for each question
@@ -164,7 +200,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
   
   const handleGradeSelected = () => {
     if (grade) {
-      fetchQuestions(difficulty, level);
+      fetchQuestions(difficulty, level, grade);
     }
   }
 
@@ -224,12 +260,12 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
     const newLevel = level + 1;
     setLevel(newLevel);
     setDifficulty(newDifficulty);
-    fetchQuestions(newDifficulty, newLevel);
+    fetchQuestions(newDifficulty, newLevel, grade);
     setLevelResult(null);
   };
   
   const handleRepeatLevel = () => {
-    fetchQuestions(difficulty, level);
+    fetchQuestions(difficulty, level, grade);
     setLevelResult(null);
   };
 
@@ -274,7 +310,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
             </div>
           </div>
           <CardTitle className="text-3xl font-extrabold font-headline text-primary">{subject.name} {mode === 'quiz' ? 'Quiz' : 'Training'}</CardTitle>
-          <CardDescription className="text-lg">Please select your grade level to begin.</CardDescription>
+          <CardDescription className="text-lg">Please select the grade level to begin.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Select onValueChange={setGrade} value={grade}>
@@ -290,7 +326,7 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
         </CardContent>
         <CardFooter>
           <Button className="w-full text-lg py-6" onClick={handleGradeSelected} disabled={!grade}>
-            Confirm Grade
+            Start Test
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </CardFooter>
