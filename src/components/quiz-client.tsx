@@ -55,6 +55,19 @@ type QuizState = "GRADE_SELECT" | "LOADING" | "ACTIVE" | "REVIEW" | "LEVEL_COMPL
 
 const CALCULATION_SUBJECTS = ['arithmetic', 'physics', 'chemistry', 'sciences', 'computer', 'electricity', 'economics'];
 
+// Fisher-Yates (aka Knuth) Shuffle algorithm
+const shuffleArray = (array: any[]) => {
+    let currentIndex = array.length, randomIndex;
+    
+    while (currentIndex !== 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    }
+    
+    return array;
+}
+
 export function QuizClient({ subject, mode }: { subject: SerializableSubject, mode: TestMode }) {
   const [quizState, setQuizState] = useState<QuizState>("GRADE_SELECT");
   const [level, setLevel] = useState(1);
@@ -115,8 +128,15 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
         numberOfQuestions: QUESTIONS_PER_LEVEL,
         grade: grade,
       });
-      setQuestions(generatedQuestions);
-      setUserAnswers(Array(generatedQuestions.length).fill(null));
+
+      // Shuffle options for each question
+      const shuffledQuestions = generatedQuestions.map(q => ({
+        ...q,
+        options: shuffleArray([...q.options])
+      }));
+
+      setQuestions(shuffledQuestions);
+      setUserAnswers(Array(shuffledQuestions.length).fill(null));
 
       let time = 0;
       if (mode === 'quiz') {
@@ -459,5 +479,3 @@ export function QuizClient({ subject, mode }: { subject: SerializableSubject, mo
     </>
   );
 }
-
-    
