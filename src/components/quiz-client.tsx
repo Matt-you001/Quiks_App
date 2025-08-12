@@ -152,7 +152,7 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
       let time = 0;
       if (mode === 'quiz') {
         const baseTime = Math.floor(recommendedTime * 0.81);
-        const levelBonus = (currentLevel - 1) * (CALCULATION_SUBJECTS.includes(subject.slug) ? 10 : 5);
+        const levelBonus = (currentLevel - 1) * (CALCULATION_SUBJECTS.includes(subject.slug) ? 15 : 5);
         time = baseTime + levelBonus;
       }
 
