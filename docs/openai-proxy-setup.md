@@ -1,0 +1,45 @@
+# OpenAI Proxy Setup
+
+This app can generate live questions through a local or deployed backend proxy so your OpenAI API key stays off the mobile device.
+
+## Important
+
+- An OpenAI API key cannot be used with Gemini APIs.
+- Gemini and OpenAI are separate providers with separate authentication.
+- For production mobile apps, keep the real API key only on the backend.
+
+## Environment
+
+Add these values to your local `.env`:
+
+```env
+OPENAI_API_KEY=your_openai_key_here
+OPENAI_MODEL=gpt-4o-mini
+PORT=8787
+
+EXPO_PUBLIC_AI_MODE=live
+EXPO_PUBLIC_AI_API_URL=http://YOUR_COMPUTER_LAN_IP:8787
+```
+
+Replace `YOUR_COMPUTER_LAN_IP` with the IP address of the machine running the proxy, for example `192.168.1.127`.
+
+## Run the proxy
+
+```powershell
+npm run proxy
+```
+
+The proxy exposes:
+
+- `GET /health`
+- `POST /questions`
+- `POST /feedback`
+- `POST /coach-plan`
+
+## Run the app
+
+```powershell
+npx expo start -c
+```
+
+Make sure your phone and computer are on the same network when using a local proxy.

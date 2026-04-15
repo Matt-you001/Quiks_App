@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Quiks",
+    "slug": "quiks",
+    "scheme": "quiks",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1F33"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.quiks.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1F33"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "./app"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

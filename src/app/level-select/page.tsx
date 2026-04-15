@@ -36,7 +36,12 @@ function LevelSelectClient() {
         const historyKey = `testHistory_${currentProfileId}`;
         const testHistory: TestResult[] = JSON.parse(localStorage.getItem(historyKey) || '[]');
         
-        const subjectHistory = testHistory.filter(result => result.subject === subject?.name);
+        const subjectHistory = testHistory.filter(result => {
+            if (subject?.slug === 'history') {
+                return result.subject === subject?.name || result.subject === 'History';
+            }
+            return result.subject === subject?.name;
+        });
         
         let maxUnlockedLevel = 1;
         subjectHistory.forEach(result => {

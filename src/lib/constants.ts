@@ -27,6 +27,7 @@ export const SUBJECTS: Subject[] = [
   { name: 'Economics', slug: 'economics', icon: Landmark, description: 'Grasp the concepts of economy.' },
   { name: 'Civic Education', slug: 'civic-education', icon: Scale, description: 'Learn about rights and duties.' },
   { name: 'Geography', slug: 'geography', icon: Globe, description: 'Discover the world.' },
+  { name: 'World History', slug: 'history', icon: Landmark, description: 'Explore global events across civilizations and eras.' },
   { name: 'General Knowledge', slug: 'general-knowledge', icon: BrainCircuit, description: 'Broaden your awareness.' },
   { name: 'Current Affairs', slug: 'current-affairs', icon: Newspaper, description: 'Stay updated with events.' },
 ];

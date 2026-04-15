@@ -76,6 +76,7 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
   const [level, setLevel] = useState(startLevel);
   const [difficulty, setDifficulty] = useState("Beginner");
   const [grade, setGrade] = useState("");
+  const [customTime, setCustomTime] = useState<string>("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<(string | null)[]>([]);
@@ -152,8 +153,13 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
 
       let time = 0;
       if (mode === 'quiz') {
-        const levelBonus = (currentLevel - 1) * TIME_INCREMENT_PER_LEVEL;
-        time = BASE_TIME_SECONDS + levelBonus;
+        const desired = parseInt(customTime, 10);
+        if (!Number.isNaN(desired) && desired > 0) {
+          time = desired;
+        } else {
+          const levelBonus = (currentLevel - 1) * TIME_INCREMENT_PER_LEVEL;
+          time = BASE_TIME_SECONDS + levelBonus;
+        }
       }
 
       setTotalTimeForLevel(time);
@@ -297,6 +303,20 @@ export function QuizClient({ subject, mode, startLevel = 1 }: { subject: Seriali
               ))}
             </SelectContent>
           </Select>
+          {mode === 'quiz' && (
+            <div className="text-left">
+              <label className="block text-sm font-medium mb-2">Set Quiz Time (seconds)</label>
+              <input
+                type="number"
+                min={10}
+                placeholder="e.g., 120"
+                value={customTime}
+                onChange={(e) => setCustomTime(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Leave empty to use default time.</p>
+            </div>
+          )}
         </CardContent>
         <CardFooter>
           <Button className="w-full text-lg py-6" onClick={handleGradeSelected} disabled={!grade}>
