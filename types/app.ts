@@ -46,6 +46,16 @@ export interface SessionResult {
   aiStudyPlan: string[];
 }
 
+export interface BreatherContent {
+  id: string;
+  title: string;
+  intro: string;
+  story: string;
+  reflection: string;
+  facts: string[];
+  continueLabel?: string;
+}
+
 export interface StoredAppState {
   profiles: UserProfile[];
   currentProfileId: string | null;

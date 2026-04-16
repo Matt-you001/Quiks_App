@@ -1251,6 +1251,148 @@ const bank: BankQuestion[] = [
   },
 ];
 
+type BankSeed = Pick<Question, "id" | "prompt" | "options" | "answer" | "explanation">;
+
+function createBankSet(subjectId: string, difficulty: Difficulty, gradeBucket: GradeBucket, seeds: BankSeed[]): BankQuestion[] {
+  return seeds.map((seed) => ({
+    ...seed,
+    subjectId,
+    difficulty,
+    gradeBucket,
+  }));
+}
+
+const extraBank: BankQuestion[] = [];
+
+extraBank.push(
+  ...createBankSet("history", "Beginner", "lower-primary", [
+    { id: "hist-lp-beg-1", prompt: "Who is a person that studies and writes about the past?", options: ["Historian", "Tailor", "Pilot", "Farmer"], answer: "Historian", explanation: "A historian studies past events and records them." },
+    { id: "hist-lp-beg-2", prompt: "Which of these helps us learn about the past?", options: ["Old photographs", "Fresh bread", "Rain water", "Plastic cup"], answer: "Old photographs", explanation: "Old photographs can show what people and places were like in the past." },
+    { id: "hist-lp-beg-3", prompt: "What do we call events arranged from earliest to latest?", options: ["Timeline", "Recipe", "Poem", "Market list"], answer: "Timeline", explanation: "A timeline shows events in time order." },
+    { id: "hist-lp-beg-4", prompt: "Which word means a time that has already happened?", options: ["Future", "Present", "Past", "Tomorrow"], answer: "Past", explanation: "The past refers to time that has already happened." },
+    { id: "hist-lp-beg-5", prompt: "Which of these is an important reason to study history?", options: ["To learn from earlier events", "To forget people", "To stop reading", "To avoid questions"], answer: "To learn from earlier events", explanation: "History teaches lessons from people and events that came before us." },
+    { id: "hist-lp-beg-6", prompt: "A king, queen, or leader from long ago belongs to which subject?", options: ["History", "Swimming", "Drawing only", "Singing only"], answer: "History", explanation: "History includes leaders, kingdoms, and events from the past." },
+    { id: "hist-lp-beg-7", prompt: "Which object could be a historical artifact?", options: ["An old clay pot", "A fresh orange", "A cloud", "A shadow"], answer: "An old clay pot", explanation: "Artifacts are old objects that tell us about earlier people." },
+    { id: "hist-lp-beg-8", prompt: "Which comes first on a timeline?", options: ["The earliest event", "The loudest event", "The newest shoe", "The biggest word"], answer: "The earliest event", explanation: "Timelines usually begin with the earliest event." },
+    { id: "hist-lp-beg-9", prompt: "What can a monument help people remember?", options: ["Important people or events", "Only the weather", "Only lunch time", "Only games"], answer: "Important people or events", explanation: "Monuments often honor important people or events from history." },
+    { id: "hist-lp-beg-10", prompt: "Which of these shows respect for history?", options: ["Protecting old records", "Tearing old books", "Throwing artifacts away", "Ignoring museums"], answer: "Protecting old records", explanation: "Old records help us understand the past, so they should be protected." },
+  ]),
+  ...createBankSet("history", "Beginner", "upper-primary", [
+    { id: "hist-up-beg-1", prompt: "What is the main purpose of a museum?", options: ["To preserve and display important objects", "To bake bread", "To repair roads", "To print money"], answer: "To preserve and display important objects", explanation: "Museums preserve objects and teach people about the past and culture." },
+    { id: "hist-up-beg-2", prompt: "Which source is called a primary source?", options: ["A diary written during an event", "A cartoon about space", "A school bell", "A football score"], answer: "A diary written during an event", explanation: "A primary source comes directly from the time being studied." },
+    { id: "hist-up-beg-3", prompt: "Why do historians compare different sources?", options: ["To check accuracy", "To make stories longer", "To avoid reading", "To erase dates"], answer: "To check accuracy", explanation: "Comparing sources helps historians confirm facts and notice bias." },
+    { id: "hist-up-beg-4", prompt: "Which statement best describes archaeology?", options: ["The study of past human life through remains", "The study of clouds", "The study of cooking", "The study of music only"], answer: "The study of past human life through remains", explanation: "Archaeology studies material remains such as tools, bones, and pottery." },
+    { id: "hist-up-beg-5", prompt: "Which of these is a benefit of knowing national history?", options: ["It builds identity and understanding", "It removes all rules", "It makes maps vanish", "It replaces science"], answer: "It builds identity and understanding", explanation: "National history helps people understand identity, progress, and past struggles." },
+    { id: "hist-up-beg-6", prompt: "What does BC or BCE refer to on a timeline?", options: ["Dates before a common reference point", "A weather season", "A money account", "A type of map"], answer: "Dates before a common reference point", explanation: "BC or BCE marks years before the commonly used starting reference." },
+    { id: "hist-up-beg-7", prompt: "Which of these was an important role of ancient kingdoms?", options: ["Organizing leadership and trade", "Stopping all farming", "Removing all language", "Ending all travel"], answer: "Organizing leadership and trade", explanation: "Ancient kingdoms often developed systems of leadership, trade, and culture." },
+    { id: "hist-up-beg-8", prompt: "A written account of a person's life is called what?", options: ["Biography", "Equation", "Diagram", "Forecast"], answer: "Biography", explanation: "A biography tells the story of a person's life." },
+    { id: "hist-up-beg-9", prompt: "Why is chronology important in history?", options: ["It shows the order of events", "It changes all dates", "It hides causes", "It replaces evidence"], answer: "It shows the order of events", explanation: "Chronology helps us understand what happened first and what followed next." },
+    { id: "hist-up-beg-10", prompt: "Which question fits historical thinking best?", options: ["What happened, and why did it matter?", "Which snack tastes best?", "Who runs fastest today?", "What color is louder?"], answer: "What happened, and why did it matter?", explanation: "History focuses on events, causes, effects, and significance." },
+  ])
+);
+
+extraBank.push(
+  ...createBankSet("government", "Beginner", "lower-primary", [
+    { id: "gov-lp-beg-1", prompt: "What do we call people chosen to lead a country or community?", options: ["Leaders", "Painters", "Visitors", "Singers"], answer: "Leaders", explanation: "Leaders help guide and make decisions for groups of people." },
+    { id: "gov-lp-beg-2", prompt: "Why do communities have rules?", options: ["To keep order and safety", "To stop all learning", "To remove kindness", "To hide roads"], answer: "To keep order and safety", explanation: "Rules help people live together peacefully and safely." },
+    { id: "gov-lp-beg-3", prompt: "What is an election?", options: ["A way to choose leaders", "A football match", "A type of weather", "A market bag"], answer: "A way to choose leaders", explanation: "An election is a process people use to choose leaders." },
+    { id: "gov-lp-beg-4", prompt: "Which place is used for making laws in a country?", options: ["Legislature", "Bakery", "Farm", "Garage"], answer: "Legislature", explanation: "The legislature is the arm of government that makes laws." },
+    { id: "gov-lp-beg-5", prompt: "Who should obey the law in a country?", options: ["Everyone", "Only children", "Only teachers", "Only visitors"], answer: "Everyone", explanation: "The law applies to everyone in the country." },
+    { id: "gov-lp-beg-6", prompt: "What do police mainly help to maintain?", options: ["Law and order", "Rainfall", "Homework only", "Tree growth"], answer: "Law and order", explanation: "Police help maintain peace, safety, and law enforcement." },
+    { id: "gov-lp-beg-7", prompt: "A country without rules would likely have more what?", options: ["Confusion", "Peaceful voting", "Clean records", "Stable order"], answer: "Confusion", explanation: "Rules help reduce confusion and disorder." },
+    { id: "gov-lp-beg-8", prompt: "What do citizens do when they vote?", options: ["Choose a leader or decision", "Bake bread", "Wash cars", "Write songs"], answer: "Choose a leader or decision", explanation: "Voting allows citizens to choose leaders or make public decisions." },
+    { id: "gov-lp-beg-9", prompt: "Which is an example of a public service?", options: ["Road maintenance", "Private toy collection", "Secret diary", "Birthday cake"], answer: "Road maintenance", explanation: "Government often provides or manages public services like roads." },
+    { id: "gov-lp-beg-10", prompt: "Why is honesty important in leadership?", options: ["It builds trust", "It closes schools", "It stops voting", "It hides facts"], answer: "It builds trust", explanation: "Honesty helps leaders earn public trust." },
+  ]),
+  ...createBankSet("government", "Beginner", "upper-primary", [
+    { id: "gov-up-beg-1", prompt: "Which arm of government interprets laws?", options: ["Judiciary", "Executive", "Legislature", "Press"], answer: "Judiciary", explanation: "The judiciary interprets laws and settles legal disputes." },
+    { id: "gov-up-beg-2", prompt: "What is the main duty of the executive arm?", options: ["To implement laws and policies", "To draw maps", "To write novels", "To sell goods"], answer: "To implement laws and policies", explanation: "The executive carries out laws and manages government administration." },
+    { id: "gov-up-beg-3", prompt: "Why is separation of powers important?", options: ["It prevents too much power in one place", "It removes courts", "It stops elections", "It ends constitutions"], answer: "It prevents too much power in one place", explanation: "Separation of powers helps prevent abuse by sharing responsibilities." },
+    { id: "gov-up-beg-4", prompt: "What is a constitution?", options: ["The supreme set of rules of a state", "A market price list", "A weather record", "A music sheet"], answer: "The supreme set of rules of a state", explanation: "A constitution sets out the basic laws and structure of government." },
+    { id: "gov-up-beg-5", prompt: "What is democracy?", options: ["Government by the people or their representatives", "Rule by weather", "Government without laws", "Power of one child only"], answer: "Government by the people or their representatives", explanation: "In a democracy, people participate directly or through elected representatives." },
+    { id: "gov-up-beg-6", prompt: "Which institution often conducts elections?", options: ["Electoral commission", "Hospital board", "Art club", "Football team"], answer: "Electoral commission", explanation: "An electoral commission organizes and supervises elections." },
+    { id: "gov-up-beg-7", prompt: "What is the rule of law?", options: ["The idea that everyone is subject to the law", "A rule for one person only", "A type of tax", "A market agreement"], answer: "The idea that everyone is subject to the law", explanation: "The rule of law means no one is above the law." },
+    { id: "gov-up-beg-8", prompt: "Why do governments collect taxes?", options: ["To fund public services", "To stop farming", "To remove schools", "To hide budgets"], answer: "To fund public services", explanation: "Taxes help governments pay for services such as schools, roads, and hospitals." },
+    { id: "gov-up-beg-9", prompt: "Which of these is a sign of good governance?", options: ["Accountability", "Secrecy in all things", "No public services", "Ignoring laws"], answer: "Accountability", explanation: "Good governance includes accountability, transparency, and responsibility." },
+    { id: "gov-up-beg-10", prompt: "Why do citizens need political education?", options: ["To participate wisely in public life", "To avoid all rules", "To stop asking questions", "To remove institutions"], answer: "To participate wisely in public life", explanation: "Political education helps citizens make informed decisions about leadership and government." },
+  ]),
+  ...createBankSet("civic-education", "Beginner", "lower-primary", [
+    { id: "civic-lp-beg-1", prompt: "Which value helps people tell the truth?", options: ["Honesty", "Noise", "Anger", "Delay"], answer: "Honesty", explanation: "Honesty means telling the truth and acting sincerely." },
+    { id: "civic-lp-beg-2", prompt: "What should a good citizen do with public property?", options: ["Protect it", "Damage it", "Hide it", "Ignore it"], answer: "Protect it", explanation: "Public property belongs to everyone and should be protected." },
+    { id: "civic-lp-beg-3", prompt: "Which action shows respect?", options: ["Listening when others speak", "Breaking desks", "Shouting at elders", "Throwing dirt around"], answer: "Listening when others speak", explanation: "Listening respectfully shows good character." },
+    { id: "civic-lp-beg-4", prompt: "What does cooperation mean?", options: ["Working well with others", "Fighting over everything", "Hiding from school", "Wasting water"], answer: "Working well with others", explanation: "Cooperation means helping and working together." },
+    { id: "civic-lp-beg-5", prompt: "Why should we keep our environment clean?", options: ["For health and safety", "To invite disease", "To spoil roads", "To block drains"], answer: "For health and safety", explanation: "A clean environment helps people stay healthy and safe." },
+    { id: "civic-lp-beg-6", prompt: "Which of these shows responsibility?", options: ["Doing your assigned duty", "Ignoring tasks", "Destroying books", "Refusing to help"], answer: "Doing your assigned duty", explanation: "Responsibility means doing what you are supposed to do." },
+    { id: "civic-lp-beg-7", prompt: "What should you do if you see someone in need?", options: ["Offer safe help or tell a responsible adult", "Laugh and walk away", "Push the person", "Take their things"], answer: "Offer safe help or tell a responsible adult", explanation: "Caring citizens help others in safe and responsible ways." },
+    { id: "civic-lp-beg-8", prompt: "Which action supports peace?", options: ["Settling disagreements calmly", "Starting fights", "Spreading lies", "Breaking rules for fun"], answer: "Settling disagreements calmly", explanation: "Peace grows when people resolve disagreements calmly." },
+    { id: "civic-lp-beg-9", prompt: "What is a community?", options: ["A group of people living together in one area", "Only a single person", "A kind of weather", "A school subject only"], answer: "A group of people living together in one area", explanation: "A community is a group of people who share a place and life together." },
+    { id: "civic-lp-beg-10", prompt: "Why is punctuality important?", options: ["It shows respect for time and duty", "It makes work impossible", "It causes confusion", "It stops teamwork"], answer: "It shows respect for time and duty", explanation: "Being punctual shows discipline and respect for others." },
+  ]),
+  ...createBankSet("civic-education", "Beginner", "upper-primary", [
+    { id: "civic-up-beg-1", prompt: "Which of these is a civic responsibility?", options: ["Obeying laws", "Damaging roads", "Spreading violence", "Avoiding school completely"], answer: "Obeying laws", explanation: "Citizens have responsibilities such as obeying laws and supporting order." },
+    { id: "civic-up-beg-2", prompt: "What is tolerance?", options: ["Respecting people with differences", "Fighting everyone", "Ignoring every rule", "Taking public property"], answer: "Respecting people with differences", explanation: "Tolerance means living peacefully with people who may think or act differently." },
+    { id: "civic-up-beg-3", prompt: "Why is community service valuable?", options: ["It improves society through helpful action", "It removes rights", "It wastes every effort", "It blocks cooperation"], answer: "It improves society through helpful action", explanation: "Community service helps solve problems and strengthens society." },
+    { id: "civic-up-beg-4", prompt: "Which action best shows patriotism?", options: ["Working for the good of your country", "Destroying national symbols", "Refusing all duties", "Ignoring public issues"], answer: "Working for the good of your country", explanation: "Patriotism includes serving and caring about the progress of one's country." },
+    { id: "civic-up-beg-5", prompt: "What is one benefit of human rights?", options: ["They protect dignity and freedom", "They remove all duties", "They end all laws", "They stop education"], answer: "They protect dignity and freedom", explanation: "Human rights help protect people from abuse and unfair treatment." },
+    { id: "civic-up-beg-6", prompt: "Why is discipline important in school and society?", options: ["It helps order and progress", "It destroys teamwork", "It stops learning", "It removes respect"], answer: "It helps order and progress", explanation: "Discipline supports responsible behavior and progress." },
+    { id: "civic-up-beg-7", prompt: "Which behavior supports national unity?", options: ["Respecting people from different groups", "Insulting others for their background", "Spreading hatred", "Rejecting peace talks"], answer: "Respecting people from different groups", explanation: "Respect and inclusion help build national unity." },
+    { id: "civic-up-beg-8", prompt: "What does integrity mean?", options: ["Doing what is right even when no one is watching", "Changing truth for gain", "Avoiding all responsibility", "Breaking promises often"], answer: "Doing what is right even when no one is watching", explanation: "Integrity means strong moral behavior and consistency." },
+    { id: "civic-up-beg-9", prompt: "Which of these helps prevent corruption?", options: ["Transparency and accountability", "Secret misuse of funds", "Ignoring records", "Refusing oversight"], answer: "Transparency and accountability", explanation: "Transparency and accountability help reduce corruption." },
+    { id: "civic-up-beg-10", prompt: "Why should citizens participate in community decisions?", options: ["To help shape better outcomes", "To avoid every responsibility", "To stop all discussion", "To remove cooperation"], answer: "To help shape better outcomes", explanation: "Active participation helps communities make wiser and fairer decisions." },
+  ])
+);
+
+extraBank.push(
+  ...createBankSet("economics", "Beginner", "lower-primary", [
+    { id: "econ-lp-beg-1", prompt: "Which of these is something people need?", options: ["Clean water", "Golden crown", "Toy robot", "Video game"], answer: "Clean water", explanation: "Clean water is a basic need for life." },
+    { id: "econ-lp-beg-2", prompt: "What do we call something people want but can live without?", options: ["Want", "Law", "River", "Harvest"], answer: "Want", explanation: "A want is something people would like but do not need for survival." },
+    { id: "econ-lp-beg-3", prompt: "When you save money, what are you doing?", options: ["Keeping some money for later", "Throwing money away", "Cutting money in half", "Painting coins"], answer: "Keeping some money for later", explanation: "Saving means keeping money to use in the future." },
+    { id: "econ-lp-beg-4", prompt: "Where do many people buy and sell goods?", options: ["Market", "Library", "Playground", "Bridge"], answer: "Market", explanation: "A market is a place where goods are bought and sold." },
+    { id: "econ-lp-beg-5", prompt: "If you choose one toy instead of another, you are making a what?", options: ["Choice", "Storm", "Shadow", "Map"], answer: "Choice", explanation: "Economics often involves making choices between options." },
+    { id: "econ-lp-beg-6", prompt: "Who sells bread in a shop?", options: ["Seller", "Reader", "Painter", "Runner"], answer: "Seller", explanation: "A seller provides goods to buyers." },
+    { id: "econ-lp-beg-7", prompt: "What do we use to pay for goods and services?", options: ["Money", "Leaves", "Dust", "Stones"], answer: "Money", explanation: "Money is commonly used to buy goods and services." },
+    { id: "econ-lp-beg-8", prompt: "If a family buys food, the family is acting as what?", options: ["Consumer", "Mountain", "Weather", "Animal"], answer: "Consumer", explanation: "Consumers are people who use or buy goods and services." },
+    { id: "econ-lp-beg-9", prompt: "What is a simple meaning of price?", options: ["The amount paid for something", "The color of a product", "The smell of a product", "The age of a shop"], answer: "The amount paid for something", explanation: "Price is the amount of money paid for a good or service." },
+    { id: "econ-lp-beg-10", prompt: "Why do people work?", options: ["To earn income", "To stop all trade", "To remove markets", "To freeze time"], answer: "To earn income", explanation: "People work to earn income and meet needs and wants." },
+  ]),
+  ...createBankSet("economics", "Beginner", "upper-primary", [
+    { id: "econ-up-beg-1", prompt: "What does scarcity mean?", options: ["Resources are limited", "Money grows on trees", "Everything is free", "Needs disappear"], answer: "Resources are limited", explanation: "Scarcity means resources are not enough to satisfy every want." },
+    { id: "econ-up-beg-2", prompt: "What is opportunity cost?", options: ["The next best option you give up", "A free prize", "A school timetable", "A bank note design"], answer: "The next best option you give up", explanation: "Opportunity cost is the value of the next best alternative not chosen." },
+    { id: "econ-up-beg-3", prompt: "Who is a producer?", options: ["Someone who makes goods or services", "Someone who sleeps at work", "Someone who only watches", "Someone who avoids markets"], answer: "Someone who makes goods or services", explanation: "Producers create goods or provide services." },
+    { id: "econ-up-beg-4", prompt: "If demand for rice rises sharply while supply stays the same, what is likely to happen to price?", options: ["It may rise", "It must become zero", "It turns into wages", "It becomes a map"], answer: "It may rise", explanation: "When demand rises and supply does not, prices often increase." },
+    { id: "econ-up-beg-5", prompt: "What is a budget?", options: ["A plan for spending and saving money", "A type of transport", "A market building", "A farming tool"], answer: "A plan for spending and saving money", explanation: "A budget helps people manage income and expenses." },
+    { id: "econ-up-beg-6", prompt: "Which of these is an example of a service?", options: ["Haircut", "Bag of rice", "Desk", "Bottle"], answer: "Haircut", explanation: "A haircut is a service because someone performs work for another person." },
+    { id: "econ-up-beg-7", prompt: "Why is saving useful?", options: ["It helps with future needs and emergencies", "It destroys value", "It stops planning", "It removes all choices"], answer: "It helps with future needs and emergencies", explanation: "Savings can help pay for future goals or unexpected problems." },
+    { id: "econ-up-beg-8", prompt: "What is profit in a simple business?", options: ["Money left after costs are paid", "All the goods on a shelf", "Every coin in a town", "Only the selling price"], answer: "Money left after costs are paid", explanation: "Profit is what remains after subtracting costs from revenue." },
+    { id: "econ-up-beg-9", prompt: "What does supply refer to?", options: ["The amount producers are willing to sell", "Only imported goods", "The number of school bags", "Every road in a town"], answer: "The amount producers are willing to sell", explanation: "Supply is the quantity of goods or services sellers offer." },
+    { id: "econ-up-beg-10", prompt: "Why do economists study choices?", options: ["Because resources are limited", "Because weather never changes", "Because maps are silent", "Because food has no cost"], answer: "Because resources are limited", explanation: "Economics studies how people choose when resources are limited." },
+  ]),
+  ...createBankSet("geography", "Beginner", "lower-primary", [
+    { id: "geo-lp-beg-1", prompt: "Which tool helps us find places on Earth?", options: ["Map", "Spoon", "Pillow", "Drum"], answer: "Map", explanation: "A map shows places and where they are located." },
+    { id: "geo-lp-beg-2", prompt: "What do we call a very large body of land?", options: ["Continent", "Raindrop", "Footpath", "Lantern"], answer: "Continent", explanation: "A continent is a very large continuous area of land." },
+    { id: "geo-lp-beg-3", prompt: "Which of these is a water body?", options: ["River", "Hill", "Road", "Forest path"], answer: "River", explanation: "A river is a natural body of flowing water." },
+    { id: "geo-lp-beg-4", prompt: "Which weather condition brings drops of water from clouds?", options: ["Rain", "Dust", "Rock", "Leaf"], answer: "Rain", explanation: "Rain is water that falls from clouds." },
+    { id: "geo-lp-beg-5", prompt: "What do we call land that is higher than the area around it?", options: ["Hill", "Plate", "Bag", "Bottle"], answer: "Hill", explanation: "A hill is raised land above the surrounding area." },
+    { id: "geo-lp-beg-6", prompt: "Which direction does the sun usually rise from?", options: ["East", "West", "North", "South"], answer: "East", explanation: "The sun appears to rise in the east." },
+    { id: "geo-lp-beg-7", prompt: "A place where many trees grow is called what?", options: ["Forest", "Harbor", "Factory", "Bridge"], answer: "Forest", explanation: "A forest is an area with many trees." },
+    { id: "geo-lp-beg-8", prompt: "Which of these is part of our environment?", options: ["Air", "Homework only", "Television show", "Secret code"], answer: "Air", explanation: "Air is part of the natural environment around us." },
+    { id: "geo-lp-beg-9", prompt: "What helps people know if a day may be sunny or rainy?", options: ["Weather report", "Storybook cover", "School bell", "Football net"], answer: "Weather report", explanation: "A weather report tells us about expected weather conditions." },
+    { id: "geo-lp-beg-10", prompt: "Which place is likely to have sand and very little rain?", options: ["Desert", "Lake", "Swamp", "Garden"], answer: "Desert", explanation: "Deserts are usually dry and receive very little rain." },
+  ]),
+  ...createBankSet("geography", "Beginner", "upper-primary", [
+    { id: "geo-up-beg-1", prompt: "What is climate?", options: ["The usual weather of a place over time", "A single cloud", "A map symbol", "A type of trade"], answer: "The usual weather of a place over time", explanation: "Climate describes the long-term weather pattern of a place." },
+    { id: "geo-up-beg-2", prompt: "Which line divides the Earth into Northern and Southern Hemispheres?", options: ["Equator", "Tropic of Cancer", "Prime Meridian", "International Date Line"], answer: "Equator", explanation: "The Equator divides the Earth into northern and southern halves." },
+    { id: "geo-up-beg-3", prompt: "What is the main purpose of a compass?", options: ["To show direction", "To measure rainfall", "To count population", "To store water"], answer: "To show direction", explanation: "A compass helps people find direction." },
+    { id: "geo-up-beg-4", prompt: "Which of these is a renewable natural resource?", options: ["Sunlight", "Coal only", "Gold bar", "Plastic bottle"], answer: "Sunlight", explanation: "Sunlight is a renewable resource because it is naturally replenished." },
+    { id: "geo-up-beg-5", prompt: "Why do many people live near rivers?", options: ["Water and transport are available", "Mountains disappear there", "There is never any farming", "There are no settlements"], answer: "Water and transport are available", explanation: "Rivers support water supply, farming, and transport." },
+    { id: "geo-up-beg-6", prompt: "Which term describes the number of people living in a place?", options: ["Population", "Vegetation", "Latitude", "Altitude"], answer: "Population", explanation: "Population is the number of people in a given place." },
+    { id: "geo-up-beg-7", prompt: "What is erosion?", options: ["The wearing away of soil or rock", "The growth of new cities", "The making of laws", "The study of language"], answer: "The wearing away of soil or rock", explanation: "Erosion removes soil or rock through water, wind, or other forces." },
+    { id: "geo-up-beg-8", prompt: "Which map feature explains what symbols mean?", options: ["Legend or key", "Compass rose only", "Border", "Title page only"], answer: "Legend or key", explanation: "A map legend or key explains symbols used on the map." },
+    { id: "geo-up-beg-9", prompt: "What is the main difference between weather and climate?", options: ["Weather is short-term, climate is long-term", "Weather is always hot", "Climate happens in one day", "They mean exactly the same thing"], answer: "Weather is short-term, climate is long-term", explanation: "Weather changes daily, while climate describes long-term patterns." },
+    { id: "geo-up-beg-10", prompt: "Which human activity can increase pollution in a city?", options: ["Poor waste disposal", "Planting trees", "Cleaning drains", "Recycling materials"], answer: "Poor waste disposal", explanation: "Poor waste disposal can pollute land, water, and air." },
+  ])
+);
+
 function toGradeBucket(grade: string): GradeBucket {
   const gradeNumber = Number(grade.replace(/[^\d]/g, ""));
   if (Number.isFinite(gradeNumber) && gradeNumber >= 4) {
@@ -1271,19 +1413,20 @@ function rotate<T>(items: T[], offset: number) {
 
 export function getLocalQuestions(request: QuestionRequest): Question[] {
   const gradeBucket = toGradeBucket(request.grade);
+  const allQuestions = [...bank, ...extraBank];
 
-  const exact = bank.filter(
+  const exact = allQuestions.filter(
     (question) =>
       question.subjectId === request.subject.id &&
       question.difficulty === request.difficulty &&
       question.gradeBucket === gradeBucket
   );
 
-  const subjectFallback = bank.filter(
+  const subjectFallback = allQuestions.filter(
     (question) => question.subjectId === request.subject.id && question.gradeBucket === gradeBucket
   );
 
-  const difficultyFallback = bank.filter(
+  const difficultyFallback = allQuestions.filter(
     (question) => question.subjectId === request.subject.id && question.difficulty === request.difficulty
   );
 

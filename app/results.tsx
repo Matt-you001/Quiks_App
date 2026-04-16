@@ -1,8 +1,10 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { getSubjectPassStreak, shouldOfferBreather } from "../lib/breathers";
+import { readAppState } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import type { Difficulty, SessionResult } from "../types/app";
@@ -11,6 +13,8 @@ const allowedDifficulties: Difficulty[] = ["Beginner", "Intermediate", "Advanced
 
 export default function ResultsScreen() {
   const params = useLocalSearchParams<{ result?: string; nextDifficulty?: string }>();
+  const [showBreather, setShowBreather] = useState(false);
+  const [passStreak, setPassStreak] = useState(0);
 
   const result = useMemo(() => {
     if (!params.result || Array.isArray(params.result)) {
@@ -23,6 +27,33 @@ export default function ResultsScreen() {
       return null;
     }
   }, [params.result]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!result) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    readAppState().then((state) => {
+      if (cancelled) {
+        return;
+      }
+
+      const currentProfileId = state.currentProfileId;
+      const profileResults = currentProfileId ? state.results[currentProfileId] ?? [] : [];
+      const streak = getSubjectPassStreak(profileResults, result.subjectId);
+
+      setPassStreak(streak);
+      setShowBreather(shouldOfferBreather(profileResults, result));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [result]);
 
   if (!result) {
     return (
@@ -78,6 +109,22 @@ export default function ResultsScreen() {
     });
   };
 
+  const openBreather = () => {
+    router.push({
+      pathname: "/breather",
+      params: {
+        subjectId: result.subjectId,
+        subjectName: result.subjectName,
+        level: String(result.level),
+        grade: result.grade,
+        mode: result.mode,
+        difficulty: result.difficulty,
+        nextDifficulty,
+        streak: String(passStreak),
+      },
+    });
+  };
+
   return (
     <AppBackground>
       <View style={styles.heroCard}>
@@ -88,6 +135,17 @@ export default function ResultsScreen() {
         </Text>
         <Text style={styles.heroSummary}>{summary}</Text>
       </View>
+
+      {passed && showBreather ? (
+        <View style={styles.rewardCard}>
+          <Text style={styles.rewardEyebrow}>Reward unlocked</Text>
+          <Text style={styles.rewardTitle}>Take a learning breather</Text>
+          <Text style={styles.rewardText}>
+            You have passed {passStreak} {passStreak === 1 ? "level" : "levels"} in {result.subjectName}. A short,
+            story-based reset is ready if you want one before the next exercise.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.title}>Performance message</Text>
@@ -114,8 +172,15 @@ export default function ResultsScreen() {
       </View>
 
       <View style={styles.actionColumn}>
-        {passed ? <PrimaryButton label="Next Level" onPress={goToNextLevel} /> : null}
-        <PrimaryButton label="Repeat" variant={passed ? "secondary" : "primary"} onPress={repeatLevel} />
+        {passed && showBreather ? <PrimaryButton label="Take Learning Breather" onPress={openBreather} /> : null}
+        {passed ? (
+          <PrimaryButton
+            label={showBreather ? "Skip Breather and Continue" : "Next Level"}
+            variant={showBreather ? "secondary" : "primary"}
+            onPress={goToNextLevel}
+          />
+        ) : null}
+        <PrimaryButton label="Repeat This Level" variant={passed ? "secondary" : "primary"} onPress={repeatLevel} />
         <PrimaryButton label="Back Home" variant="ghost" onPress={backHome} />
       </View>
     </AppBackground>
@@ -152,6 +217,32 @@ const styles = StyleSheet.create({
     marginTop: 10,
     lineHeight: 22,
     fontSize: 15,
+  },
+  rewardCard: {
+    marginTop: 18,
+    backgroundColor: "#FFF4DE",
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#F2C982",
+  },
+  rewardEyebrow: {
+    color: "#9A6400",
+    textTransform: "uppercase",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+  },
+  rewardTitle: {
+    color: "#493000",
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  rewardText: {
+    color: "#6A5130",
+    marginTop: 10,
+    lineHeight: 22,
   },
   card: {
     marginTop: 18,
