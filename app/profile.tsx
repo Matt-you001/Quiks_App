@@ -1,62 +1,50 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { deleteProfile, getProfileResults, readAppState, setCurrentProfile, upsertProfile } from "../lib/storage";
+import { readAppState } from "../lib/storage";
+import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import type { SessionResult, UserProfile } from "../types/app";
 
-const defaultForm = {
-  name: "",
-  age: "",
-  targetExam: "General school prep",
-  dailyGoalMinutes: "20",
-};
+function getGradeRank(grade: string) {
+  const gradeNumber = Number(grade.replace(/[^\d]/g, ""));
+  if (Number.isFinite(gradeNumber) && gradeNumber > 0) {
+    return gradeNumber;
+  }
 
-function createId() {
-  return Math.random().toString(36).slice(2, 10);
+  if (grade === "High School") {
+    return 13;
+  }
+
+  if (grade === "University") {
+    return 14;
+  }
+
+  return 0;
+}
+
+function isSameLocalDay(dateIso: string) {
+  const now = new Date();
+  const value = new Date(dateIso);
+
+  return (
+    value.getFullYear() === now.getFullYear() &&
+    value.getMonth() === now.getMonth() &&
+    value.getDate() === now.getDate()
+  );
 }
 
 export default function ProfileScreen() {
-  const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [currentProfileId, setCurrentProfileIdState] = useState<string | null>(null);
+  const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
-  const [form, setForm] = useState(defaultForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const activeProfile = useMemo(
-    () => profiles.find((profile) => profile.id === currentProfileId) ?? null,
-    [profiles, currentProfileId]
-  );
 
   const load = useCallback(async () => {
     const state = await readAppState();
-    setProfiles(state.profiles);
-    setCurrentProfileIdState(state.currentProfileId);
     const profile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
-    if (profile) {
-      setEditingId(profile.id);
-      setForm({
-        name: profile.name,
-        age: String(profile.age),
-        targetExam: profile.targetExam,
-        dailyGoalMinutes: String(profile.dailyGoalMinutes),
-      });
-      setResults(await getProfileResults(profile.id));
-    } else {
-      setEditingId(null);
-      setForm(defaultForm);
-      setResults([]);
-    }
+    setActiveProfile(profile);
+    setResults(profile ? state.results[profile.id] ?? [] : []);
   }, []);
 
   useFocusEffect(
@@ -65,172 +53,180 @@ export default function ProfileScreen() {
     }, [load])
   );
 
-  const saveProfile = async () => {
-    if (!form.name.trim()) {
-      Alert.alert("Name required", "Please enter a learner name.");
-      return;
+  const bestScore = results.length > 0 ? `${Math.max(...results.map((result) => result.score))}%` : "0%";
+  const latestPerformance = results[0] ? `${results[0].score}% in ${results[0].subjectName}` : "No sessions yet";
+
+  const highestAttainment = useMemo(() => {
+    const passedResults = results.filter((result) => result.score >= SCORE_THRESHOLD);
+    if (passedResults.length === 0) {
+      return { grade: "Not reached yet", level: "-" };
     }
 
-    const age = Number(form.age);
-    const goal = Number(form.dailyGoalMinutes);
-    if (!Number.isFinite(age) || age < 3) {
-      Alert.alert("Invalid age", "Please enter a valid age.");
-      return;
-    }
+    const best = passedResults.reduce((currentBest, result) => {
+      if (!currentBest) {
+        return result;
+      }
 
-    if (!Number.isFinite(goal) || goal < 5) {
-      Alert.alert("Invalid goal", "Please enter at least 5 minutes for the daily goal.");
-      return;
-    }
+      const gradeDiff = getGradeRank(result.grade) - getGradeRank(currentBest.grade);
+      if (gradeDiff > 0) {
+        return result;
+      }
 
-    setSaving(true);
-    const profile: UserProfile = {
-      id: editingId ?? createId(),
-      name: form.name.trim(),
-      age,
-      targetExam: form.targetExam.trim() || "General school prep",
-      dailyGoalMinutes: goal,
+      if (gradeDiff === 0 && result.level > currentBest.level) {
+        return result;
+      }
+
+      return currentBest;
+    }, passedResults[0]);
+
+    return {
+      grade: best.grade,
+      level: String(best.level),
     };
-    await upsertProfile(profile);
-    await load();
-    setSaving(false);
-  };
+  }, [results]);
 
-  const switchProfile = async (profileId: string) => {
-    await setCurrentProfile(profileId);
-    await load();
-  };
+  const todaySeconds = results.filter((result) => isSameLocalDay(result.date)).reduce((sum, result) => sum + result.timeTakenSeconds, 0);
+  const todayMinutes = Math.round(todaySeconds / 60);
+  const goalMinutes = activeProfile?.dailyGoalMinutes ?? 0;
 
-  const removeProfile = async (profileId: string) => {
-    await deleteProfile(profileId);
-    await load();
-  };
+  let goalFeedback = "No study target available yet.";
+  if (activeProfile) {
+    if (todayMinutes > goalMinutes) {
+      goalFeedback = "Daily target exceeded. Excellent consistency today.";
+    } else if (todayMinutes === goalMinutes) {
+      goalFeedback = "Daily target reached. Well done.";
+    } else {
+      goalFeedback = `Daily target not reached yet. ${Math.max(goalMinutes - todayMinutes, 0)} minute(s) to go.`;
+    }
+  }
 
-  const resetForm = () => {
-    setEditingId(null);
-    setForm(defaultForm);
-  };
-
-  const totalCoins = results.reduce((sum, result) => sum + result.coinsEarned, 0);
+  if (!activeProfile) {
+    return (
+      <AppBackground>
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>No student selected</Text>
+            <Text style={styles.emptyText}>Create a profile first or return home and choose a learner.</Text>
+            <View style={styles.actionColumn}>
+            <PrimaryButton
+              label="Create profile"
+              onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
+            />
+            <PrimaryButton label="Back Home" variant="ghost" onPress={() => router.replace("/")} />
+          </View>
+        </View>
+      </AppBackground>
+    );
+  }
 
   return (
     <AppBackground>
-      <View style={styles.headerCard}>
-        <Text style={styles.headerTitle}>Learner profile</Text>
-        <Text style={styles.headerText}>
-          Personalize the study experience, keep progress per learner, and prepare for a store-ready family-friendly app
-          flow.
+      <View style={styles.heroCard}>
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroIdentity}>
+            <Text style={styles.heroTitle}>{activeProfile.name}</Text>
+            <Text style={styles.heroSubtitle}>
+              Age {activeProfile.age} | {activeProfile.targetExam}
+            </Text>
+          </View>
+        </View>
+        <View>
+          <Text style={styles.heroText}>Goal: {activeProfile.dailyGoalMinutes} minutes</Text>
+          <View style={styles.attainmentCard}>
+            <Text style={styles.attainmentLabel}>Highest attained</Text>
+            <Text style={styles.attainmentValue}>{highestAttainment.grade}</Text>
+            <Text style={styles.attainmentSubtext}>Level {highestAttainment.level}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Today&apos;s study time</Text>
+        <Text style={styles.metricHighlight}>
+          {todayMinutes} min / {goalMinutes} min
         </Text>
+        <Text style={styles.metricText}>{goalFeedback}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{editingId ? "Edit active learner" : "Create learner"}</Text>
-
-        <Text style={styles.label}>Name</Text>
-        <TextInput
-          value={form.name}
-          onChangeText={(value) => setForm((current) => ({ ...current, name: value }))}
-          style={styles.input}
-          placeholder="Enter learner name"
-          placeholderTextColor="#7C8EA3"
-        />
-
-        <Text style={styles.label}>Age</Text>
-        <TextInput
-          value={form.age}
-          onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
-          style={styles.input}
-          placeholder="Age"
-          keyboardType="number-pad"
-          placeholderTextColor="#7C8EA3"
-        />
-
-        <Text style={styles.label}>Target exam</Text>
-        <TextInput
-          value={form.targetExam}
-          onChangeText={(value) => setForm((current) => ({ ...current, targetExam: value }))}
-          style={styles.input}
-          placeholder="WAEC, school prep, olympiad..."
-          placeholderTextColor="#7C8EA3"
-        />
-
-        <Text style={styles.label}>Daily goal in minutes</Text>
-        <TextInput
-          value={form.dailyGoalMinutes}
-          onChangeText={(value) => setForm((current) => ({ ...current, dailyGoalMinutes: value }))}
-          style={styles.input}
-          placeholder="20"
-          keyboardType="number-pad"
-          placeholderTextColor="#7C8EA3"
-        />
-
-        <View style={styles.row}>
-          <PrimaryButton label="Save profile" onPress={saveProfile} loading={saving} style={styles.flex} />
-          <PrimaryButton label="New learner" variant="secondary" onPress={resetForm} style={styles.flex} />
-        </View>
+        <Text style={styles.cardTitle}>Learning record</Text>
+        <Text style={styles.metricText}>Best score: {bestScore}</Text>
+        <Text style={styles.metricText}>Sessions completed: {results.length}</Text>
+        <Text style={styles.metricText}>Latest score: {latestPerformance}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Saved learners</Text>
-        {profiles.length === 0 ? (
-          <Text style={styles.emptyText}>No learner profiles yet.</Text>
-        ) : (
-          profiles.map((profile) => (
-            <View key={profile.id} style={styles.profileRow}>
-              <View style={styles.profileMeta}>
-                <Text style={styles.profileName}>{profile.name}</Text>
-                <Text style={styles.profileSubtext}>
-                  Age {profile.age} • {profile.targetExam} • {profile.dailyGoalMinutes} mins/day
-                </Text>
-              </View>
-              <View style={styles.profileButtons}>
-                <PrimaryButton
-                  label={profile.id === currentProfileId ? "Active" : "Use"}
-                  variant={profile.id === currentProfileId ? "primary" : "secondary"}
-                  onPress={() => switchProfile(profile.id)}
-                  style={styles.smallButton}
-                />
-                <PrimaryButton label="Delete" variant="ghost" onPress={() => removeProfile(profile.id)} style={styles.smallButton} />
-              </View>
-            </View>
-          ))
-        )}
+        <Text style={styles.cardTitle}>Profile details</Text>
+        <Text style={styles.metricText}>Target exam: {activeProfile.targetExam}</Text>
+        <Text style={styles.metricText}>Daily target: {activeProfile.dailyGoalMinutes} minutes</Text>
       </View>
 
-      {activeProfile ? (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Progress snapshot</Text>
-          <Text style={styles.metricText}>Coins earned: {totalCoins}</Text>
-          <Text style={styles.metricText}>Sessions completed: {results.length}</Text>
-          <Text style={styles.metricText}>
-            Latest score: {results[0] ? `${results[0].score}% in ${results[0].subjectName}` : "No sessions yet"}
-          </Text>
-
-          <Pressable onPress={() => router.back()} style={styles.linkButton}>
-            <Text style={styles.linkText}>Return to home</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      <View style={styles.actionColumn}>
+        <PrimaryButton label="Edit Profile" onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "edit" } } as never)} />
+        <PrimaryButton
+          label="Create Another Profile"
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
+        />
+        <PrimaryButton label="Back Home" variant="ghost" onPress={() => router.replace("/")} />
+      </View>
     </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  headerCard: {
+  heroCard: {
     marginTop: 12,
     borderRadius: 28,
     padding: 22,
     backgroundColor: "rgba(255,255,255,0.1)",
   },
-  headerTitle: {
-    color: palette.white,
-    fontSize: 30,
-    fontWeight: "800",
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
   },
-  headerText: {
-    marginTop: 10,
+  heroIdentity: {
+    flex: 1,
+  },
+  heroTitle: {
+    color: palette.white,
+    fontSize: 28,
+    fontWeight: "900",
+  },
+  heroSubtitle: {
+    marginTop: 8,
     color: "#E8F4FB",
     lineHeight: 22,
+  },
+  heroText: {
+    marginTop: 16,
+    color: "#D8EDF8",
+    lineHeight: 22,
+  },
+  attainmentCard: {
+    minWidth: 128,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    padding: 14,
+  },
+  attainmentLabel: {
+    color: "#D5F0FB",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.9,
+  },
+  attainmentValue: {
+    color: palette.white,
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  attainmentSubtext: {
+    color: "#D8EDF8",
+    marginTop: 4,
+    fontSize: 13,
   },
   card: {
     marginTop: 18,
@@ -243,72 +239,37 @@ const styles = StyleSheet.create({
     color: palette.ink,
     fontSize: 20,
     fontWeight: "800",
-    marginBottom: 14,
-  },
-  label: {
-    color: palette.slate,
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 6,
-    marginTop: 10,
-  },
-  input: {
-    minHeight: 50,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#D6E0EA",
-    backgroundColor: "#F9FBFD",
-    paddingHorizontal: 14,
-    color: palette.ink,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 16,
-  },
-  flex: {
-    flex: 1,
-  },
-  emptyText: {
-    color: palette.slate,
-  },
-  profileRow: {
-    borderWidth: 1,
-    borderColor: "#E3EAF1",
-    borderRadius: 18,
-    padding: 14,
-    marginTop: 12,
-  },
-  profileMeta: {
     marginBottom: 10,
   },
-  profileName: {
-    color: palette.ink,
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  profileSubtext: {
-    color: palette.slate,
-    marginTop: 4,
-  },
-  profileButtons: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  smallButton: {
-    flex: 1,
-    minHeight: 46,
+  metricHighlight: {
+    color: palette.navy,
+    fontSize: 28,
+    fontWeight: "900",
   },
   metricText: {
     color: palette.slate,
     lineHeight: 24,
+    marginTop: 6,
   },
-  linkButton: {
-    marginTop: 12,
-    paddingVertical: 10,
+  emptyCard: {
+    marginTop: 30,
+    backgroundColor: palette.white,
+    borderRadius: 24,
+    padding: 20,
+    ...shadows.card,
   },
-  linkText: {
-    color: palette.navy,
-    fontWeight: "700",
+  emptyTitle: {
+    color: palette.ink,
+    fontSize: 26,
+    fontWeight: "800",
+  },
+  emptyText: {
+    color: palette.slate,
+    marginTop: 10,
+    lineHeight: 22,
+  },
+  actionColumn: {
+    marginTop: 18,
+    gap: 12,
   },
 });

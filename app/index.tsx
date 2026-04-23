@@ -1,29 +1,43 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
-import { getProfileResults, readAppState } from "../lib/storage";
-import { subjects } from "../lib/subjects";
+import { readAppState, setCurrentProfile } from "../lib/storage";
+import { SCORE_THRESHOLD, subjects } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import type { SessionResult, UserProfile } from "../types/app";
 
+function getGradeRank(grade: string) {
+  const gradeNumber = Number(grade.replace(/[^\d]/g, ""));
+  if (Number.isFinite(gradeNumber) && gradeNumber > 0) {
+    return gradeNumber;
+  }
+
+  if (grade === "High School") {
+    return 13;
+  }
+
+  if (grade === "University") {
+    return 14;
+  }
+
+  return 0;
+}
+
 export default function HomeScreen() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [results, setResults] = useState<SessionResult[]>([]);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [currentProfileId, setCurrentProfileIdState] = useState<string | null>(null);
+  const [resultsByProfile, setResultsByProfile] = useState<Record<string, SessionResult[]>>({});
 
   const loadData = useCallback(async () => {
     const state = await readAppState();
-    const activeProfile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
-    setProfile(activeProfile);
-    if (activeProfile) {
-      setResults(await getProfileResults(activeProfile.id));
-    } else {
-      setResults([]);
-    }
+    setProfiles(state.profiles);
+    setCurrentProfileIdState(state.currentProfileId);
+    setResultsByProfile(state.results);
   }, []);
 
   useFocusEffect(
@@ -32,52 +46,223 @@ export default function HomeScreen() {
     }, [loadData])
   );
 
-  const totalCoins = results.reduce((sum, result) => sum + result.coinsEarned, 0);
-  const bestScore = results[0] ? `${Math.max(...results.map((result) => result.score))}%` : "0%";
+  const activeProfile = useMemo(
+    () => profiles.find((profile) => profile.id === currentProfileId) ?? null,
+    [profiles, currentProfileId]
+  );
+
+  const activeProfileResults = useMemo(
+    () => (activeProfile ? resultsByProfile[activeProfile.id] ?? [] : []),
+    [activeProfile, resultsByProfile]
+  );
+
+  const highestUnlockedBySubject = useMemo(() => {
+    if (!activeProfile) {
+      return [];
+    }
+
+    return subjects
+      .map((subject) => {
+        const passedResults = activeProfileResults.filter(
+          (result) => result.subjectId === subject.id && result.score >= SCORE_THRESHOLD
+        );
+
+        if (passedResults.length === 0) {
+          return null;
+        }
+
+        const best = passedResults.reduce((currentBest, result) => {
+          if (!currentBest) {
+            return result;
+          }
+
+          const gradeDiff = getGradeRank(result.grade) - getGradeRank(currentBest.grade);
+          if (gradeDiff > 0) {
+            return result;
+          }
+
+          if (gradeDiff === 0 && result.level > currentBest.level) {
+            return result;
+          }
+
+          return currentBest;
+        }, passedResults[0]);
+
+        return {
+          subjectId: subject.id,
+          subjectName: subject.name,
+          grade: best.grade,
+          level: best.level + 1,
+        };
+      })
+      .filter((entry): entry is { subjectId: string; subjectName: string; grade: string; level: number } => Boolean(entry))
+      .sort((left, right) => {
+        const gradeDiff = getGradeRank(right.grade) - getGradeRank(left.grade);
+        if (gradeDiff !== 0) {
+          return gradeDiff;
+        }
+
+        return right.level - left.level;
+      });
+  }, [activeProfile, activeProfileResults]);
+
+  const selectProfile = async (profileId: string) => {
+    await setCurrentProfile(profileId);
+    setCurrentProfileIdState(profileId);
+  };
+
+  const openSubject = (subjectId: string) => {
+    if (!activeProfile) {
+      router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never);
+      return;
+    }
+
+    router.push({ pathname: "/subject/[slug]", params: { slug: subjectId } });
+  };
 
   return (
     <AppBackground>
       <View style={styles.heroCard}>
-        <Text style={styles.eyebrow}>AI-powered learning, rebuilt for mobile</Text>
         <Text style={styles.title}>Quiks</Text>
         <Text style={styles.subtitle}>
-          A faster, native study app for Android with adaptive quizzes, progress tracking, and an AI coach.
+          A study app. Create student profiles, track progress, and unlock new levels across subjects.
         </Text>
 
         <View style={styles.statRow}>
-          <StatPill label="Active learner" value={profile?.name ?? "Guest"} />
-          <StatPill label="Best score" value={bestScore} />
-          <StatPill label="Coins" value={String(totalCoins)} />
+          <StatPill label="Students" value={String(profiles.length)} />
+          <StatPill label="Selected learner" value={activeProfile?.name ?? "None"} />
         </View>
 
         <View style={styles.ctaRow}>
           <PrimaryButton
-            label={profile ? "Manage profile" : "Create profile"}
-            onPress={() => router.push("/profile")}
+            label="Create profile"
+            onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
             style={styles.flexButton}
           />
           <PrimaryButton
-            label="AI coach"
+            label={activeProfile ? "Open profile" : "Choose learner"}
             variant="secondary"
-            onPress={() => router.push("/profile")}
+            onPress={() => router.push(activeProfile ? "/profile" : "/")}
             style={styles.flexButton}
           />
         </View>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Students List</Text>
+        <Text style={styles.cardHint}>
+          Select a learner below and start practising.
+        </Text>
+
+        {profiles.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No student profiles yet.</Text>
+            <PrimaryButton
+              label="Create first student"
+              onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
+            />
+          </View>
+        ) : (
+          profiles.map((profile) => {
+            const profileResults = resultsByProfile[profile.id] ?? [];
+            const latest = profileResults[0];
+            const isActive = profile.id === currentProfileId;
+
+            return (
+              <Pressable
+                key={profile.id}
+                onPress={() => selectProfile(profile.id)}
+                style={[styles.studentRow, isActive ? styles.studentRowActive : null]}
+              >
+                {isActive ? (
+                  <View style={styles.activeIndicator}>
+                    <MaterialCommunityIcons name="check-circle" size={18} color={palette.white} />
+                  </View>
+                ) : null}
+
+                <View style={styles.studentAvatar}>
+                  <Text style={styles.studentAvatarText}>{profile.name.charAt(0).toUpperCase()}</Text>
+                </View>
+
+                <View style={styles.studentMeta}>
+                  <Text style={styles.studentName}>{profile.name}</Text>
+                  <Text style={styles.studentSubtext}>
+                    Age {profile.age} | {profile.targetExam}
+                  </Text>
+                  <Text style={styles.studentSubtext}>
+                    {latest
+                      ? `Last activity: ${latest.subjectName} Level ${latest.level} (${latest.score}%)`
+                      : "No sessions yet"}
+                  </Text>
+                </View>
+
+                <View style={[styles.studentBadge, isActive ? styles.studentBadgeActive : null]}>
+                  <Text style={[styles.studentBadgeText, isActive ? styles.studentBadgeTextActive : null]}>
+                    {isActive ? "Selected" : "Select"}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </View>
+
+      <View style={[styles.activeLearnerCard, !activeProfile ? styles.activeLearnerCardMuted : null]}>
+        <View style={styles.activeLearnerHeader}>
+          <Text style={styles.activeLearnerEyebrow}>Current learner</Text>
+          {activeProfile ? (
+            <View style={styles.activeLearnerBadge}>
+              <MaterialCommunityIcons name="account-check-outline" size={16} color={palette.white} />
+              <Text style={styles.activeLearnerBadgeText}>Ready</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {activeProfile ? (
+          <>
+            <Text style={styles.activeLearnerName}>{activeProfile.name}</Text>
+            <Text style={styles.activeLearnerText}>
+              Age {activeProfile.age} | {activeProfile.targetExam}
+            </Text>
+            <Text style={styles.progressTitle}>Highest unlocked by subject</Text>
+            {highestUnlockedBySubject.length > 0 ? (
+              <View style={styles.progressWrap}>
+                {highestUnlockedBySubject.map((entry) => (
+                  <View key={entry.subjectId} style={styles.progressChip}>
+                    <Text style={styles.progressChipTitle}>{entry.subjectName}</Text>
+                    <Text style={styles.progressChipText}>
+                      {entry.grade} | Level {entry.level}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.activeLearnerText}>No unlocked subject progress yet.</Text>
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={styles.activeLearnerName}>No student selected</Text>
+            <Text style={styles.activeLearnerText}>
+              Pick a learner from the Students List before opening any subject.
+            </Text>
+          </>
+        )}
+      </View>
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Subjects</Text>
-        <Text style={styles.sectionHint}>Tap a subject to choose mode and start learning.</Text>
+        <Text style={styles.sectionHint}>
+          {activeProfile
+            ? `${activeProfile.name}, pick a subject.`
+            : "Select a student first, then choose a subject."}
+        </Text>
       </View>
 
       <View style={styles.subjectGrid}>
         {subjects.map((subject) => (
-          <Pressable
-            key={subject.id}
-            onPress={() => router.push({ pathname: "/subject/[slug]", params: { slug: subject.id } })}
-            style={styles.subjectPressable}
-          >
-            <LinearGradient colors={subject.accent} style={styles.subjectCard}>
+          <Pressable key={subject.id} onPress={() => openSubject(subject.id)} style={styles.subjectPressable}>
+            <LinearGradient colors={subject.accent} style={[styles.subjectCard, !activeProfile ? styles.subjectCardDim : null]}>
               <MaterialCommunityIcons name={subject.icon as never} size={28} color={palette.white} />
               <Text style={styles.subjectName}>{subject.name}</Text>
               <Text style={styles.subjectTagline}>{subject.tagline}</Text>
@@ -85,15 +270,6 @@ export default function HomeScreen() {
             </LinearGradient>
           </Pressable>
         ))}
-      </View>
-
-      <View style={styles.aiPanel}>
-        <Text style={styles.aiPanelTitle}>AI Integration Path</Text>
-        <Text style={styles.aiPanelText}>
-          Quiks now uses a native AI service layer. In demo mode it generates testable content locally, and when you
-          connect a secure backend endpoint it can serve real questions, feedback, and study plans without exposing API
-          secrets inside the app.
-        </Text>
       </View>
     </AppBackground>
   );
@@ -105,13 +281,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: "rgba(255,255,255,0.12)",
     padding: 22,
-  },
-  eyebrow: {
-    color: "#C6E8F8",
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontSize: 12,
-    fontWeight: "700",
   },
   title: {
     color: palette.white,
@@ -139,6 +308,183 @@ const styles = StyleSheet.create({
   flexButton: {
     flex: 1,
   },
+  card: {
+    marginTop: 18,
+    backgroundColor: palette.white,
+    borderRadius: 24,
+    padding: 18,
+    ...shadows.card,
+  },
+  cardTitle: {
+    color: palette.ink,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  cardHint: {
+    color: palette.slate,
+    marginTop: 8,
+    lineHeight: 22,
+  },
+  emptyState: {
+    marginTop: 16,
+    gap: 12,
+  },
+  emptyText: {
+    color: palette.slate,
+  },
+  studentRow: {
+    marginTop: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#DEE7EF",
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    position: "relative",
+  },
+  studentRowActive: {
+    backgroundColor: "#EAF7FD",
+    borderColor: "#7CCFE7",
+    borderWidth: 2,
+  },
+  activeIndicator: {
+    position: "absolute",
+    top: -8,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: palette.success,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: palette.white,
+  },
+  studentAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: palette.navy,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  studentAvatarText: {
+    color: palette.white,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  studentMeta: {
+    flex: 1,
+  },
+  studentName: {
+    color: palette.ink,
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  studentSubtext: {
+    color: palette.slate,
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  studentBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#EEF3F7",
+  },
+  studentBadgeActive: {
+    backgroundColor: palette.navy,
+  },
+  studentBadgeText: {
+    color: palette.navy,
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  studentBadgeTextActive: {
+    color: palette.white,
+  },
+  activeLearnerCard: {
+    marginTop: 18,
+    borderRadius: 24,
+    padding: 18,
+    backgroundColor: "#EAF7FD",
+    borderWidth: 1,
+    borderColor: "#9CDCF2",
+  },
+  activeLearnerCardMuted: {
+    backgroundColor: "#F3F6F9",
+    borderColor: "#D9E2EA",
+  },
+  activeLearnerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  activeLearnerEyebrow: {
+    color: palette.navy,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  activeLearnerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: palette.navy,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  activeLearnerBadgeText: {
+    color: palette.white,
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  activeLearnerName: {
+    color: palette.ink,
+    fontSize: 24,
+    fontWeight: "800",
+    marginTop: 10,
+  },
+  activeLearnerText: {
+    color: palette.slate,
+    marginTop: 6,
+    lineHeight: 22,
+  },
+  progressTitle: {
+    color: palette.navy,
+    marginTop: 14,
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  progressWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 10,
+  },
+  progressChip: {
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.68)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 132,
+  },
+  progressChipTitle: {
+    color: palette.ink,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  progressChipText: {
+    color: palette.slate,
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   sectionHeader: {
     marginTop: 26,
     marginBottom: 14,
@@ -165,6 +511,9 @@ const styles = StyleSheet.create({
     minHeight: 152,
     ...shadows.card,
   },
+  subjectCardDim: {
+    opacity: 0.75,
+  },
   subjectName: {
     color: palette.white,
     fontSize: 22,
@@ -181,22 +530,5 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.88)",
     marginTop: 10,
     lineHeight: 20,
-  },
-  aiPanel: {
-    marginTop: 26,
-    borderRadius: 24,
-    backgroundColor: palette.white,
-    padding: 20,
-    ...shadows.card,
-  },
-  aiPanelTitle: {
-    color: palette.ink,
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  aiPanelText: {
-    color: palette.slate,
-    marginTop: 10,
-    lineHeight: 22,
   },
 });

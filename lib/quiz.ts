@@ -40,6 +40,16 @@ export function getUnlockedLevels(results: SessionResult[], subjectId: string) {
   return Array.from({ length: maxUnlocked }, (_, index) => index + 1);
 }
 
+export function getUnlockedLevelsForGrade(results: SessionResult[], subjectId: string, grade: string) {
+  let maxUnlocked = 1;
+  for (const result of results) {
+    if (result.subjectId === subjectId && result.grade === grade && result.score >= SCORE_THRESHOLD) {
+      maxUnlocked = Math.max(maxUnlocked, result.level + 1);
+    }
+  }
+  return Array.from({ length: maxUnlocked }, (_, index) => index + 1);
+}
+
 export function scoreQuestions(questions: Question[], answers: Array<string | null>) {
   let correctAnswers = 0;
   questions.forEach((question, index) => {

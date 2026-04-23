@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/images/quiks-icon-1024.png",
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#0B1F33"
@@ -16,6 +17,7 @@
     "android": {
       "package": "com.quiks.mobile",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/quiks-adaptive-foreground.png",
         "backgroundColor": "#0B1F33"
       },
       "edgeToEdgeEnabled": true
@@ -30,6 +32,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "root": "./app"
+      },
+      "eas": {
+        "projectId": "f2fa2ea0-d0d5-4f61-a469-0eb14602adfa"
+      }
     }
   }
 }

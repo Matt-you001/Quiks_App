@@ -85,7 +85,7 @@ export default function BreatherScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Story</Text>
+        <Text style={styles.sectionTitle}>{content.formatLabel ?? "Story"}</Text>
         <Text style={styles.bodyText}>{content.story}</Text>
       </View>
 
@@ -96,6 +96,11 @@ export default function BreatherScreen() {
             • {item}
           </Text>
         ))}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{content.teachingTitle ?? "What this teaches"}</Text>
+        <Text style={styles.bodyText}>{content.teachingPoint ?? content.reflection}</Text>
       </View>
 
       <View style={styles.card}>

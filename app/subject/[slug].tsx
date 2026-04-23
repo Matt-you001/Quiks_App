@@ -1,12 +1,12 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../../components/AppBackground";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { getUnlockedLevelsForGrade } from "../../lib/quiz";
 import { readAppState } from "../../lib/storage";
-import { getUnlockedLevels } from "../../lib/quiz";
-import { getSubjectById } from "../../lib/subjects";
+import { getSubjectById, grades } from "../../lib/subjects";
 import { palette, shadows } from "../../lib/theme";
 import type { SessionResult, UserProfile } from "../../types/app";
 
@@ -16,7 +16,7 @@ export default function SubjectDetailScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [mode, setMode] = useState<"quiz" | "training">("quiz");
-  const [selectedLevel, setSelectedLevel] = useState(1);
+  const [selectedGrade, setSelectedGrade] = useState(grades[0]);
 
   const load = useCallback(async () => {
     const state = await readAppState();
@@ -35,7 +35,21 @@ export default function SubjectDetailScreen() {
     }, [load])
   );
 
-  const unlockedLevels = useMemo(() => (subject ? getUnlockedLevels(results, subject.id) : [1]), [results, subject]);
+  const gradeOptions = grades.slice(0, 8);
+
+  const bestUnlockedGrade = useMemo(() => {
+    if (!subject) {
+      return grades[0];
+    }
+
+    const reversed = [...gradeOptions].reverse();
+    const found = reversed.find((grade) => getUnlockedLevelsForGrade(results, subject.id, grade).length > 1);
+    return found ?? gradeOptions[0];
+  }, [gradeOptions, results, subject]);
+
+  useEffect(() => {
+    setSelectedGrade(bestUnlockedGrade);
+  }, [bestUnlockedGrade]);
 
   if (!subject) {
     return (
@@ -75,15 +89,16 @@ export default function SubjectDetailScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Unlocked levels</Text>
-        <View style={styles.levelWrap}>
-          {unlockedLevels.map((level) => (
+        <Text style={styles.cardTitle}>Grade</Text>
+        <Text style={styles.levelHint}>Choose a grade first. Your unlocked levels will show on the start card.</Text>
+        <View style={styles.gradeWrap}>
+          {gradeOptions.map((grade) => (
             <Pressable
-              key={level}
-              onPress={() => setSelectedLevel(level)}
-              style={[styles.levelChip, selectedLevel === level ? styles.levelChipActive : null]}
+              key={grade}
+              onPress={() => setSelectedGrade(grade)}
+              style={[styles.gradeChip, selectedGrade === grade ? styles.gradeChipActive : null]}
             >
-              <Text style={[styles.levelChipText, selectedLevel === level ? styles.levelChipTextActive : null]}>{level}</Text>
+              <Text style={[styles.gradeChipText, selectedGrade === grade ? styles.gradeChipTextActive : null]}>{grade}</Text>
             </Pressable>
           ))}
         </View>
@@ -95,11 +110,11 @@ export default function SubjectDetailScreen() {
           Quiks can generate question sets, feedback, and follow-up study plans for {subject.name.toLowerCase()}.
         </Text>
         <PrimaryButton
-          label={`Start level ${selectedLevel} ${mode}`}
+          label={`Open ${mode} setup`}
           onPress={() =>
             router.push({
               pathname: "/session",
-              params: { subjectId: subject.id, mode, level: String(selectedLevel) },
+              params: { subjectId: subject.id, mode, grade: selectedGrade },
             })
           }
         />
@@ -173,29 +188,31 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 20,
   },
-  levelWrap: {
+  gradeWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
   },
-  levelChip: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
+  gradeChip: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: "#F2F5F8",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  levelChipActive: {
+  gradeChipActive: {
     backgroundColor: palette.navy,
   },
-  levelChipText: {
+  gradeChipText: {
     color: palette.navy,
-    fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "700",
   },
-  levelChipTextActive: {
+  gradeChipTextActive: {
     color: palette.white,
+  },
+  levelHint: {
+    color: palette.slate,
+    marginBottom: 10,
+    lineHeight: 20,
   },
   coachText: {
     color: palette.slate,

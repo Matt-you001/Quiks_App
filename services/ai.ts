@@ -37,13 +37,15 @@ async function postJson<TRequest, TResponse>(path: string, body: TRequest): Prom
 }
 
 function buildDemoQuestions(request: QuestionRequest): Question[] {
+  const focusLabel =
+    request.focusMode === "topic" && request.topicLabel ? `${request.topicLabel} in ${request.subject.name}` : request.subject.name;
   const base = [
     {
-      stem: `Which option best matches this ${request.subject.name.toLowerCase()} concept?`,
+      stem: `Which option best matches this ${focusLabel.toLowerCase()} concept?`,
       explanation: "The correct option is the one that directly matches the concept being practiced.",
     },
     {
-      stem: `Choose the most accurate answer for this ${request.grade} ${request.subject.name.toLowerCase()} problem.`,
+      stem: `Choose the most accurate answer for this ${request.grade} ${focusLabel.toLowerCase()} problem.`,
       explanation: "A strong answer uses the key rule or idea for this topic.",
     },
     {
@@ -54,7 +56,10 @@ function buildDemoQuestions(request: QuestionRequest): Question[] {
 
   return Array.from({ length: request.questionCount }, (_, index) => {
     const template = base[index % base.length];
-    const label = `${request.subject.name} Level ${request.level}`;
+    const label =
+      request.focusMode === "topic" && request.topicLabel
+        ? `${request.topicLabel} Level ${request.level}`
+        : `${request.subject.name} Level ${request.level}`;
     const correct = `${label} answer ${index + 1}`;
     return {
       id: `${request.subject.id}-${request.level}-${index + 1}`,
@@ -115,9 +120,13 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
     `Difficulty: ${request.difficulty}`,
     `Mode: ${request.mode}`,
     `Level: ${request.level}`,
+    `Question focus: ${request.focusMode === "topic" ? `Topic only (${request.topicLabel ?? request.topicId ?? "selected topic"})` : "General mixed practice"}`,
     `Question count: ${request.questionCount}`,
     `Learner target exam: ${request.profile?.targetExam ?? "General study"}`,
     `Guidance: ${request.subject.aiPromptHint}`,
+    request.focusMode === "topic"
+      ? "Generate questions only from the selected topic. Do not mix unrelated topics into this set."
+      : "Use a healthy mix of topics within the subject.",
     "Return only valid JSON.",
     "Each question must include: id, prompt, options, answer, explanation.",
     "Each question must have exactly 4 options and one correct answer that matches one option exactly.",
@@ -239,14 +248,14 @@ export async function generateFeedback(request: FeedbackRequest): Promise<string
   }
 
   if (request.score >= 85) {
-    return `Excellent work in ${request.subject.name}. Your accuracy shows real confidence at ${request.grade} level.`;
+    return `Excellent work in ${request.topicLabel ?? request.subject.name}. Your accuracy shows real confidence at ${request.grade} level.`;
   }
 
   if (request.score >= 70) {
-    return `Strong effort. You are building solid momentum in ${request.subject.name}, and a little review will push you even higher.`;
+    return `Strong effort. You are building solid momentum in ${request.topicLabel ?? request.subject.name}, and a little review will push you even higher.`;
   }
 
-  return `You are still learning, and that is progress. Focus on the fundamentals in ${request.subject.name} and try another round with your AI coach.`;
+  return `You are still learning, and that is progress. Focus on the fundamentals in ${request.topicLabel ?? request.subject.name} and try another round with your AI coach.`;
 }
 
 export async function generateCoachPlan(request: CoachPlanRequest): Promise<string[]> {
@@ -260,7 +269,7 @@ export async function generateCoachPlan(request: CoachPlanRequest): Promise<stri
   }
 
   return [
-    `Review ${request.subject.name.toLowerCase()} foundations for 10 minutes before the next session.`,
+    `Review ${(request.topicLabel ?? request.subject.name).toLowerCase()} foundations for 10 minutes before the next session.`,
     `Redo level ${request.level} in training mode and read each explanation out loud.`,
     `Ask the AI coach for one more practice set focused on ${request.grade} weak spots.`,
   ];

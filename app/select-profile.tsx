@@ -17,7 +17,7 @@ export default function SelectProfileScreen() {
     const state = await readAppState();
     setProfiles(state.profiles);
     if (state.profiles.length === 0 && subject) {
-      router.replace("/profile");
+      router.replace({ pathname: "/profile-editor", params: { mode: "create" } } as never);
     }
   }, [subject]);
 
@@ -55,8 +55,11 @@ export default function SelectProfileScreen() {
             <PrimaryButton label="Use" onPress={() => continueWithProfile(profile.id)} style={styles.useButton} />
           </View>
         ))}
-
-        <PrimaryButton label="Create learner" variant="secondary" onPress={() => router.push("/profile")} />
+        <PrimaryButton
+          label="Create learner"
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
+        />
       </View>
     </AppBackground>
   );

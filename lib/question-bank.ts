@@ -1,4 +1,5 @@
-import type { Difficulty, Question, QuestionRequest } from "../types/app";
+import { getTopicById } from "./subjects";
+import type { Difficulty, Question, QuestionRequest, SubjectTopic } from "../types/app";
 
 type GradeBucket = "lower-primary" | "upper-primary";
 
@@ -1411,9 +1412,80 @@ function rotate<T>(items: T[], offset: number) {
   return [...items.slice(start), ...items.slice(0, start)];
 }
 
+function uniqueById(items: BankQuestion[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) {
+      return false;
+    }
+
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function hashSeed(parts: Array<string | number>) {
+  const joined = parts.join("|");
+  let hash = 0;
+
+  for (let index = 0; index < joined.length; index += 1) {
+    hash = (hash * 31 + joined.charCodeAt(index)) >>> 0;
+  }
+
+  return hash;
+}
+
+function normalizeTopicText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/Ã—/g, "x")
+    .replace(/Ã·/g, "/")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function getTopicScore(question: BankQuestion, topic: SubjectTopic) {
+  const blob = normalizeTopicText(
+    [question.prompt, question.explanation, question.answer, ...question.options].join(" ")
+  );
+
+  let score = 0;
+  const topicTerms = new Set([
+    ...topic.keywords.map(normalizeTopicText),
+    ...normalizeTopicText(topic.label)
+      .split(" ")
+      .filter((term) => term.length > 2),
+  ]);
+
+  for (const term of topicTerms) {
+    if (!term) {
+      continue;
+    }
+
+    if (blob.includes(term)) {
+      score += term.includes(" ") ? 3 : 2;
+    }
+  }
+
+  if (topic.id === "addition-subtraction" && /[+-]| add | subtract | plus | minus /.test(` ${blob} `)) {
+    score += 3;
+  }
+
+  if (topic.id === "multiplication-division" && /[x/]| times | divide | shared equally | groups of /.test(` ${blob} `)) {
+    score += 3;
+  }
+
+  if (topic.id === "fractions-decimals-percentages" && /(fraction|decimal|percent|half|quarter|tenths|\/)/.test(blob)) {
+    score += 3;
+  }
+
+  return score;
+}
+
 export function getLocalQuestions(request: QuestionRequest): Question[] {
   const gradeBucket = toGradeBucket(request.grade);
   const allQuestions = [...bank, ...extraBank];
+  const recentQuestionIds = new Set(request.recentQuestionIds ?? []);
 
   const exact = allQuestions.filter(
     (question) =>
@@ -1430,16 +1502,40 @@ export function getLocalQuestions(request: QuestionRequest): Question[] {
     (question) => question.subjectId === request.subject.id && question.difficulty === request.difficulty
   );
 
-  const pool = exact.length >= request.questionCount
-    ? exact
-    : subjectFallback.length >= request.questionCount
-      ? subjectFallback
-      : difficultyFallback;
+  const subjectPool = allQuestions.filter((question) => question.subjectId === request.subject.id);
+  let rankedPool = uniqueById([...exact, ...subjectFallback, ...difficultyFallback, ...subjectPool]);
 
-  if (pool.length === 0) {
+  if (request.focusMode === "topic" && request.topicId) {
+    const topic = getTopicById(request.subject, request.topicId);
+    if (!topic) {
+      return [];
+    }
+
+    const scoredTopicPool = rankedPool
+      .map((question) => ({
+        question,
+        score: getTopicScore(question, topic),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .map((entry) => entry.question);
+
+    rankedPool = uniqueById(scoredTopicPool);
+  }
+
+  if (rankedPool.length === 0) {
     return [];
   }
 
-  const rotated = rotate(pool, Math.max(request.level - 1, 0) * request.questionCount);
-  return rotated.slice(0, Math.min(request.questionCount, rotated.length)).map(({ subjectId, difficulty, gradeBucket: bucket, ...question }) => question);
+  const freshPool = rankedPool.filter((question) => !recentQuestionIds.has(question.id));
+  const refillPool = rankedPool.filter((question) => recentQuestionIds.has(question.id));
+  const candidatePool = [...freshPool, ...refillPool];
+
+  const seed = hashSeed([request.subject.id, request.grade, request.difficulty, request.level]);
+  const offset = seed % candidatePool.length;
+  const rotated = rotate(candidatePool, offset);
+
+  return rotated
+    .slice(0, Math.min(request.questionCount, rotated.length))
+    .map(({ subjectId, difficulty, gradeBucket: bucket, ...question }) => question);
 }

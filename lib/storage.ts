@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { SessionResult, StoredAppState, UserProfile } from "../types/app";
 
 const STORAGE_KEY = "quiks_mobile_state_v1";
+const QUESTION_HISTORY_KEY = "quiks_question_history_v1";
 
 const defaultState: StoredAppState = {
   profiles: [],
@@ -75,4 +76,43 @@ export async function appendResult(profileId: string, result: SessionResult) {
 export async function getProfileResults(profileId: string) {
   const state = await readAppState();
   return state.results[profileId] ?? [];
+}
+
+type QuestionHistoryState = Record<string, string[]>;
+
+async function readQuestionHistoryState(): Promise<QuestionHistoryState> {
+  const raw = await AsyncStorage.getItem(QUESTION_HISTORY_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as QuestionHistoryState;
+    return parsed ?? {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeQuestionHistoryState(nextState: QuestionHistoryState) {
+  await AsyncStorage.setItem(QUESTION_HISTORY_KEY, JSON.stringify(nextState));
+}
+
+function createQuestionHistoryKey(profileId: string, subjectId: string) {
+  return `${profileId}:${subjectId}`;
+}
+
+export async function getRecentQuestionIds(profileId: string, subjectId: string) {
+  const state = await readQuestionHistoryState();
+  return state[createQuestionHistoryKey(profileId, subjectId)] ?? [];
+}
+
+export async function appendQuestionHistory(profileId: string, subjectId: string, questionIds: string[]) {
+  const state = await readQuestionHistoryState();
+  const key = createQuestionHistoryKey(profileId, subjectId);
+  const existing = state[key] ?? [];
+  const merged = [...questionIds, ...existing.filter((id) => !questionIds.includes(id))].slice(0, 80);
+  state[key] = merged;
+  await writeQuestionHistoryState(state);
+  return merged;
 }

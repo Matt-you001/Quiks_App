@@ -74,8 +74,8 @@ export default function ResultsScreen() {
 
   const heading = passed ? (result.score === 100 ? "Excellent work" : "Great job") : "Keep trying";
   const summary = passed
-    ? `You passed Level ${result.level} in ${result.subjectName}.`
-    : `You did not pass Level ${result.level} yet, but you can improve with another try.`;
+    ? `You passed Level ${result.level} in ${result.topicLabel ?? result.subjectName}.`
+    : `You did not pass Level ${result.level} in ${result.topicLabel ?? result.subjectName} yet, but you can improve with another try.`;
 
   const backHome = () => {
     router.replace("/");
@@ -90,6 +90,8 @@ export default function ResultsScreen() {
         level: String(result.level),
         grade: result.grade,
         difficulty: result.difficulty,
+        focusMode: result.focusMode ?? "general",
+        topicId: result.topicId,
         autoStart: "1",
       },
     });
@@ -104,6 +106,8 @@ export default function ResultsScreen() {
         level: String(result.level + 1),
         grade: result.grade,
         difficulty: nextDifficulty,
+        focusMode: result.focusMode ?? "general",
+        topicId: result.topicId,
         autoStart: "1",
       },
     });
@@ -133,6 +137,7 @@ export default function ResultsScreen() {
         <Text style={styles.heroText}>
           {result.subjectName} | {result.grade} | Level {result.level}
         </Text>
+        <Text style={styles.heroText}>{result.topicLabel ? `Topic focus: ${result.topicLabel}` : "General mixed practice"}</Text>
         <Text style={styles.heroSummary}>{summary}</Text>
       </View>
 
@@ -160,6 +165,7 @@ export default function ResultsScreen() {
         <Text style={styles.summaryLine}>Time used: {result.timeTakenSeconds}s</Text>
         <Text style={styles.summaryLine}>Coins earned: {result.coinsEarned}</Text>
         <Text style={styles.summaryLine}>Mode: {result.mode}</Text>
+        <Text style={styles.summaryLine}>Focus: {result.topicLabel ?? "General mixed practice"}</Text>
       </View>
 
       <View style={styles.card}>
