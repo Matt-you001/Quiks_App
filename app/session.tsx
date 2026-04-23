@@ -5,10 +5,10 @@ import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState } from "../lib/storage";
 import { calculateQuizTime, getNextDifficulty, getUnlockedLevelsForGrade, normalizeQuestions, scoreQuestions } from "../lib/quiz";
-import { getSubjectById, getTopicById, grades, QUESTIONS_PER_LEVEL } from "../lib/subjects";
+import { getSubjectById, grades, QUESTIONS_PER_LEVEL } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import { generateCoachPlan, generateFeedback, generateQuestions } from "../services/ai";
-import type { Difficulty, Question, QuestionFocusMode, QuestionResponse, SessionResult, TestMode, UserProfile } from "../types/app";
+import type { Difficulty, Question, QuestionResponse, SessionResult, TestMode, UserProfile } from "../types/app";
 
 type SessionPhase = "setup" | "loading" | "active" | "review";
 
@@ -19,8 +19,6 @@ export default function SessionScreen() {
     level?: string;
     grade?: string;
     difficulty?: Difficulty;
-    focusMode?: QuestionFocusMode;
-    topicId?: string;
     autoStart?: string;
   }>();
 
@@ -33,12 +31,6 @@ export default function SessionScreen() {
   const [results, setResults] = useState<SessionResult[]>([]);
   const [grade, setGrade] = useState(() =>
     typeof params.grade === "string" && grades.includes(params.grade) ? params.grade : grades[0]
-  );
-  const [focusMode, setFocusMode] = useState<QuestionFocusMode>(
-    params.focusMode === "topic" ? "topic" : "general"
-  );
-  const [topicId, setTopicId] = useState<string | null>(
-    typeof params.topicId === "string" ? params.topicId : null
   );
   const [selectedLevel, setSelectedLevel] = useState(Math.max(1, presetLevel));
   const [difficulty, setDifficulty] = useState<Difficulty>(() =>
@@ -72,34 +64,10 @@ export default function SessionScreen() {
       setGrade(params.grade);
     }
 
-    if (params.focusMode === "topic" || params.focusMode === "general") {
-      setFocusMode(params.focusMode);
-    }
-
-    if (typeof params.topicId === "string") {
-      setTopicId(params.topicId);
-    }
-
     if (params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)) {
       setDifficulty(params.difficulty);
     }
-  }, [params.grade, params.difficulty, params.focusMode, params.topicId]);
-
-  useEffect(() => {
-    if (!subject) {
-      return;
-    }
-
-    if (focusMode === "topic") {
-      const hasCurrentTopic = topicId && subject.topics.some((topic) => topic.id === topicId);
-      if (!hasCurrentTopic) {
-        setTopicId(subject.topics[0]?.id ?? null);
-      }
-      return;
-    }
-
-    setTopicId(null);
-  }, [focusMode, subject, topicId]);
+  }, [params.grade, params.difficulty]);
 
   const unlockedLevels = useMemo(() => {
     if (!subject) {
@@ -108,8 +76,6 @@ export default function SessionScreen() {
 
     return getUnlockedLevelsForGrade(results, subject.id, grade);
   }, [grade, results, subject]);
-
-  const selectedTopic = useMemo(() => getTopicById(subject, topicId ?? undefined), [subject, topicId]);
 
   useEffect(() => {
     if (unlockedLevels.length === 0) {
@@ -168,9 +134,6 @@ export default function SessionScreen() {
         mode,
         level: selectedLevel,
         questionCount: QUESTIONS_PER_LEVEL,
-        focusMode,
-        topicId: selectedTopic?.id,
-        topicLabel: selectedTopic?.label,
         profile,
         recentQuestionIds,
       });
@@ -250,10 +213,9 @@ export default function SessionScreen() {
 
     const score = scoreQuestions(questions, finalAnswers);
     const bonusCoins = mode === "quiz" && score.score === 100 ? Math.floor(Math.max(timeLeft, 0) * 0.05) : 0;
-    const practiceLabel = selectedTopic?.label ?? subject.name;
-    let feedback = `You completed your ${practiceLabel} session. Keep building your confidence one level at a time.`;
+    let feedback = `You completed your ${subject.name} session. Keep building your confidence one level at a time.`;
     let studyPlan = [
-      `Review the key ideas from ${practiceLabel.toLowerCase()} before your next session.`,
+      `Review the key ideas from ${subject.name.toLowerCase()} before your next session.`,
       `Repeat this level in training mode if any question felt difficult.`,
       `Move steadily and focus on accuracy first, then speed.`,
     ];
@@ -263,8 +225,6 @@ export default function SessionScreen() {
         score: score.score,
         subject,
         grade,
-        focusMode,
-        topicLabel: selectedTopic?.label,
         profile,
       });
     } catch {
@@ -277,8 +237,6 @@ export default function SessionScreen() {
         subject,
         grade,
         level: selectedLevel,
-        focusMode,
-        topicLabel: selectedTopic?.label,
         profile,
       });
     } catch {
@@ -294,9 +252,6 @@ export default function SessionScreen() {
       difficulty,
       grade,
       mode,
-      focusMode,
-      topicId: selectedTopic?.id,
-      topicLabel: selectedTopic?.label,
       score: score.score,
       timeTakenSeconds: mode === "quiz" ? calculateQuizTime(selectedLevel) - timeLeft : elapsed,
       correctAnswers: score.correctAnswers,
@@ -353,47 +308,7 @@ export default function SessionScreen() {
             </>
           ) : null}
 
-          <Text style={styles.label}>Question Focus</Text>
-          <View style={styles.choiceWrap}>
-            <Pressable
-              onPress={() => setFocusMode("general")}
-              style={[styles.choiceChip, focusMode === "general" ? styles.choiceChipActive : null]}
-            >
-              <Text style={[styles.choiceText, focusMode === "general" ? styles.choiceTextActive : null]}>General</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setFocusMode("topic")}
-              style={[styles.choiceChip, focusMode === "topic" ? styles.choiceChipActive : null]}
-            >
-              <Text style={[styles.choiceText, focusMode === "topic" ? styles.choiceTextActive : null]}>Topic Focus</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.hintText}>
-            {focusMode === "general"
-              ? "General mixes questions from different topics in this subject."
-              : "Topic Focus keeps the whole session inside one selected topic."}
-          </Text>
-
-          {focusMode === "topic" ? (
-            <>
-              <Text style={styles.label}>Choose Topic</Text>
-              <View style={styles.choiceWrap}>
-                {subject.topics.map((topic) => (
-                  <Pressable
-                    key={topic.id}
-                    onPress={() => setTopicId(topic.id)}
-                    style={[styles.topicChip, topicId === topic.id ? styles.choiceChipActive : null]}
-                  >
-                    <Text style={[styles.topicText, topicId === topic.id ? styles.choiceTextActive : null]}>{topic.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              {selectedTopic ? <Text style={styles.hintText}>{selectedTopic.description}</Text> : null}
-            </>
-          ) : null}
-
           <Text style={styles.label}>Unlocked Levels</Text>
-          <Text style={styles.hintText}>The highest unlocked level for {grade} is selected for you.</Text>
           <View style={styles.choiceWrap}>
             {unlockedLevels.map((entry) => (
               <Pressable
@@ -439,14 +354,11 @@ export default function SessionScreen() {
   return (
     <AppBackground>
       <View style={styles.panel}>
-          <View style={styles.topRow}>
+        <View style={styles.topRow}>
           <View>
             <Text style={styles.titleSmall}>{subject.name}</Text>
             <Text style={styles.subtitle}>
               {grade} | Level {selectedLevel} | {difficulty}
-            </Text>
-            <Text style={styles.focusLine}>
-              {focusMode === "topic" && selectedTopic ? `Topic focus: ${selectedTopic.label}` : "General mixed practice"}
             </Text>
           </View>
           <View style={styles.topRight}>
@@ -577,21 +489,6 @@ const styles = StyleSheet.create({
   },
   levelText: {
     color: palette.navy,
-    fontWeight: "700",
-  },
-  topicChip: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "#F2F5F8",
-  },
-  topicText: {
-    color: palette.navy,
-    fontWeight: "700",
-  },
-  focusLine: {
-    color: palette.navy,
-    marginTop: 6,
     fontWeight: "700",
   },
   topRow: {
