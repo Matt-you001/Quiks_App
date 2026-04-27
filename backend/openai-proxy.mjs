@@ -1,9 +1,15 @@
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
 
 const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
 const openAiModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const competitionWaiters = new Map();
+const competitionWaitersById = new Map();
+const competitionWaiterByPlayer = new Map();
+const competitionMatches = new Map();
+const competitionMatchByPlayer = new Map();
 
 function describeAcademicStage(body) {
   const focusLabel =
@@ -52,6 +58,7 @@ function buildQuestionPromptLines(body) {
     `Question count: ${body.questionCount ?? 10}`,
     `App variant: ${body.appVariant ?? "children"}`,
     `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+    `Learner language: ${body.learnerLanguageLabel ?? "English"}`,
     `Learner age: ${body.profile?.age ?? "Unknown"}`,
     `Target exam: ${body.profile?.targetExam ?? "General study"}`,
     `Subject guidance: ${body.subject?.aiPromptHint ?? ""}`,
@@ -63,6 +70,7 @@ function buildQuestionPromptLines(body) {
     "Treat the provided grade/band and level as mandatory signals for academic standard.",
     "The set must reflect the true reasoning level expected for the class, band, and app variant.",
     "Avoid over-simplified filler questions that belong to a lower academic stage.",
+    `Write all question prompts, answer options, and explanations in ${body.learnerLanguageLabel ?? "English"}.`,
   ];
 }
 
@@ -206,6 +214,204 @@ function buildPlanSchema() {
   };
 }
 
+function buildCompetitionKey(body) {
+  return [
+    body.appVariant ?? "children",
+    body.subject?.id ?? "subject",
+    body.grade ?? "grade",
+    body.level ?? 1,
+    body.difficulty ?? "Beginner",
+    body.focusMode ?? "general",
+    body.topicId ?? "",
+  ].join("::");
+}
+
+function buildCompetitionPayload(match, playerId) {
+  const opponent = match.players.find((player) => player.playerId !== playerId) ?? match.players[1] ?? match.players[0];
+  return {
+    competitionId: match.id,
+    opponentName: opponent?.name ?? "Opponent",
+    questions: match.questions,
+    chats: match.chats ?? [],
+  };
+}
+
+function getCompetitionOutcome(match, playerId) {
+  const own = match.submissions[playerId];
+  const opponent = match.players.find((player) => player.playerId !== playerId);
+  const rival = opponent ? match.submissions[opponent.playerId] : undefined;
+
+  if (!own || !opponent || !rival) {
+    return {
+      status: "submitted",
+      outcome: "pending",
+      opponentName: opponent?.name ?? "Opponent",
+      playerScore: own?.score ?? 0,
+    };
+  }
+
+  if (own.score > rival.score) {
+    return {
+      status: "completed",
+      outcome: "won",
+      opponentName: opponent.name,
+      playerScore: own.score,
+      opponentScore: rival.score,
+    };
+  }
+
+  if (own.score < rival.score) {
+    return {
+      status: "completed",
+      outcome: "lost",
+      opponentName: opponent.name,
+      playerScore: own.score,
+      opponentScore: rival.score,
+    };
+  }
+
+  if (own.timeTakenSeconds < rival.timeTakenSeconds) {
+    return {
+      status: "completed",
+      outcome: "won",
+      opponentName: opponent.name,
+      playerScore: own.score,
+      opponentScore: rival.score,
+    };
+  }
+
+  if (own.timeTakenSeconds > rival.timeTakenSeconds) {
+    return {
+      status: "completed",
+      outcome: "lost",
+      opponentName: opponent.name,
+      playerScore: own.score,
+      opponentScore: rival.score,
+    };
+  }
+
+  return {
+    status: "completed",
+    outcome: "draw",
+    opponentName: opponent.name,
+    playerScore: own.score,
+    opponentScore: rival.score,
+  };
+}
+
+async function generateQuestionSet(body) {
+  const data = await createOpenAiResponse({
+    schemaName: "competition_questions",
+    schema: buildQuestionSchema(),
+    instructions: [
+      "You generate multiple-choice educational quiz questions for a mobile learning app competition.",
+      "Return only factual, age-appropriate questions.",
+      "Each question must have exactly 4 options, one correct answer, and a short explanation.",
+      "Do not include unsafe content or trick questions.",
+      "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
+      "If the course is university-level, produce genuine undergraduate-style questions rather than simplified school questions.",
+      "Return learner-facing content in the learner's selected language.",
+    ].join(" "),
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              ...buildQuestionPromptLines({
+                ...body,
+                mode: "quiz",
+                questionCount: body.questionCount ?? 10,
+              }),
+            ].join("\n"),
+          },
+        ],
+      },
+    ],
+  });
+
+  return data.questions;
+}
+
+async function createCompetitionMatch(waiter, challenger) {
+  const body = {
+    ...challenger.body,
+    profile: challenger.body.profile ?? waiter.body.profile,
+  };
+  const questions = await generateQuestionSet(body);
+  const match = {
+    id: randomUUID(),
+    subjectId: challenger.body.subject?.id ?? waiter.body.subject?.id ?? "subject",
+    grade: challenger.body.grade,
+    level: challenger.body.level,
+    difficulty: challenger.body.difficulty,
+    focusMode: challenger.body.focusMode ?? "general",
+    topicId: challenger.body.topicId,
+    topicLabel: challenger.body.topicLabel,
+    questions,
+    players: [
+      { playerId: waiter.playerId, name: waiter.name },
+      { playerId: challenger.playerId, name: challenger.name },
+    ],
+    chats: [],
+    submissions: {},
+    createdAt: Date.now(),
+  };
+
+  competitionMatches.set(match.id, match);
+  competitionMatchByPlayer.set(waiter.playerId, match.id);
+  competitionMatchByPlayer.set(challenger.playerId, match.id);
+  competitionWaiters.delete(waiter.key);
+  competitionWaitersById.delete(waiter.queueId);
+  competitionWaiterByPlayer.delete(waiter.playerId);
+
+  return match;
+}
+
+function buildBreatherSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      breather: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          intro: { type: "string" },
+          formatLabel: { type: "string" },
+          story: { type: "string" },
+          teachingPoint: { type: "string" },
+          teachingTitle: { type: "string" },
+          reflection: { type: "string" },
+          facts: {
+            type: "array",
+            minItems: 2,
+            maxItems: 4,
+            items: { type: "string" },
+          },
+          continueLabel: { type: "string" },
+        },
+        required: [
+          "id",
+          "title",
+          "intro",
+          "formatLabel",
+          "story",
+          "teachingPoint",
+          "teachingTitle",
+          "reflection",
+          "facts",
+          "continueLabel",
+        ],
+      },
+    },
+    required: ["breather"],
+  };
+}
+
 async function handleQuestions(body, response) {
   const data = await createOpenAiResponse({
     schemaName: "quiz_questions",
@@ -218,6 +424,7 @@ async function handleQuestions(body, response) {
       "Use Nigerian/West African-friendly school context when appropriate, but keep questions globally understandable.",
       "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
       "If the course is university-level, produce genuine undergraduate-style questions rather than simplified school questions.",
+      "Return learner-facing content in the learner's selected language.",
     ].join(" "),
     input: [
       {
@@ -259,8 +466,10 @@ async function handleFeedback(body, response) {
               `Question focus: ${body.focusMode === "topic" ? body.topicLabel ?? body.topicId ?? "selected topic" : "General mixed practice"}`,
               `App variant: ${body.appVariant ?? "children"}`,
               `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+              `Learner language: ${body.learnerLanguageLabel ?? "English"}`,
               `Variant guidance: ${body.appGuidance ?? ""}`,
               `Learner age: ${body.profile?.age ?? "Unknown"}`,
+              `Write the feedback in ${body.learnerLanguageLabel ?? "English"}.`,
             ].join("\n"),
           },
         ],
@@ -294,9 +503,11 @@ async function handlePlan(body, response) {
               `Question focus: ${body.focusMode === "topic" ? body.topicLabel ?? body.topicId ?? "selected topic" : "General mixed practice"}`,
               `App variant: ${body.appVariant ?? "children"}`,
               `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+              `Learner language: ${body.learnerLanguageLabel ?? "English"}`,
               `Variant guidance: ${body.appGuidance ?? ""}`,
               `Learner age: ${body.profile?.age ?? "Unknown"}`,
               `Target exam: ${body.profile?.targetExam ?? "General study"}`,
+              `Write the study plan in ${body.learnerLanguageLabel ?? "English"}.`,
             ].join("\n"),
           },
         ],
@@ -305,6 +516,216 @@ async function handlePlan(body, response) {
   });
 
   sendJson(response, 200, { plan: data.plan });
+}
+
+async function handleBreather(body, response) {
+  const focusLabel =
+    body.focusMode === "topic"
+      ? body.topicLabel ?? body.topicId ?? "selected topic"
+      : `general ${body.subject?.name ?? "subject"} coverage`;
+
+  const data = await createOpenAiResponse({
+    schemaName: "learning_breather",
+    schema: buildBreatherSchema(),
+    instructions: [
+      "You create short educational breather content for a mobile learning app.",
+      "The content should feel like a rewarding mini-lesson, not a quiz.",
+      "Keep it engaging, age-appropriate, academically accurate, and encouraging.",
+      "For children use simple, vivid wording and short reading pieces.",
+      "For teens use revision-friendly school-level mini lessons or reading passages.",
+      "For university learners use concise concept reflections, course-linked notes, or brief applied academic readings.",
+      "Return all learner-facing content in the learner's selected language.",
+    ].join(" "),
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              `Subject/Course: ${body.subject?.name ?? "Unknown"}`,
+              `Grade/Band: ${body.grade ?? "Unknown"}`,
+              `Level: ${body.level ?? 1}`,
+              `Pass streak: ${body.streak ?? 0}`,
+              `Mode: ${body.mode ?? "quiz"}`,
+              `Difficulty: ${body.difficulty ?? "Beginner"}`,
+              `Question focus: ${body.focusMode === "topic" ? `Topic only (${body.topicLabel ?? body.topicId ?? "selected topic"})` : "General mixed practice"}`,
+              `Selected focus label: ${focusLabel}`,
+              `App variant: ${body.appVariant ?? "children"}`,
+              `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+              `Learner language: ${body.learnerLanguageLabel ?? "English"}`,
+              `Learner age: ${body.profile?.age ?? "Unknown"}`,
+              `Target exam: ${body.profile?.targetExam ?? "General study"}`,
+              `Subject guidance: ${body.subject?.aiPromptHint ?? ""}`,
+              `Variant guidance: ${body.appGuidance ?? ""}`,
+              `Academic stage guidance: ${describeAcademicStage(body)}`,
+              "Create a short breather that teaches something real inside this subject or course.",
+              "The content may be a poem, reading passage, concept note, applied reflection, or mini lesson depending on the learner stage.",
+              "Do not return quiz questions, multiple-choice options, or assessment instructions.",
+              "The story field should be a readable educational passage of moderate length.",
+              "The facts array should contain 2 to 4 concise takeaways.",
+              `Write the entire breather in ${body.learnerLanguageLabel ?? "English"}.`,
+            ].join("\n"),
+          },
+        ],
+      },
+    ],
+  });
+
+  sendJson(response, 200, { breather: data.breather });
+}
+
+async function handleCompetitionJoin(body, response) {
+  if (body.appVariant === "children") {
+    sendJson(response, 400, { error: "Competition is not available for Quiks Children." });
+    return;
+  }
+
+  const playerId = body.profile?.id;
+  const playerName = body.profile?.name ?? "Learner";
+  if (!playerId || !body.subject?.id || !body.grade || !body.level) {
+    sendJson(response, 400, { error: "Competition request is missing required fields." });
+    return;
+  }
+
+  const existingMatchId = competitionMatchByPlayer.get(playerId);
+  if (existingMatchId) {
+    const existingMatch = competitionMatches.get(existingMatchId);
+    if (existingMatch) {
+      sendJson(response, 200, {
+        status: "matched",
+        competition: buildCompetitionPayload(existingMatch, playerId),
+      });
+      return;
+    }
+  }
+
+  const existingQueueId = competitionWaiterByPlayer.get(playerId);
+  if (existingQueueId) {
+    const waiter = competitionWaitersById.get(existingQueueId);
+    if (waiter) {
+      sendJson(response, 200, { status: "waiting", queueId: waiter.queueId });
+      return;
+    }
+  }
+
+  const key = buildCompetitionKey(body);
+  const waiter = competitionWaiters.get(key);
+  if (waiter && waiter.playerId !== playerId) {
+    const match = await createCompetitionMatch(waiter, {
+      queueId: randomUUID(),
+      key,
+      playerId,
+      name: playerName,
+      body,
+    });
+    sendJson(response, 200, {
+      status: "matched",
+      competition: buildCompetitionPayload(match, playerId),
+    });
+    return;
+  }
+
+  const queueEntry = {
+    queueId: randomUUID(),
+    key,
+    playerId,
+    name: playerName,
+    body,
+    createdAt: Date.now(),
+  };
+
+  competitionWaiters.set(key, queueEntry);
+  competitionWaitersById.set(queueEntry.queueId, queueEntry);
+  competitionWaiterByPlayer.set(playerId, queueEntry.queueId);
+  sendJson(response, 200, { status: "waiting", queueId: queueEntry.queueId });
+}
+
+async function handleCompetitionStatus(body, response) {
+  const playerId = body.playerId;
+  if (!playerId) {
+    sendJson(response, 400, { error: "Missing playerId." });
+    return;
+  }
+
+  const matchId = competitionMatchByPlayer.get(playerId);
+  if (matchId) {
+    const match = competitionMatches.get(matchId);
+    if (match) {
+      sendJson(response, 200, {
+        status: "matched",
+        competition: buildCompetitionPayload(match, playerId),
+      });
+      return;
+    }
+  }
+
+  const queueId = body.queueId ?? competitionWaiterByPlayer.get(playerId);
+  if (queueId) {
+    const waiter = competitionWaitersById.get(queueId);
+    if (waiter) {
+      sendJson(response, 200, { status: "waiting", queueId });
+      return;
+    }
+  }
+
+  sendJson(response, 200, { status: "not_found" });
+}
+
+async function handleCompetitionSubmit(body, response) {
+  const match = competitionMatches.get(body.competitionId);
+  if (!match) {
+    sendJson(response, 404, { error: "Competition match not found." });
+    return;
+  }
+
+  if (!body.playerId || !match.players.some((player) => player.playerId === body.playerId)) {
+    sendJson(response, 400, { error: "Player is not part of this competition." });
+    return;
+  }
+
+  match.submissions[body.playerId] = {
+    score: body.score ?? 0,
+    correctAnswers: body.correctAnswers ?? 0,
+    totalQuestions: body.totalQuestions ?? 0,
+    timeTakenSeconds: body.timeTakenSeconds ?? 0,
+    submittedAt: Date.now(),
+  };
+
+  const payload = getCompetitionOutcome(match, body.playerId);
+  sendJson(response, 200, payload);
+}
+
+async function handleCompetitionChat(body, response) {
+  const match = competitionMatches.get(body.competitionId);
+  if (!match) {
+    sendJson(response, 404, { error: "Competition match not found." });
+    return;
+  }
+
+  const sender = match.players.find((player) => player.playerId === body.playerId);
+  if (!sender) {
+    sendJson(response, 400, { error: "Player is not part of this competition." });
+    return;
+  }
+
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!message) {
+    sendJson(response, 400, { error: "Message is required." });
+    return;
+  }
+
+  const chatEntry = {
+    id: randomUUID(),
+    senderId: sender.playerId,
+    senderName: sender.name,
+    message,
+    createdAt: Date.now(),
+  };
+
+  match.chats.push(chatEntry);
+  match.chats = match.chats.slice(-20);
+  sendJson(response, 200, { ok: true, chats: match.chats });
 }
 
 const server = http.createServer(async (request, response) => {
@@ -350,6 +771,31 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/coach-plan") {
       await handlePlan(body, response);
+      return;
+    }
+
+    if (url.pathname === "/breather") {
+      await handleBreather(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/join") {
+      await handleCompetitionJoin(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/status") {
+      await handleCompetitionStatus(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/submit") {
+      await handleCompetitionSubmit(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/chat") {
+      await handleCompetitionChat(body, response);
       return;
     }
 

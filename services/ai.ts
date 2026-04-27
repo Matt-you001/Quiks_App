@@ -1,7 +1,18 @@
 import Constants from "expo-constants";
 import { appVariant } from "../lib/app-variant";
+import { getLanguageLabel, normalizeLanguage } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
 import type {
+  BreatherContent,
+  BreatherRequest,
+  CompetitionJoinRequest,
+  CompetitionJoinResponse,
+  CompetitionChatSendRequest,
+  CompetitionChatSendResponse,
+  CompetitionStatusRequest,
+  CompetitionStatusResponse,
+  CompetitionSubmitRequest,
+  CompetitionSubmitResponse,
   CoachPlanRequest,
   FeedbackRequest,
   Question,
@@ -53,6 +64,7 @@ function describeAcademicStage(request: QuestionRequest) {
 }
 
 function buildPromptLines(request: QuestionRequest) {
+  const language = normalizeLanguage(request.profile?.language);
   return [
     `Subject/Course: ${request.subject.name}`,
     `Grade/Band: ${request.grade}`,
@@ -62,6 +74,7 @@ function buildPromptLines(request: QuestionRequest) {
     `Question focus: ${request.focusMode === "topic" ? `Topic only (${request.topicLabel ?? request.topicId ?? "selected topic"})` : "General mixed practice"}`,
     `Question count: ${request.questionCount}`,
     `App audience: ${appVariant.appName} (${appVariant.audienceLabel})`,
+    `Learner language: ${getLanguageLabel(language)}`,
     `Learner target exam: ${request.profile?.targetExam ?? "General study"}`,
     `Subject guidance: ${request.subject.aiPromptHint}`,
     `Variant guidance: ${appVariant.aiGuidance}`,
@@ -72,6 +85,7 @@ function buildPromptLines(request: QuestionRequest) {
     "Treat the provided grade/band and level as mandatory signals for academic standard.",
     "The questions must match the real reasoning level expected for that class, band, and app variant.",
     "Avoid generic filler, placeholders, or over-simplified questions that belong to a lower academic stage.",
+    `Write all question prompts, answer options, and explanations in ${getLanguageLabel(language)}.`,
   ];
 }
 
@@ -97,11 +111,15 @@ async function postJson<TRequest, TResponse>(path: string, body: TRequest): Prom
 }
 
 function withVariantMeta<T extends object>(body: T) {
+  const profile = "profile" in body ? (body as { profile?: { language?: string } | null }).profile : null;
+  const language = normalizeLanguage(profile?.language);
   return {
     ...body,
     appVariant: appVariant.id,
     appAudienceLabel: appVariant.audienceLabel,
     appGuidance: appVariant.aiGuidance,
+    learnerLanguage: language,
+    learnerLanguageLabel: getLanguageLabel(language),
   };
 }
 
@@ -337,4 +355,32 @@ export async function generateCoachPlan(request: CoachPlanRequest): Promise<stri
     `Redo level ${request.level} in training mode and read each explanation out loud.`,
     `Ask the AI coach for one more practice set focused on ${request.grade} weak spots.`,
   ];
+}
+
+export async function generateBreather(request: BreatherRequest): Promise<BreatherContent> {
+  if (apiUrl && aiMode !== "demo") {
+    const response = await postJson<Record<string, unknown>, { breather: BreatherContent }>(
+      "/breather",
+      withVariantMeta(request) as unknown as Record<string, unknown>
+    );
+    return response.breather;
+  }
+
+  throw new Error("Live breather generation is unavailable.");
+}
+
+export async function joinCompetition(request: CompetitionJoinRequest): Promise<CompetitionJoinResponse> {
+  return postJson("/competition/join", withVariantMeta(request));
+}
+
+export async function getCompetitionStatus(request: CompetitionStatusRequest): Promise<CompetitionStatusResponse> {
+  return postJson("/competition/status", withVariantMeta(request));
+}
+
+export async function submitCompetitionResult(request: CompetitionSubmitRequest): Promise<CompetitionSubmitResponse> {
+  return postJson("/competition/submit", withVariantMeta(request));
+}
+
+export async function sendCompetitionChat(request: CompetitionChatSendRequest): Promise<CompetitionChatSendResponse> {
+  return postJson("/competition/chat", withVariantMeta(request));
 }

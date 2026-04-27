@@ -4,6 +4,8 @@ export type Difficulty = "Beginner" | "Intermediate" | "Advanced" | "Expert";
 
 export type QuestionFocusMode = "general" | "topic";
 
+export type AppLanguage = "en" | "fr" | "es" | "pt" | "ar" | "sw" | "zh" | "de";
+
 export interface SubjectTopic {
   id: string;
   label: string;
@@ -28,6 +30,7 @@ export interface UserProfile {
   age: number;
   targetExam: string;
   dailyGoalMinutes: number;
+  language: AppLanguage;
 }
 
 export interface Question {
@@ -57,6 +60,11 @@ export interface SessionResult {
   coinsEarned: number;
   aiFeedback: string;
   aiStudyPlan: string[];
+  competitionId?: string;
+  competitionOpponentName?: string;
+  competitionOutcome?: "won" | "lost" | "draw" | "pending";
+  competitionPlayerScore?: number;
+  competitionOpponentScore?: number;
 }
 
 export interface BreatherContent {
@@ -114,4 +122,89 @@ export interface CoachPlanRequest {
   focusMode?: QuestionFocusMode;
   topicLabel?: string;
   profile?: UserProfile | null;
+}
+
+export interface BreatherRequest {
+  subject: Subject;
+  grade: string;
+  level: number;
+  streak: number;
+  mode?: TestMode;
+  difficulty?: Difficulty;
+  focusMode?: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  profile?: UserProfile | null;
+}
+
+export interface CompetitionJoinRequest {
+  subject: Subject;
+  grade: string;
+  level: number;
+  difficulty: Difficulty;
+  focusMode?: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  profile: UserProfile;
+  questionCount?: number;
+}
+
+export interface CompetitionChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  createdAt: number;
+}
+
+export interface CompetitionQuestionPayload {
+  competitionId: string;
+  opponentName: string;
+  questions: Question[];
+  chats?: CompetitionChatMessage[];
+}
+
+export interface CompetitionJoinResponse {
+  status: "waiting" | "matched";
+  queueId?: string;
+  competition?: CompetitionQuestionPayload;
+}
+
+export interface CompetitionStatusRequest {
+  queueId?: string;
+  playerId: string;
+}
+
+export interface CompetitionStatusResponse {
+  status: "waiting" | "matched" | "not_found";
+  queueId?: string;
+  competition?: CompetitionQuestionPayload;
+}
+
+export interface CompetitionSubmitRequest {
+  competitionId: string;
+  playerId: string;
+  score: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  timeTakenSeconds: number;
+}
+
+export interface CompetitionSubmitResponse {
+  status: "submitted" | "completed";
+  outcome: "won" | "lost" | "draw" | "pending";
+  opponentName: string;
+  playerScore: number;
+  opponentScore?: number;
+}
+
+export interface CompetitionChatSendRequest {
+  competitionId: string;
+  playerId: string;
+  message: string;
+}
+
+export interface CompetitionChatSendResponse {
+  ok: true;
+  chats: CompetitionChatMessage[];
 }

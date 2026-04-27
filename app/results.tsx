@@ -4,10 +4,11 @@ import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { getSubjectPassStreak, shouldOfferBreather } from "../lib/breathers";
+import { t } from "../lib/i18n";
 import { readAppState } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
-import type { Difficulty, SessionResult } from "../types/app";
+import type { AppLanguage, Difficulty, SessionResult } from "../types/app";
 
 const allowedDifficulties: Difficulty[] = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
@@ -15,6 +16,7 @@ export default function ResultsScreen() {
   const params = useLocalSearchParams<{ result?: string; nextDifficulty?: string }>();
   const [showBreather, setShowBreather] = useState(false);
   const [passStreak, setPassStreak] = useState(0);
+  const [language, setLanguage] = useState<AppLanguage>("en");
 
   const result = useMemo(() => {
     if (!params.result || Array.isArray(params.result)) {
@@ -44,8 +46,10 @@ export default function ResultsScreen() {
 
       const currentProfileId = state.currentProfileId;
       const profileResults = currentProfileId ? state.results[currentProfileId] ?? [] : [];
+      const profile = state.profiles.find((item) => item.id === currentProfileId) ?? null;
       const streak = getSubjectPassStreak(profileResults, result.subjectId);
 
+      setLanguage(profile?.language ?? "en");
       setPassStreak(streak);
       setShowBreather(shouldOfferBreather(profileResults, result));
     });
@@ -59,8 +63,8 @@ export default function ResultsScreen() {
     return (
       <AppBackground>
         <View style={styles.card}>
-          <Text style={styles.title}>No result found</Text>
-          <PrimaryButton label="Back Home" onPress={() => router.replace("/")} />
+          <Text style={styles.title}>{t(language, "noResultFound")}</Text>
+          <PrimaryButton label={t(language, "backHome")} onPress={() => router.replace("/")} />
         </View>
       </AppBackground>
     );
@@ -72,10 +76,19 @@ export default function ResultsScreen() {
       ? (params.nextDifficulty as Difficulty)
       : result.difficulty;
 
-  const heading = passed ? (result.score === 100 ? "Excellent work" : "Great job") : "Keep trying";
+  const heading = passed ? (result.score === 100 ? t(language, "excellentWork") : t(language, "greatJob")) : t(language, "keepTrying");
   const summary = passed
-    ? `You passed Level ${result.level} in ${result.topicLabel ?? result.subjectName}.`
-    : `You did not pass Level ${result.level} in ${result.topicLabel ?? result.subjectName} yet, but you can improve with another try.`;
+    ? t(language, "passedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName })
+    : t(language, "notPassedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName });
+  const isCompetition = Boolean(result.competitionId);
+  const competitionOutcomeText =
+    result.competitionOutcome === "won"
+      ? t(language, "wonCompetition")
+      : result.competitionOutcome === "lost"
+        ? t(language, "lostCompetition")
+        : result.competitionOutcome === "draw"
+          ? t(language, "drewCompetition")
+          : t(language, "waitingOpponentResult");
 
   const backHome = () => {
     router.replace("/");
@@ -125,6 +138,9 @@ export default function ResultsScreen() {
         difficulty: result.difficulty,
         nextDifficulty,
         streak: String(passStreak),
+        focusMode: result.focusMode ?? "general",
+        topicId: result.topicId,
+        topicLabel: result.topicLabel,
       },
     });
   };
@@ -137,57 +153,76 @@ export default function ResultsScreen() {
         <Text style={styles.heroText}>
           {result.subjectName} | {result.grade} | Level {result.level}
         </Text>
-        <Text style={styles.heroText}>{result.topicLabel ? `Topic focus: ${result.topicLabel}` : "General mixed practice"}</Text>
+        <Text style={styles.heroText}>{result.topicLabel ? t(language, "topicFocusLabel", { topic: result.topicLabel }) : t(language, "generalMixedPractice")}</Text>
         <Text style={styles.heroSummary}>{summary}</Text>
       </View>
 
       {passed && showBreather ? (
         <View style={styles.rewardCard}>
-          <Text style={styles.rewardEyebrow}>Reward unlocked</Text>
-          <Text style={styles.rewardTitle}>Take a learning breather</Text>
+          <Text style={styles.rewardEyebrow}>{t(language, "rewardUnlocked")}</Text>
+          <Text style={styles.rewardTitle}>{t(language, "takeLearningBreather")}</Text>
           <Text style={styles.rewardText}>
-            You have passed {passStreak} {passStreak === 1 ? "level" : "levels"} in {result.subjectName}. A short,
-            story-based reset is ready if you want one before the next exercise.
+            {t(language, "breatherRewardText", {
+              count: passStreak,
+              levelWord: passStreak === 1 ? "level" : "levels",
+              subject: result.subjectName,
+            })}
           </Text>
         </View>
       ) : null}
 
+      {isCompetition ? (
+        <View style={styles.card}>
+          <Text style={styles.title}>{t(language, "competitionSummary")}</Text>
+          <Text style={styles.summaryLine}>
+            {t(language, "opponent")}: {result.competitionOpponentName ?? "-"}
+          </Text>
+          <Text style={styles.summaryLine}>{competitionOutcomeText}</Text>
+          <Text style={styles.summaryLine}>You: {result.competitionPlayerScore ?? result.score}%</Text>
+          {typeof result.competitionOpponentScore === "number" ? (
+            <Text style={styles.summaryLine}>
+              {result.competitionOpponentName ?? t(language, "opponent")}: {result.competitionOpponentScore}%
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={styles.card}>
-        <Text style={styles.title}>Performance message</Text>
+        <Text style={styles.title}>{t(language, "performanceMessage")}</Text>
         <Text style={styles.feedback}>{result.aiFeedback}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.title}>Session summary</Text>
+        <Text style={styles.title}>{t(language, "sessionSummary")}</Text>
         <Text style={styles.summaryLine}>
-          Correct answers: {result.correctAnswers}/{result.totalQuestions}
+          {t(language, "correctAnswers")}: {result.correctAnswers}/{result.totalQuestions}
         </Text>
-        <Text style={styles.summaryLine}>Time used: {result.timeTakenSeconds}s</Text>
-        <Text style={styles.summaryLine}>Coins earned: {result.coinsEarned}</Text>
-        <Text style={styles.summaryLine}>Mode: {result.mode}</Text>
-        <Text style={styles.summaryLine}>Focus: {result.topicLabel ?? "General mixed practice"}</Text>
+        <Text style={styles.summaryLine}>{t(language, "timeUsed")}: {result.timeTakenSeconds}s</Text>
+        <Text style={styles.summaryLine}>{t(language, "coinsEarned")}: {result.coinsEarned}</Text>
+        <Text style={styles.summaryLine}>{t(language, "mode")}: {result.mode}</Text>
+        <Text style={styles.summaryLine}>{t(language, "focus")}: {result.topicLabel ?? t(language, "generalMixedPractice")}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.title}>Study plan</Text>
+        <Text style={styles.title}>{t(language, "studyPlan")}</Text>
         {result.aiStudyPlan.map((item) => (
           <Text key={item} style={styles.planLine}>
-            • {item}
+            - {item}
           </Text>
         ))}
       </View>
 
       <View style={styles.actionColumn}>
-        {passed && showBreather ? <PrimaryButton label="Take Learning Breather" onPress={openBreather} /> : null}
+        {passed && showBreather ? <PrimaryButton label={t(language, "takeLearningBreather")} onPress={openBreather} /> : null}
         {passed ? (
           <PrimaryButton
-            label={showBreather ? "Skip Breather and Continue" : "Next Level"}
+            label={showBreather ? t(language, "skipBreatherAndContinue") : t(language, "nextLevel")}
             variant={showBreather ? "secondary" : "primary"}
             onPress={goToNextLevel}
           />
         ) : null}
-        <PrimaryButton label="Repeat This Level" variant={passed ? "secondary" : "primary"} onPress={repeatLevel} />
-        <PrimaryButton label="Back Home" variant="ghost" onPress={backHome} />
+        <PrimaryButton label={t(language, "repeatThisLevel")} variant={passed ? "secondary" : "primary"} onPress={repeatLevel} />
+        <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={backHome} />
       </View>
     </AppBackground>
   );
