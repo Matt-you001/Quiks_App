@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { appVariant } from "../lib/app-variant";
 import { getLocalQuestions } from "../lib/question-bank";
 import type {
   CoachPlanRequest,
@@ -14,6 +15,65 @@ const apiKey = process.env.EXPO_PUBLIC_AI_API_KEY ?? extra.EXPO_PUBLIC_AI_API_KE
 const aiMode = process.env.EXPO_PUBLIC_AI_MODE ?? extra.EXPO_PUBLIC_AI_MODE ?? "demo";
 const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? extra.EXPO_PUBLIC_GEMINI_API_KEY;
 const geminiModel = process.env.EXPO_PUBLIC_GEMINI_MODEL ?? extra.EXPO_PUBLIC_GEMINI_MODEL ?? "gemini-2.5-flash";
+
+function describeAcademicStage(request: QuestionRequest) {
+  const focusLabel =
+    request.focusMode === "topic"
+      ? request.topicLabel ?? request.topicId ?? "selected topic"
+      : `general ${request.subject.name} coverage`;
+
+  if (appVariant.id === "children") {
+    return [
+      `This learner is in ${request.grade}, which should be treated as a real primary-school class level for ages roughly 5 to 12.`,
+      `Level ${request.level} means progression depth inside the class, not a random difficulty jump.`,
+      "Use concrete, school-appropriate examples, short wording, and clear single-skill or two-step reasoning.",
+      "Do not generate secondary-school or university-style abstraction unless the class level truly supports it.",
+      `The set should feel like authentic primary-school ${request.subject.name.toLowerCase()} practice focused on ${focusLabel.toLowerCase()}.`,
+    ].join(" ");
+  }
+
+  if (appVariant.id === "teens") {
+    return [
+      `This learner is in ${request.grade}, which should be treated as a real secondary-school or college class level for ages roughly 11 to 20.`,
+      `Level ${request.level} means progression depth within that class and should reflect increasingly stronger WAEC/NECO/JAMB-style reasoning where appropriate.`,
+      "Use authentic school-subject language, stronger interpretation, and multi-step problem solving suited to junior or senior secondary learners.",
+      "Do not simplify the content down to primary-school level, and do not jump to specialized university framing unless the subject naturally demands it.",
+      `The set should feel like credible secondary-school ${request.subject.name.toLowerCase()} work focused on ${focusLabel.toLowerCase()}.`,
+    ].join(" ");
+  }
+
+  return [
+    "This learner is in the University band and should receive true tertiary-level course content.",
+    `For Quiks Uni, treat ${request.subject.name} as a university course, not a school subject.`,
+    `Level ${request.level} means course progression depth: Level 1 should feel like first-year university foundations, while higher levels should show more abstraction, formalism, application, and analytical reasoning.`,
+    "Use correct academic terminology, concept-based reasoning, and realistic undergraduate question styles.",
+    "Do not downgrade Mathematics, Law, Engineering, Medicine, Management Studies, or any other course to primary- or secondary-school material.",
+    `The set should feel like authentic introductory or intermediate university ${request.subject.name.toLowerCase()} work focused on ${focusLabel.toLowerCase()}.`,
+  ].join(" ");
+}
+
+function buildPromptLines(request: QuestionRequest) {
+  return [
+    `Subject/Course: ${request.subject.name}`,
+    `Grade/Band: ${request.grade}`,
+    `Difficulty: ${request.difficulty}`,
+    `Mode: ${request.mode}`,
+    `Level: ${request.level}`,
+    `Question focus: ${request.focusMode === "topic" ? `Topic only (${request.topicLabel ?? request.topicId ?? "selected topic"})` : "General mixed practice"}`,
+    `Question count: ${request.questionCount}`,
+    `App audience: ${appVariant.appName} (${appVariant.audienceLabel})`,
+    `Learner target exam: ${request.profile?.targetExam ?? "General study"}`,
+    `Subject guidance: ${request.subject.aiPromptHint}`,
+    `Variant guidance: ${appVariant.aiGuidance}`,
+    `Academic stage guidance: ${describeAcademicStage(request)}`,
+    request.focusMode === "topic"
+      ? "Generate questions only from the selected topic. Do not mix unrelated topics into this set."
+      : "Use a healthy mix of topics within the subject or course.",
+    "Treat the provided grade/band and level as mandatory signals for academic standard.",
+    "The questions must match the real reasoning level expected for that class, band, and app variant.",
+    "Avoid generic filler, placeholders, or over-simplified questions that belong to a lower academic stage.",
+  ];
+}
 
 async function postJson<TRequest, TResponse>(path: string, body: TRequest): Promise<TResponse> {
   if (!apiUrl) {
@@ -34,6 +94,15 @@ async function postJson<TRequest, TResponse>(path: string, body: TRequest): Prom
   }
 
   return (await response.json()) as TResponse;
+}
+
+function withVariantMeta<T extends object>(body: T) {
+  return {
+    ...body,
+    appVariant: appVariant.id,
+    appAudienceLabel: appVariant.audienceLabel,
+    appGuidance: appVariant.aiGuidance,
+  };
 }
 
 function buildDemoQuestions(request: QuestionRequest): Question[] {
@@ -115,18 +184,7 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
 
   const prompt = [
     "Generate a JSON object with a `questions` array for a mobile quiz app.",
-    `Subject: ${request.subject.name}`,
-    `Grade: ${request.grade}`,
-    `Difficulty: ${request.difficulty}`,
-    `Mode: ${request.mode}`,
-    `Level: ${request.level}`,
-    `Question focus: ${request.focusMode === "topic" ? `Topic only (${request.topicLabel ?? request.topicId ?? "selected topic"})` : "General mixed practice"}`,
-    `Question count: ${request.questionCount}`,
-    `Learner target exam: ${request.profile?.targetExam ?? "General study"}`,
-    `Guidance: ${request.subject.aiPromptHint}`,
-    request.focusMode === "topic"
-      ? "Generate questions only from the selected topic. Do not mix unrelated topics into this set."
-      : "Use a healthy mix of topics within the subject.",
+    ...buildPromptLines(request),
     "Return only valid JSON.",
     "Each question must include: id, prompt, options, answer, explanation.",
     "Each question must have exactly 4 options and one correct answer that matches one option exactly.",
@@ -208,7 +266,7 @@ export async function generateQuestions(request: QuestionRequest): Promise<Quest
   if (aiMode !== "demo") {
     try {
       if (apiUrl) {
-        return postJson<QuestionRequest, QuestionResponse>("/questions", request);
+        return postJson("/questions", withVariantMeta(request));
       }
 
       if (geminiApiKey) {
@@ -240,7 +298,10 @@ export async function generateQuestions(request: QuestionRequest): Promise<Quest
 export async function generateFeedback(request: FeedbackRequest): Promise<string> {
   if (apiUrl && aiMode !== "demo") {
     try {
-      const response = await postJson<FeedbackRequest, { feedback: string }>("/feedback", request);
+      const response = await postJson<Record<string, unknown>, { feedback: string }>(
+        "/feedback",
+        withVariantMeta(request) as unknown as Record<string, unknown>
+      );
       return response.feedback;
     } catch {
       // Fall back to local feedback so session completion is never blocked.
@@ -261,7 +322,10 @@ export async function generateFeedback(request: FeedbackRequest): Promise<string
 export async function generateCoachPlan(request: CoachPlanRequest): Promise<string[]> {
   if (apiUrl && aiMode !== "demo") {
     try {
-      const response = await postJson<CoachPlanRequest, { plan: string[] }>("/coach-plan", request);
+      const response = await postJson<Record<string, unknown>, { plan: string[] }>(
+        "/coach-plan",
+        withVariantMeta(request) as unknown as Record<string, unknown>
+      );
       return response.plan;
     } catch {
       // Fall back to a local study plan so results can still render.

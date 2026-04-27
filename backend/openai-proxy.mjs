@@ -5,6 +5,67 @@ const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
 const openAiModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
+function describeAcademicStage(body) {
+  const focusLabel =
+    body.focusMode === "topic"
+      ? body.topicLabel ?? body.topicId ?? "selected topic"
+      : `general ${body.subject?.name ?? "course"} coverage`;
+
+  if (body.appVariant === "children") {
+    return [
+      `Treat ${body.grade ?? "the learner's grade"} as a real primary-school class level for ages roughly 5 to 12.`,
+      `Level ${body.level ?? 1} means progression depth within that class, not a random difficulty spike.`,
+      "Use short, clear wording, concrete school examples, and mostly single-skill or simple two-step reasoning.",
+      "Do not produce secondary-school or tertiary-style abstraction unless the stated class level supports it.",
+      `The questions should feel like authentic primary-school ${String(body.subject?.name ?? "subject").toLowerCase()} practice focused on ${String(focusLabel).toLowerCase()}.`,
+    ].join(" ");
+  }
+
+  if (body.appVariant === "teens") {
+    return [
+      `Treat ${body.grade ?? "the learner's grade"} as a real secondary-school or college class level for ages roughly 11 to 20.`,
+      `Level ${body.level ?? 1} means progression depth inside that class and should support stronger WAEC/NECO/JAMB-style reasoning where relevant.`,
+      "Use authentic secondary-school language, interpretation, worked logic, and multi-step reasoning appropriate to the class.",
+      "Do not reduce the questions to primary-school simplicity, and do not jump to specialized university framing unless the subject naturally requires it.",
+      `The questions should feel like credible secondary-school ${String(body.subject?.name ?? "subject").toLowerCase()} work focused on ${String(focusLabel).toLowerCase()}.`,
+    ].join(" ");
+  }
+
+  return [
+    "Treat this learner as a university student receiving true tertiary-level course content.",
+    `For Quiks Uni, treat ${body.subject?.name ?? "the subject"} as a university course, not a school subject.`,
+    `Level ${body.level ?? 1} means course progression depth: Level 1 should feel like first-year undergraduate foundations, while higher levels should show more abstraction, formalism, application, and analysis.`,
+    "Use correct academic terminology, concept-based reasoning, and realistic undergraduate question styles.",
+    "Do not downgrade Mathematics, Law, Engineering, Medicine, Management Studies, or any other course to school-level filler.",
+    `The questions should feel like authentic introductory or intermediate university ${String(body.subject?.name ?? "course").toLowerCase()} work focused on ${String(focusLabel).toLowerCase()}.`,
+  ].join(" ");
+}
+
+function buildQuestionPromptLines(body) {
+  return [
+    `Subject/Course: ${body.subject?.name ?? "Unknown"}`,
+    `Grade/Band: ${body.grade ?? "Unknown"}`,
+    `Difficulty: ${body.difficulty ?? "Beginner"}`,
+    `Mode: ${body.mode ?? "quiz"}`,
+    `Level: ${body.level ?? 1}`,
+    `Question focus: ${body.focusMode === "topic" ? `Topic only (${body.topicLabel ?? body.topicId ?? "selected topic"})` : "General mixed practice"}`,
+    `Question count: ${body.questionCount ?? 10}`,
+    `App variant: ${body.appVariant ?? "children"}`,
+    `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+    `Learner age: ${body.profile?.age ?? "Unknown"}`,
+    `Target exam: ${body.profile?.targetExam ?? "General study"}`,
+    `Subject guidance: ${body.subject?.aiPromptHint ?? ""}`,
+    `Variant guidance: ${body.appGuidance ?? ""}`,
+    `Academic stage guidance: ${describeAcademicStage(body)}`,
+    body.focusMode === "topic"
+      ? "Generate questions only from the selected topic. Do not mix in unrelated topics."
+      : "Use a healthy spread of topics within the subject or course.",
+    "Treat the provided grade/band and level as mandatory signals for academic standard.",
+    "The set must reflect the true reasoning level expected for the class, band, and app variant.",
+    "Avoid over-simplified filler questions that belong to a lower academic stage.",
+  ];
+}
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json",
@@ -155,6 +216,8 @@ async function handleQuestions(body, response) {
       "Each question must have exactly 4 options, one correct answer, and a short explanation.",
       "Do not include unsafe content or trick questions.",
       "Use Nigerian/West African-friendly school context when appropriate, but keep questions globally understandable.",
+      "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
+      "If the course is university-level, produce genuine undergraduate-style questions rather than simplified school questions.",
     ].join(" "),
     input: [
       {
@@ -163,19 +226,7 @@ async function handleQuestions(body, response) {
           {
             type: "input_text",
             text: [
-              `Subject: ${body.subject?.name ?? "Unknown"}`,
-              `Grade: ${body.grade ?? "Unknown"}`,
-              `Difficulty: ${body.difficulty ?? "Beginner"}`,
-              `Mode: ${body.mode ?? "quiz"}`,
-              `Level: ${body.level ?? 1}`,
-              `Question focus: ${body.focusMode === "topic" ? `Topic only (${body.topicLabel ?? body.topicId ?? "selected topic"})` : "General mixed practice"}`,
-              `Question count: ${body.questionCount ?? 10}`,
-              `Learner age: ${body.profile?.age ?? "Unknown"}`,
-              `Target exam: ${body.profile?.targetExam ?? "General study"}`,
-              `Guidance: ${body.subject?.aiPromptHint ?? ""}`,
-              body.focusMode === "topic"
-                ? "Generate questions only from the selected topic. Do not mix in unrelated topics."
-                : "Use a healthy spread of topics within the subject.",
+              ...buildQuestionPromptLines(body),
             ].join("\n"),
           },
         ],
@@ -206,6 +257,9 @@ async function handleFeedback(body, response) {
               `Subject: ${body.subject?.name ?? "Unknown"}`,
               `Grade: ${body.grade ?? "Unknown"}`,
               `Question focus: ${body.focusMode === "topic" ? body.topicLabel ?? body.topicId ?? "selected topic" : "General mixed practice"}`,
+              `App variant: ${body.appVariant ?? "children"}`,
+              `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+              `Variant guidance: ${body.appGuidance ?? ""}`,
               `Learner age: ${body.profile?.age ?? "Unknown"}`,
             ].join("\n"),
           },
@@ -238,6 +292,9 @@ async function handlePlan(body, response) {
               `Grade: ${body.grade ?? "Unknown"}`,
               `Level: ${body.level ?? 1}`,
               `Question focus: ${body.focusMode === "topic" ? body.topicLabel ?? body.topicId ?? "selected topic" : "General mixed practice"}`,
+              `App variant: ${body.appVariant ?? "children"}`,
+              `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+              `Variant guidance: ${body.appGuidance ?? ""}`,
               `Learner age: ${body.profile?.age ?? "Unknown"}`,
               `Target exam: ${body.profile?.targetExam ?? "General study"}`,
             ].join("\n"),
