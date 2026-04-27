@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "Quiks",
+    "name": "Quiks Children",
     "slug": "quiks",
-    "scheme": "quiks",
+    "scheme": "quiks-children",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/images/quiks-icon-1024.png",
+    "icon": "./assets/images/quiks-children-icon-1024.png",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#0B1F33"
+      "backgroundColor": "#7A2CC8"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "android": {
-      "package": "com.quiks.mobile",
+      "package": "com.quiks.children",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/quiks-adaptive-foreground.png",
-        "backgroundColor": "#0B1F33"
+        "foregroundImage": "./assets/images/quiks-children-adaptive-foreground.png",
+        "backgroundColor": "#7A2CC8"
       },
       "edgeToEdgeEnabled": true
     },
@@ -34,6 +34,8 @@
       "typedRoutes": true
     },
     "extra": {
+      "APP_VARIANT": "children",
+      "EXPO_PUBLIC_APP_VARIANT": "children",
       "router": {
         "root": "./app"
       },
