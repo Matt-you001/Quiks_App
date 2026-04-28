@@ -27,6 +27,37 @@ const aiMode = process.env.EXPO_PUBLIC_AI_MODE ?? extra.EXPO_PUBLIC_AI_MODE ?? "
 const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? extra.EXPO_PUBLIC_GEMINI_API_KEY;
 const geminiModel = process.env.EXPO_PUBLIC_GEMINI_MODEL ?? extra.EXPO_PUBLIC_GEMINI_MODEL ?? "gemini-2.5-flash";
 
+function describeDifficultyRigour(request: QuestionRequest) {
+  if (request.difficulty === "Beginner") {
+    return [
+      "Beginner does not mean childish or below the learner's class band.",
+      "It means accessible entry-level questions for this exact variant, grade, and level.",
+      "Use foundational concepts, but keep the content firmly inside the correct academic stage.",
+    ].join(" ");
+  }
+
+  if (request.difficulty === "Intermediate") {
+    return [
+      "Intermediate should require solid understanding, correct terminology, and multi-step reasoning typical of this class band.",
+      "Questions should feel like normal in-class assessments for this learner stage, not revision for younger students.",
+    ].join(" ");
+  }
+
+  if (request.difficulty === "Advanced") {
+    return [
+      "Advanced should be demanding for this exact learner stage.",
+      "Use deeper application, interpretation, and less obvious answer choices.",
+      "The questions should feel like stronger school or university assessments, not introductory drills.",
+    ].join(" ");
+  }
+
+  return [
+    "Expert should represent the highest challenge inside this learner band.",
+    "Use rigorous reasoning, strong distractors, and higher-order application while staying inside the official subject or course scope for this variant, grade, and level.",
+    "Do not simplify the content into lower-stage material.",
+  ].join(" ");
+}
+
 function describeAcademicStage(request: QuestionRequest) {
   const focusLabel =
     request.focusMode === "topic"
@@ -79,12 +110,15 @@ function buildPromptLines(request: QuestionRequest) {
     `Subject guidance: ${request.subject.aiPromptHint}`,
     `Variant guidance: ${appVariant.aiGuidance}`,
     `Academic stage guidance: ${describeAcademicStage(request)}`,
+    `Difficulty rigour guidance: ${describeDifficultyRigour(request)}`,
     request.focusMode === "topic"
       ? "Generate questions only from the selected topic. Do not mix unrelated topics into this set."
       : "Use a healthy mix of topics within the subject or course.",
     "Treat the provided grade/band and level as mandatory signals for academic standard.",
-    "The questions must match the real reasoning level expected for that class, band, and app variant.",
+    "Treat the selected difficulty as a mandatory signal for reasoning depth inside that academic stage.",
+    "The questions must match the real reasoning level expected for that class, band, level, difficulty, and app variant.",
     "Avoid generic filler, placeholders, or over-simplified questions that belong to a lower academic stage.",
+    "Never answer a teens or university request with primary-school style content.",
     `Write all question prompts, answer options, and explanations in ${getLanguageLabel(language)}.`,
   ];
 }

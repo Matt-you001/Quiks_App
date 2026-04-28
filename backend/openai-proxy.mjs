@@ -11,6 +11,37 @@ const competitionWaiterByPlayer = new Map();
 const competitionMatches = new Map();
 const competitionMatchByPlayer = new Map();
 
+function describeDifficultyRigour(body) {
+  if (body.difficulty === "Beginner") {
+    return [
+      "Beginner does not mean childish or below the learner's academic band.",
+      "It means accessible entry-level questions for this exact variant, grade, and level.",
+      "Use foundational concepts, but keep the content firmly inside the correct school or university stage.",
+    ].join(" ");
+  }
+
+  if (body.difficulty === "Intermediate") {
+    return [
+      "Intermediate should require solid understanding, correct terminology, and multi-step reasoning typical of this class band.",
+      "Questions should feel like normal assessments for this learner stage, not revision for younger students.",
+    ].join(" ");
+  }
+
+  if (body.difficulty === "Advanced") {
+    return [
+      "Advanced should be demanding for this exact learner stage.",
+      "Use deeper application, interpretation, and less obvious answer choices.",
+      "The questions should feel like stronger school or university assessments, not introductory drills.",
+    ].join(" ");
+  }
+
+  return [
+    "Expert should represent the highest challenge inside this learner band.",
+    "Use rigorous reasoning, strong distractors, and higher-order application while staying inside the official subject or course scope for this variant, grade, and level.",
+    "Do not simplify the content into lower-stage material.",
+  ].join(" ");
+}
+
 function describeAcademicStage(body) {
   const focusLabel =
     body.focusMode === "topic"
@@ -64,12 +95,15 @@ function buildQuestionPromptLines(body) {
     `Subject guidance: ${body.subject?.aiPromptHint ?? ""}`,
     `Variant guidance: ${body.appGuidance ?? ""}`,
     `Academic stage guidance: ${describeAcademicStage(body)}`,
+    `Difficulty rigour guidance: ${describeDifficultyRigour(body)}`,
     body.focusMode === "topic"
       ? "Generate questions only from the selected topic. Do not mix in unrelated topics."
       : "Use a healthy spread of topics within the subject or course.",
     "Treat the provided grade/band and level as mandatory signals for academic standard.",
-    "The set must reflect the true reasoning level expected for the class, band, and app variant.",
+    "Treat the selected difficulty as a mandatory signal for reasoning depth inside that academic stage.",
+    "The set must reflect the true reasoning level expected for the class, band, level, difficulty, and app variant.",
     "Avoid over-simplified filler questions that belong to a lower academic stage.",
+    "Never answer a teens or university request with primary-school style content.",
     `Write all question prompts, answer options, and explanations in ${body.learnerLanguageLabel ?? "English"}.`,
   ];
 }
@@ -309,7 +343,9 @@ async function generateQuestionSet(body) {
       "Each question must have exactly 4 options, one correct answer, and a short explanation.",
       "Do not include unsafe content or trick questions.",
       "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
+      "Take the selected difficulty seriously as a real rigor band inside that stage.",
       "If the course is university-level, produce genuine undergraduate-style questions rather than simplified school questions.",
+      "If the request is for Quiks Teens, do not generate primary-school style questions.",
       "Return learner-facing content in the learner's selected language.",
     ].join(" "),
     input: [
@@ -423,7 +459,9 @@ async function handleQuestions(body, response) {
       "Do not include unsafe content or trick questions.",
       "Use Nigerian/West African-friendly school context when appropriate, but keep questions globally understandable.",
       "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
+      "Take the selected difficulty seriously as a real rigor band inside that stage.",
       "If the course is university-level, produce genuine undergraduate-style questions rather than simplified school questions.",
+      "If the request is for Quiks Teens, do not generate primary-school style questions.",
       "Return learner-facing content in the learner's selected language.",
     ].join(" "),
     input: [
