@@ -7,8 +7,18 @@ import type {
   BreatherRequest,
   CompetitionJoinRequest,
   CompetitionJoinResponse,
+  CompetitionChallengeAcceptRequest,
+  CompetitionChallengeAcceptResponse,
   CompetitionChatSendRequest,
   CompetitionChatSendResponse,
+  CompetitionChallengeCreateRequest,
+  CompetitionChallengeCreateResponse,
+  CompetitionChallengeListRequest,
+  CompetitionChallengeListResponse,
+  CompetitionChallengeStatusRequest,
+  CompetitionChallengeStatusResponse,
+  CompetitionProgressUpdateRequest,
+  CompetitionProgressUpdateResponse,
   CompetitionStatusRequest,
   CompetitionStatusResponse,
   CompetitionSubmitRequest,
@@ -407,8 +417,38 @@ export async function joinCompetition(request: CompetitionJoinRequest): Promise<
   return postJson("/competition/join", withVariantMeta(request));
 }
 
+export async function createCompetitionChallenge(
+  request: CompetitionChallengeCreateRequest
+): Promise<CompetitionChallengeCreateResponse> {
+  return postJson("/competition/challenge/create", withVariantMeta(request));
+}
+
+export async function listCompetitionChallenges(
+  request: CompetitionChallengeListRequest
+): Promise<CompetitionChallengeListResponse> {
+  return postJson("/competition/challenge/list", withVariantMeta(request));
+}
+
+export async function acceptCompetitionChallenge(
+  request: CompetitionChallengeAcceptRequest
+): Promise<CompetitionChallengeAcceptResponse> {
+  return postJson("/competition/challenge/accept", withVariantMeta(request));
+}
+
+export async function getCompetitionChallengeStatus(
+  request: CompetitionChallengeStatusRequest
+): Promise<CompetitionChallengeStatusResponse> {
+  return postJson("/competition/challenge/status", withVariantMeta(request));
+}
+
 export async function getCompetitionStatus(request: CompetitionStatusRequest): Promise<CompetitionStatusResponse> {
   return postJson("/competition/status", withVariantMeta(request));
+}
+
+export async function updateCompetitionProgress(
+  request: CompetitionProgressUpdateRequest
+): Promise<CompetitionProgressUpdateResponse> {
+  return postJson("/competition/progress", withVariantMeta(request));
 }
 
 export async function submitCompetitionResult(request: CompetitionSubmitRequest): Promise<CompetitionSubmitResponse> {

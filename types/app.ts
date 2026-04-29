@@ -157,28 +157,63 @@ export interface CompetitionChatMessage {
   createdAt: number;
 }
 
+export interface CompetitionLiveProgress {
+  playerId: string;
+  playerName: string;
+  answeredCount: number;
+  correctAnswers: number;
+  score: number;
+  finished: boolean;
+  submittedAt?: number;
+}
+
 export interface CompetitionQuestionPayload {
   competitionId: string;
   opponentName: string;
   questions: Question[];
   chats?: CompetitionChatMessage[];
+  startAt?: number;
+  endAt?: number;
+  liveProgress?: CompetitionLiveProgress[];
+}
+
+export interface CompetitionChallengeSummary {
+  challengeId: string;
+  subjectId: string;
+  subjectName: string;
+  grade: string;
+  level: number;
+  difficulty: Difficulty;
+  focusMode: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  creatorId: string;
+  creatorName: string;
+  createdAt: number;
 }
 
 export interface CompetitionJoinResponse {
-  status: "waiting" | "matched";
+  status: "waiting" | "matched" | "accepted";
   queueId?: string;
+  challenge?: CompetitionChallengeSummary;
   competition?: CompetitionQuestionPayload;
 }
 
 export interface CompetitionStatusRequest {
   queueId?: string;
   playerId: string;
+  competitionId?: string;
 }
 
 export interface CompetitionStatusResponse {
-  status: "waiting" | "matched" | "not_found";
+  status: "waiting" | "matched" | "not_found" | "accepted" | "completed";
   queueId?: string;
+  challenge?: CompetitionChallengeSummary;
   competition?: CompetitionQuestionPayload;
+  outcome?: "won" | "lost" | "draw" | "pending";
+  opponentName?: string;
+  playerScore?: number;
+  opponentScore?: number;
 }
 
 export interface CompetitionSubmitRequest {
@@ -207,4 +242,58 @@ export interface CompetitionChatSendRequest {
 export interface CompetitionChatSendResponse {
   ok: true;
   chats: CompetitionChatMessage[];
+}
+
+export interface CompetitionChallengeCreateRequest extends CompetitionJoinRequest {
+  durationSeconds: number;
+}
+
+export interface CompetitionChallengeCreateResponse {
+  status: "open";
+  challenge: CompetitionChallengeSummary;
+}
+
+export interface CompetitionChallengeListRequest {
+  playerId: string;
+  subjectId?: string;
+}
+
+export interface CompetitionChallengeListResponse {
+  challenges: CompetitionChallengeSummary[];
+}
+
+export interface CompetitionChallengeAcceptRequest {
+  challengeId: string;
+  playerId: string;
+  profile: UserProfile;
+}
+
+export interface CompetitionChallengeAcceptResponse {
+  status: "accepted";
+  competition: CompetitionQuestionPayload;
+}
+
+export interface CompetitionChallengeStatusRequest {
+  challengeId: string;
+  playerId: string;
+}
+
+export interface CompetitionChallengeStatusResponse {
+  status: "open" | "accepted" | "not_found";
+  challenge?: CompetitionChallengeSummary;
+  competition?: CompetitionQuestionPayload;
+}
+
+export interface CompetitionProgressUpdateRequest {
+  competitionId: string;
+  playerId: string;
+  answeredCount: number;
+  correctAnswers: number;
+  score: number;
+  finished?: boolean;
+}
+
+export interface CompetitionProgressUpdateResponse {
+  ok: true;
+  competition: CompetitionQuestionPayload;
 }

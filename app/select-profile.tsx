@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { getLanguageLabel, t } from "../lib/i18n";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getSubjectById } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -11,7 +12,8 @@ import type { UserProfile } from "../types/app";
 export default function SelectProfileScreen() {
   const { subject } = useLocalSearchParams<{ subject?: string }>();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const selectedSubject = getSubjectById(subject);
+  const language = profiles[0]?.language ?? "en";
+  const selectedSubject = getSubjectById(subject, language);
 
   const load = useCallback(async () => {
     const state = await readAppState();
@@ -37,9 +39,9 @@ export default function SelectProfileScreen() {
   return (
     <AppBackground>
       <View style={styles.hero}>
-        <Text style={styles.title}>Choose learner</Text>
+        <Text style={styles.title}>{t(language, "chooseLearner")}</Text>
         <Text style={styles.subtitle}>
-          {selectedSubject ? `Who is practicing ${selectedSubject.name} today?` : "Select the learner for this session."}
+          {selectedSubject ? t(language, "whoIsPracticing", { subject: selectedSubject.name }) : t(language, "selectLearnerForSession")}
         </Text>
       </View>
 
@@ -49,14 +51,14 @@ export default function SelectProfileScreen() {
             <View>
               <Text style={styles.name}>{profile.name}</Text>
               <Text style={styles.meta}>
-                Age {profile.age} • {profile.targetExam}
+                {t(language, "age")} {profile.age} | {profile.targetExam} | {getLanguageLabel(profile.language)}
               </Text>
             </View>
-            <PrimaryButton label="Use" onPress={() => continueWithProfile(profile.id)} style={styles.useButton} />
+            <PrimaryButton label={t(language, "use")} onPress={() => continueWithProfile(profile.id)} style={styles.useButton} />
           </View>
         ))}
         <PrimaryButton
-          label="Create learner"
+          label={t(language, "createLearner")}
           variant="secondary"
           onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
         />

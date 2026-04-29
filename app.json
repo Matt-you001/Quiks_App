@@ -15,7 +15,7 @@
       "**/*"
     ],
     "android": {
-      "package": "com.quiks.children",
+      "package": "com.quiks.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/quiks-children-adaptive-foreground.png",
         "backgroundColor": "#7A2CC8"

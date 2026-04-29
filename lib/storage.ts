@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { DEFAULT_LANGUAGE, normalizeLanguage } from "./i18n";
 import type { SessionResult, StoredAppState, UserProfile } from "../types/app";
 
 const STORAGE_KEY = "quiks_mobile_state_v1";
@@ -10,6 +11,13 @@ const defaultState: StoredAppState = {
   results: {},
 };
 
+function normalizeProfile(profile: UserProfile): UserProfile {
+  return {
+    ...profile,
+    language: normalizeLanguage(profile.language ?? DEFAULT_LANGUAGE),
+  };
+}
+
 export async function readAppState(): Promise<StoredAppState> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -19,7 +27,7 @@ export async function readAppState(): Promise<StoredAppState> {
   try {
     const parsed = JSON.parse(raw) as StoredAppState;
     return {
-      profiles: parsed.profiles ?? [],
+      profiles: (parsed.profiles ?? []).map(normalizeProfile),
       currentProfileId: parsed.currentProfileId ?? null,
       results: parsed.results ?? {},
     };
@@ -34,15 +42,16 @@ export async function writeAppState(nextState: StoredAppState) {
 
 export async function upsertProfile(profile: UserProfile) {
   const state = await readAppState();
-  const index = state.profiles.findIndex((item) => item.id === profile.id);
+  const normalizedProfile = normalizeProfile(profile);
+  const index = state.profiles.findIndex((item) => item.id === normalizedProfile.id);
 
   if (index >= 0) {
-    state.profiles[index] = profile;
+    state.profiles[index] = normalizedProfile;
   } else {
-    state.profiles.push(profile);
+    state.profiles.push(normalizedProfile);
   }
 
-  state.currentProfileId = profile.id;
+  state.currentProfileId = normalizedProfile.id;
   await writeAppState(state);
   return state;
 }

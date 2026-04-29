@@ -6,8 +6,10 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
+import { appVariant } from "../lib/app-variant";
+import { getLanguageLabel, t } from "../lib/i18n";
 import { readAppState, setCurrentProfile } from "../lib/storage";
-import { SCORE_THRESHOLD, subjects } from "../lib/subjects";
+import { getLocalizedSubjects, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import type { SessionResult, UserProfile } from "../types/app";
 
@@ -55,13 +57,15 @@ export default function HomeScreen() {
     () => (activeProfile ? resultsByProfile[activeProfile.id] ?? [] : []),
     [activeProfile, resultsByProfile]
   );
+  const language = activeProfile?.language ?? "en";
+  const localizedSubjects = useMemo(() => getLocalizedSubjects(language), [language]);
 
   const highestUnlockedBySubject = useMemo(() => {
     if (!activeProfile) {
       return [];
     }
 
-    return subjects
+    return localizedSubjects
       .map((subject) => {
         const passedResults = activeProfileResults.filter(
           (result) => result.subjectId === subject.id && result.score >= SCORE_THRESHOLD
@@ -104,7 +108,7 @@ export default function HomeScreen() {
 
         return right.level - left.level;
       });
-  }, [activeProfile, activeProfileResults]);
+  }, [activeProfile, activeProfileResults, localizedSubjects]);
 
   const selectProfile = async (profileId: string) => {
     await setCurrentProfile(profileId);
@@ -123,24 +127,23 @@ export default function HomeScreen() {
   return (
     <AppBackground>
       <View style={styles.heroCard}>
-        <Text style={styles.title}>Quiks</Text>
-        <Text style={styles.subtitle}>
-          A study app. Create student profiles, track progress, and unlock new levels across subjects.
-        </Text>
+        <Text style={styles.title}>{appVariant.heroTitle}</Text>
+        <Text style={styles.audienceBadge}>{appVariant.audienceLabel}</Text>
+        <Text style={styles.subtitle}>{appVariant.heroSubtitle}</Text>
 
         <View style={styles.statRow}>
-          <StatPill label="Students" value={String(profiles.length)} />
-          <StatPill label="Selected learner" value={activeProfile?.name ?? "None"} />
+          <StatPill label={`${appVariant.profileNoun}s`} value={String(profiles.length)} />
+          <StatPill label={`Selected ${appVariant.profileNoun}`} value={activeProfile?.name ?? t(language, "noneSelected")} />
         </View>
 
         <View style={styles.ctaRow}>
           <PrimaryButton
-            label="Create profile"
+            label={t(language, "homeCreateProfile")}
             onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
             style={styles.flexButton}
           />
           <PrimaryButton
-            label={activeProfile ? "Open profile" : "Choose learner"}
+            label={activeProfile ? t(language, "homeOpenProfile") : t(language, "homeChooseLearner")}
             variant="secondary"
             onPress={() => router.push(activeProfile ? "/profile" : "/")}
             style={styles.flexButton}
@@ -149,16 +152,14 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Students List</Text>
-        <Text style={styles.cardHint}>
-          Select a learner below and start practising.
-        </Text>
+        <Text style={styles.cardTitle}>{t(language, "studentsList")}</Text>
+        <Text style={styles.cardHint}>{t(language, "selectLearnerPrompt")}</Text>
 
         {profiles.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No student profiles yet.</Text>
+            <Text style={styles.emptyText}>{t(language, "noProfilesYet")}</Text>
             <PrimaryButton
-              label="Create first student"
+              label={t(language, "createFirstLearner")}
               onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
             />
           </View>
@@ -187,18 +188,21 @@ export default function HomeScreen() {
                 <View style={styles.studentMeta}>
                   <Text style={styles.studentName}>{profile.name}</Text>
                   <Text style={styles.studentSubtext}>
-                    Age {profile.age} | {profile.targetExam}
+                    {t(language, "age")} {profile.age} | {profile.targetExam}
                   </Text>
                   <Text style={styles.studentSubtext}>
                     {latest
-                      ? `Last activity: ${latest.subjectName} Level ${latest.level} (${latest.score}%)`
-                      : "No sessions yet"}
+                      ? `${t(language, "lastActivity")}: ${latest.subjectName} Level ${latest.level} (${latest.score}%)`
+                      : t(language, "noSessionsYet")}
+                  </Text>
+                  <Text style={styles.studentSubtext}>
+                    {t(language, "currentLanguage")}: {getLanguageLabel(profile.language)}
                   </Text>
                 </View>
 
                 <View style={[styles.studentBadge, isActive ? styles.studentBadgeActive : null]}>
                   <Text style={[styles.studentBadgeText, isActive ? styles.studentBadgeTextActive : null]}>
-                    {isActive ? "Selected" : "Select"}
+                    {isActive ? t(language, "selected") : t(language, "select")}
                   </Text>
                 </View>
               </Pressable>
@@ -209,11 +213,11 @@ export default function HomeScreen() {
 
       <View style={[styles.activeLearnerCard, !activeProfile ? styles.activeLearnerCardMuted : null]}>
         <View style={styles.activeLearnerHeader}>
-          <Text style={styles.activeLearnerEyebrow}>Current learner</Text>
+          <Text style={styles.activeLearnerEyebrow}>{t(language, "currentLearner")}</Text>
           {activeProfile ? (
             <View style={styles.activeLearnerBadge}>
               <MaterialCommunityIcons name="account-check-outline" size={16} color={palette.white} />
-              <Text style={styles.activeLearnerBadgeText}>Ready</Text>
+              <Text style={styles.activeLearnerBadgeText}>{t(language, "ready")}</Text>
             </View>
           ) : null}
         </View>
@@ -222,45 +226,45 @@ export default function HomeScreen() {
           <>
             <Text style={styles.activeLearnerName}>{activeProfile.name}</Text>
             <Text style={styles.activeLearnerText}>
-              Age {activeProfile.age} | {activeProfile.targetExam}
+              {t(language, "age")} {activeProfile.age} | {activeProfile.targetExam}
             </Text>
-            <Text style={styles.progressTitle}>Highest unlocked by subject</Text>
+            <Text style={styles.progressTitle}>{t(language, "highestUnlockedBySubject")}</Text>
             {highestUnlockedBySubject.length > 0 ? (
               <View style={styles.progressWrap}>
                 {highestUnlockedBySubject.map((entry) => (
                   <View key={entry.subjectId} style={styles.progressChip}>
                     <Text style={styles.progressChipTitle}>{entry.subjectName}</Text>
                     <Text style={styles.progressChipText}>
-                      {entry.grade} | Level {entry.level}
+                      {entry.grade} | {t(language, "levelLabel")} {entry.level}
                     </Text>
                   </View>
                 ))}
               </View>
             ) : (
-              <Text style={styles.activeLearnerText}>No unlocked subject progress yet.</Text>
+              <Text style={styles.activeLearnerText}>{t(language, "noUnlockedProgressYet")}</Text>
             )}
           </>
         ) : (
           <>
-            <Text style={styles.activeLearnerName}>No student selected</Text>
+            <Text style={styles.activeLearnerName}>{t(language, "noStudentSelected")}</Text>
             <Text style={styles.activeLearnerText}>
-              Pick a learner from the Students List before opening any subject.
+              {t(language, "pickLearnerFirst")}
             </Text>
           </>
         )}
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Subjects</Text>
+        <Text style={styles.sectionTitle}>{appVariant.curriculumPlural}</Text>
         <Text style={styles.sectionHint}>
           {activeProfile
-            ? `${activeProfile.name}, pick a subject.`
-            : "Select a student first, then choose a subject."}
+            ? t(language, "subjectsHintSelected", { name: activeProfile.name, item: appVariant.curriculumSingular })
+            : t(language, "subjectsHintUnselected", { item: appVariant.curriculumSingular })}
         </Text>
       </View>
 
       <View style={styles.subjectGrid}>
-        {subjects.map((subject) => (
+        {localizedSubjects.map((subject) => (
           <Pressable key={subject.id} onPress={() => openSubject(subject.id)} style={styles.subjectPressable}>
             <LinearGradient colors={subject.accent} style={[styles.subjectCard, !activeProfile ? styles.subjectCardDim : null]}>
               <MaterialCommunityIcons name={subject.icon as never} size={28} color={palette.white} />
@@ -293,6 +297,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     marginTop: 10,
+  },
+  audienceBadge: {
+    alignSelf: "flex-start",
+    marginTop: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    color: palette.white,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.9,
   },
   statRow: {
     flexDirection: "row",

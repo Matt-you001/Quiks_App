@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../../components/AppBackground";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { appVariant } from "../../lib/app-variant";
+import { t } from "../../lib/i18n";
 import { getUnlockedLevelsForGrade } from "../../lib/quiz";
 import { readAppState } from "../../lib/storage";
 import { getSubjectById, grades } from "../../lib/subjects";
@@ -12,11 +14,12 @@ import type { SessionResult, UserProfile } from "../../types/app";
 
 export default function SubjectDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
-  const subject = getSubjectById(slug);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
-  const [mode, setMode] = useState<"quiz" | "training">("quiz");
+  const [mode, setMode] = useState<"quiz" | "training">(appVariant.defaultMode);
   const [selectedGrade, setSelectedGrade] = useState(grades[0]);
+  const language = profile?.language ?? "en";
+  const subject = getSubjectById(slug, language);
 
   const load = useCallback(async () => {
     const state = await readAppState();
@@ -55,8 +58,8 @@ export default function SubjectDetailScreen() {
     return (
       <AppBackground>
         <View style={styles.fallbackCard}>
-          <Text style={styles.subjectTitle}>Subject not found</Text>
-          <PrimaryButton label="Back home" onPress={() => router.replace("/")} />
+          <Text style={styles.subjectTitle}>{appVariant.curriculumSingular === "course" ? t(language, "courseNotFound") : t(language, "subjectNotFound")}</Text>
+          <PrimaryButton label={t(language, "backHome")} onPress={() => router.replace("/")} />
         </View>
       </AppBackground>
     );
@@ -68,29 +71,29 @@ export default function SubjectDetailScreen() {
         <MaterialCommunityIcons name={subject.icon as never} size={34} color={palette.white} />
         <Text style={styles.subjectTitle}>{subject.name}</Text>
         <Text style={styles.subjectDescription}>{subject.description}</Text>
-        <Text style={styles.profileLine}>Active learner: {profile?.name ?? "None selected"}</Text>
+        <Text style={styles.profileLine}>{t(language, "activeLearner")}: {profile?.name ?? t(language, "noStudentSelected")}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Choose mode</Text>
+        <Text style={styles.cardTitle}>{t(language, "chooseMode")}</Text>
         <View style={styles.modeRow}>
           <Pressable
             onPress={() => setMode("training")}
             style={[styles.modeButton, mode === "training" ? styles.modeActive : null]}
           >
-            <Text style={[styles.modeLabel, mode === "training" ? styles.modeLabelActive : null]}>Training</Text>
-            <Text style={styles.modeHint}>Slower pace with explanations</Text>
+            <Text style={[styles.modeLabel, mode === "training" ? styles.modeLabelActive : null]}>{appVariant.trainingLabel}</Text>
+            <Text style={styles.modeHint}>{appVariant.trainingHint}</Text>
           </Pressable>
           <Pressable onPress={() => setMode("quiz")} style={[styles.modeButton, mode === "quiz" ? styles.modeActive : null]}>
-            <Text style={[styles.modeLabel, mode === "quiz" ? styles.modeLabelActive : null]}>Quiz</Text>
-            <Text style={styles.modeHint}>Timed challenge for performance</Text>
+            <Text style={[styles.modeLabel, mode === "quiz" ? styles.modeLabelActive : null]}>{appVariant.quizLabel}</Text>
+            <Text style={styles.modeHint}>{appVariant.quizHint}</Text>
           </Pressable>
         </View>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Grade</Text>
-        <Text style={styles.levelHint}>Choose a grade first. Your unlocked levels will show on the start card.</Text>
+        <Text style={styles.cardTitle}>{t(language, "grade")}</Text>
+        <Text style={styles.levelHint}>{t(language, "chooseGradeFirst")}</Text>
         <View style={styles.gradeWrap}>
           {gradeOptions.map((grade) => (
             <Pressable
@@ -105,12 +108,12 @@ export default function SubjectDetailScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>AI coach for this subject</Text>
+        <Text style={styles.cardTitle}>{appVariant.studyAssistantTitle}</Text>
         <Text style={styles.coachText}>
-          Quiks can generate question sets, feedback, and follow-up study plans for {subject.name.toLowerCase()}.
+          {t(language, "aiCoachDescription", { appName: appVariant.appName, subject: subject.name.toLowerCase() })}
         </Text>
         <PrimaryButton
-          label={`Open ${mode} setup`}
+          label={t(language, "openSetup", { mode })}
           onPress={() =>
             router.push({
               pathname: "/session",
@@ -119,6 +122,23 @@ export default function SubjectDetailScreen() {
           }
         />
       </View>
+
+      {appVariant.id !== "children" ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t(language, "competitionArena")}</Text>
+          <Text style={styles.coachText}>{t(language, "competitionArenaHint")}</Text>
+          <PrimaryButton
+            label={t(language, "enterCompetition")}
+            variant="secondary"
+            onPress={() =>
+              router.push({
+                pathname: "/competition" as never,
+                params: { subjectId: subject.id, grade: selectedGrade },
+              })
+            }
+          />
+        </View>
+      ) : null}
     </AppBackground>
   );
 }

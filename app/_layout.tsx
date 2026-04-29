@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
+import { appVariant } from "../lib/app-variant";
 import { palette } from "../lib/theme";
 
 export default function RootLayout() {
@@ -15,6 +16,7 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
+          title: appVariant.appName,
           contentStyle: {
             backgroundColor: palette.paper,
           },

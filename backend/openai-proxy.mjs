@@ -10,6 +10,7 @@ const competitionWaitersById = new Map();
 const competitionWaiterByPlayer = new Map();
 const competitionMatches = new Map();
 const competitionMatchByPlayer = new Map();
+const competitionChallenges = new Map();
 
 function describeDifficultyRigour(body) {
   if (body.difficulty === "Beginner") {
@@ -267,10 +268,54 @@ function buildCompetitionPayload(match, playerId) {
     opponentName: opponent?.name ?? "Opponent",
     questions: match.questions,
     chats: match.chats ?? [],
+    startAt: match.startAt,
+    endAt: match.endAt,
+    liveProgress: Object.values(match.liveProgress ?? {}),
   };
 }
 
+function buildChallengeSummary(challenge) {
+  return {
+    challengeId: challenge.id,
+    subjectId: challenge.subjectId,
+    subjectName: challenge.subjectName,
+    grade: challenge.grade,
+    level: challenge.level,
+    difficulty: challenge.difficulty,
+    focusMode: challenge.focusMode ?? "general",
+    topicId: challenge.topicId,
+    topicLabel: challenge.topicLabel,
+    creatorId: challenge.creatorId,
+    creatorName: challenge.creatorName,
+    createdAt: challenge.createdAt,
+  };
+}
+
+function resolveSubmissionFromSnapshot(match, playerId) {
+  const snapshot = match.liveProgress?.[playerId];
+  return {
+    score: snapshot?.score ?? 0,
+    correctAnswers: snapshot?.correctAnswers ?? 0,
+    totalQuestions: match.questions.length,
+    timeTakenSeconds: Math.max(0, Math.floor((match.endAt - match.startAt) / 1000)),
+    submittedAt: Date.now(),
+  };
+}
+
+function ensureCompetitionResolved(match) {
+  if (Date.now() < match.endAt) {
+    return;
+  }
+
+  for (const player of match.players) {
+    if (!match.submissions[player.playerId]) {
+      match.submissions[player.playerId] = resolveSubmissionFromSnapshot(match, player.playerId);
+    }
+  }
+}
+
 function getCompetitionOutcome(match, playerId) {
+  ensureCompetitionResolved(match);
   const own = match.submissions[playerId];
   const opponent = match.players.find((player) => player.playerId !== playerId);
   const rival = opponent ? match.submissions[opponent.playerId] : undefined;
@@ -391,8 +436,28 @@ async function createCompetitionMatch(waiter, challenger) {
       { playerId: challenger.playerId, name: challenger.name },
     ],
     chats: [],
+    liveProgress: {
+      [waiter.playerId]: {
+        playerId: waiter.playerId,
+        playerName: waiter.name,
+        answeredCount: 0,
+        correctAnswers: 0,
+        score: 0,
+        finished: false,
+      },
+      [challenger.playerId]: {
+        playerId: challenger.playerId,
+        playerName: challenger.name,
+        answeredCount: 0,
+        correctAnswers: 0,
+        score: 0,
+        finished: false,
+      },
+    },
     submissions: {},
     createdAt: Date.now(),
+    startAt: Date.now(),
+    endAt: Date.now() + ((challenger.body.durationSeconds ?? body.durationSeconds ?? 120) * 1000),
   };
 
   competitionMatches.set(match.id, match);
@@ -402,6 +467,65 @@ async function createCompetitionMatch(waiter, challenger) {
   competitionWaitersById.delete(waiter.queueId);
   competitionWaiterByPlayer.delete(waiter.playerId);
 
+  return match;
+}
+
+async function createChallengeCompetition(challenge, accepterProfile) {
+  const body = {
+    ...challenge.body,
+    profile: challenge.body.profile ?? accepterProfile,
+  };
+  const questions = await generateQuestionSet(body);
+  const startAt = Date.now() + 5000;
+  const endAt = startAt + (challenge.durationSeconds * 1000);
+  const match = {
+    id: randomUUID(),
+    challengeId: challenge.id,
+    subjectId: challenge.subjectId,
+    grade: challenge.grade,
+    level: challenge.level,
+    difficulty: challenge.difficulty,
+    focusMode: challenge.focusMode ?? "general",
+    topicId: challenge.topicId,
+    topicLabel: challenge.topicLabel,
+    questions,
+    players: [
+      { playerId: challenge.creatorId, name: challenge.creatorName },
+      { playerId: accepterProfile.id, name: accepterProfile.name ?? "Learner" },
+    ],
+    chats: [],
+    liveProgress: {
+      [challenge.creatorId]: {
+        playerId: challenge.creatorId,
+        playerName: challenge.creatorName,
+        answeredCount: 0,
+        correctAnswers: 0,
+        score: 0,
+        finished: false,
+      },
+      [accepterProfile.id]: {
+        playerId: accepterProfile.id,
+        playerName: accepterProfile.name ?? "Learner",
+        answeredCount: 0,
+        correctAnswers: 0,
+        score: 0,
+        finished: false,
+      },
+    },
+    submissions: {},
+    createdAt: Date.now(),
+    startAt,
+    endAt,
+  };
+
+  competitionMatches.set(match.id, match);
+  competitionMatchByPlayer.set(challenge.creatorId, match.id);
+  competitionMatchByPlayer.set(accepterProfile.id, match.id);
+  challenge.status = "accepted";
+  challenge.acceptedAt = Date.now();
+  challenge.acceptedById = accepterProfile.id;
+  challenge.acceptedByName = accepterProfile.name ?? "Learner";
+  challenge.competitionId = match.id;
   return match;
 }
 
@@ -690,9 +814,14 @@ async function handleCompetitionStatus(body, response) {
   if (matchId) {
     const match = competitionMatches.get(matchId);
     if (match) {
+      const outcome = getCompetitionOutcome(match, playerId);
       sendJson(response, 200, {
-        status: "matched",
+        status: outcome.status === "completed" ? "completed" : "matched",
         competition: buildCompetitionPayload(match, playerId),
+        outcome: outcome.outcome,
+        opponentName: outcome.opponentName,
+        playerScore: outcome.playerScore,
+        opponentScore: outcome.opponentScore,
       });
       return;
     }
@@ -722,6 +851,18 @@ async function handleCompetitionSubmit(body, response) {
     return;
   }
 
+  if (!match.liveProgress) {
+    match.liveProgress = {};
+  }
+  match.liveProgress[body.playerId] = {
+    playerId: body.playerId,
+    playerName: match.players.find((player) => player.playerId === body.playerId)?.name ?? "Learner",
+    answeredCount: body.totalQuestions ?? match.questions.length,
+    correctAnswers: body.correctAnswers ?? 0,
+    score: body.score ?? 0,
+    finished: true,
+    submittedAt: Date.now(),
+  };
   match.submissions[body.playerId] = {
     score: body.score ?? 0,
     correctAnswers: body.correctAnswers ?? 0,
@@ -732,6 +873,122 @@ async function handleCompetitionSubmit(body, response) {
 
   const payload = getCompetitionOutcome(match, body.playerId);
   sendJson(response, 200, payload);
+}
+
+async function handleCompetitionProgress(body, response) {
+  const match = competitionMatches.get(body.competitionId);
+  if (!match) {
+    sendJson(response, 404, { error: "Competition match not found." });
+    return;
+  }
+
+  const player = match.players.find((item) => item.playerId === body.playerId);
+  if (!player) {
+    sendJson(response, 400, { error: "Player is not part of this competition." });
+    return;
+  }
+
+  if (!match.liveProgress) {
+    match.liveProgress = {};
+  }
+
+  match.liveProgress[body.playerId] = {
+    playerId: body.playerId,
+    playerName: player.name,
+    answeredCount: body.answeredCount ?? 0,
+    correctAnswers: body.correctAnswers ?? 0,
+    score: body.score ?? 0,
+    finished: Boolean(body.finished),
+    submittedAt: body.finished ? Date.now() : undefined,
+  };
+
+  sendJson(response, 200, { ok: true, competition: buildCompetitionPayload(match, body.playerId) });
+}
+
+async function handleChallengeCreate(body, response) {
+  if (body.appVariant === "children") {
+    sendJson(response, 400, { error: "Competition is not available for Quiks Children." });
+    return;
+  }
+
+  const profile = body.profile;
+  if (!profile?.id || !body.subject?.id || !body.grade || !body.level) {
+    sendJson(response, 400, { error: "Challenge request is missing required fields." });
+    return;
+  }
+
+  const challenge = {
+    id: randomUUID(),
+    status: "open",
+    creatorId: profile.id,
+    creatorName: profile.name ?? "Learner",
+    subjectId: body.subject.id,
+    subjectName: body.subject.name,
+    grade: body.grade,
+    level: body.level,
+    difficulty: body.difficulty ?? "Beginner",
+    focusMode: body.focusMode ?? "general",
+    topicId: body.topicId,
+    topicLabel: body.topicLabel,
+    body,
+    durationSeconds: Math.max(30, Number(body.durationSeconds ?? 120)),
+    createdAt: Date.now(),
+  };
+
+  competitionChallenges.set(challenge.id, challenge);
+  sendJson(response, 200, { status: "open", challenge: buildChallengeSummary(challenge) });
+}
+
+async function handleChallengeList(body, response) {
+  const challenges = Array.from(competitionChallenges.values())
+    .filter((challenge) => challenge.status === "open")
+    .filter((challenge) => !body.subjectId || challenge.subjectId === body.subjectId)
+    .filter((challenge) => challenge.creatorId !== body.playerId)
+    .sort((left, right) => right.createdAt - left.createdAt)
+    .map(buildChallengeSummary);
+
+  sendJson(response, 200, { challenges });
+}
+
+async function handleChallengeAccept(body, response) {
+  const challenge = competitionChallenges.get(body.challengeId);
+  if (!challenge || challenge.status !== "open") {
+    sendJson(response, 404, { error: "Challenge is no longer available." });
+    return;
+  }
+
+  if (!body.playerId || !body.profile?.id || body.playerId !== body.profile.id) {
+    sendJson(response, 400, { error: "Player identity mismatch." });
+    return;
+  }
+
+  if (challenge.creatorId === body.playerId) {
+    sendJson(response, 400, { error: "You cannot accept your own challenge." });
+    return;
+  }
+
+  const match = await createChallengeCompetition(challenge, body.profile);
+  sendJson(response, 200, { status: "accepted", competition: buildCompetitionPayload(match, body.playerId) });
+}
+
+async function handleChallengeStatus(body, response) {
+  const challenge = competitionChallenges.get(body.challengeId);
+  if (!challenge) {
+    sendJson(response, 200, { status: "not_found" });
+    return;
+  }
+
+  if (challenge.status === "accepted" && challenge.competitionId) {
+    const match = competitionMatches.get(challenge.competitionId);
+    sendJson(response, 200, {
+      status: "accepted",
+      challenge: buildChallengeSummary(challenge),
+      competition: match ? buildCompetitionPayload(match, body.playerId) : undefined,
+    });
+    return;
+  }
+
+  sendJson(response, 200, { status: "open", challenge: buildChallengeSummary(challenge) });
 }
 
 async function handleCompetitionChat(body, response) {
@@ -822,8 +1079,33 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/competition/challenge/create") {
+      await handleChallengeCreate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/challenge/list") {
+      await handleChallengeList(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/challenge/accept") {
+      await handleChallengeAccept(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/challenge/status") {
+      await handleChallengeStatus(body, response);
+      return;
+    }
+
     if (url.pathname === "/competition/status") {
       await handleCompetitionStatus(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/progress") {
+      await handleCompetitionProgress(body, response);
       return;
     }
 

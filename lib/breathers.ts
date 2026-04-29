@@ -1,9 +1,10 @@
+import { appVariant } from "./app-variant";
 import { SCORE_THRESHOLD } from "./subjects";
-import type { BreatherContent, SessionResult } from "../types/app";
+import type { AppLanguage, BreatherContent, SessionResult } from "../types/app";
 
 const BREATHER_INTERVAL = 3;
 
-const subjectBreathers: Record<string, BreatherContent[]> = {
+const childrenSubjectBreathers: Record<string, BreatherContent[]> = {
   arithmetic: [
     {
       id: "arith-patterns",
@@ -428,7 +429,263 @@ const subjectBreathers: Record<string, BreatherContent[]> = {
   ],
 };
 
-const generalBreathers: BreatherContent[] = [
+const teenGeneralBreathers: BreatherContent[] = [
+  {
+    id: "teens-exam-reset",
+    title: "Revision Reset: Breathe and Reframe",
+    intro: "A short reset can help you return sharper for the next test round.",
+    formatLabel: "Revision note",
+    story:
+      "Strong secondary-school learners do not only keep answering questions nonstop. They pause, reframe the topic, and return with better focus. A short revision break can help you connect facts, methods, and meaning before the next set begins.",
+    teachingTitle: "What this is teaching",
+    teachingPoint: "This breather teaches that deliberate pauses can improve retention, exam control, and confidence under pressure.",
+    reflection: "Before the next round starts, ask yourself what idea the last level was really testing.",
+    facts: [
+      "Short revision pauses can improve concentration.",
+      "Understanding the idea behind a question is often more useful than memorizing one answer.",
+    ],
+    continueLabel: "Continue revision",
+  },
+  {
+    id: "teens-concept-link",
+    title: "Concept Link: Learn Beyond the Mark",
+    intro: "This break is here to connect the topic to stronger exam understanding.",
+    formatLabel: "Exam insight",
+    story:
+      "In serious school study, one topic often supports another. A learner who understands the concept behind a question can handle unfamiliar wording much better than one who memorizes isolated facts. Good revision turns separate points into connected understanding.",
+    teachingTitle: "What this is teaching",
+    teachingPoint: "This breather teaches transfer of understanding, which is essential for stronger exam performance.",
+    reflection: "As you continue, look for the rule, principle, or pattern that can help in more than one question.",
+    facts: [
+      "Connected understanding supports better problem solving.",
+      "Exam success often depends on applying ideas in new forms.",
+    ],
+    continueLabel: "Back to the test",
+  },
+];
+
+const uniGeneralBreathers: BreatherContent[] = [
+  {
+    id: "uni-academic-pause",
+    title: "Academic Pause: Consolidate the Concept",
+    intro: "A short academic pause can improve recall and conceptual control.",
+    formatLabel: "Study reflection",
+    story:
+      "University-level learning is not only about finishing questions. It is also about consolidating ideas, clarifying definitions, and recognizing how concepts connect across a course. A brief pause like this helps convert activity into understanding.",
+    teachingTitle: "What this is teaching",
+    teachingPoint: "This breather teaches that higher learning improves when students pause to organize knowledge rather than rushing through tasks mechanically.",
+    reflection: "Before continuing, summarize the main idea from the last level in one precise sentence.",
+    facts: [
+      "Conceptual consolidation improves long-term retention.",
+      "Clear definitions and relationships matter in tertiary study.",
+    ],
+    continueLabel: "Continue study session",
+  },
+  {
+    id: "uni-application-pause",
+    title: "Application Pause: From Theory to Use",
+    intro: "This breather keeps the mind active while lowering the pressure for a moment.",
+    formatLabel: "Applied note",
+    story:
+      "At university level, strong answers often depend on more than remembering a term. They depend on applying a concept carefully to a problem, case, system, or example. A useful break is one that reminds you to think with the idea, not only about it.",
+    teachingTitle: "What this is teaching",
+    teachingPoint: "This breather teaches applied reasoning, which is central to coursework, assessments, and professional preparation.",
+    reflection: "When the next question appears, ask how the concept should be used, not only how it should be defined.",
+    facts: [
+      "Application is a key marker of tertiary-level mastery.",
+      "Higher-level questions often test judgment, structure, and relevance.",
+    ],
+    continueLabel: "Return to your course",
+  },
+];
+
+const teenSubjectBreathers: Record<string, BreatherContent[]> = {
+  arithmetic: [
+    {
+      id: "teens-math-method",
+      title: "Mathematics Break: Method Before Speed",
+      intro: "A strong math learner improves fastest when method becomes clear.",
+      formatLabel: "Revision strategy",
+      story:
+        "Many secondary-school mathematics questions become easier once you identify the method first. Is the question testing algebraic manipulation, number reasoning, ratio, or geometry? When you classify the question early, your chances of choosing the right path improve.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This teaches learners to recognize question type before attempting a solution, a strong exam skill.",
+      reflection: "As you continue, pause briefly at each question and name the method it is likely testing.",
+      facts: [
+        "Correct method selection reduces careless mistakes.",
+        "Good mathematics revision is not only about speed but also about structure.",
+      ],
+      continueLabel: "Continue mathematics",
+    },
+  ],
+  english: [
+    {
+      id: "teens-english-precision",
+      title: "English Break: Read the Writer Carefully",
+      intro: "A short reading pause can sharpen interpretation for the next set.",
+      formatLabel: "Language insight",
+      story:
+        "In secondary-school English, strong answers often depend on noticing tone, purpose, grammar, and implied meaning. A passage or sentence may seem simple at first, yet the best answer usually belongs to the learner who reads carefully rather than quickly.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This teaches close reading, which supports comprehension, summary, and interpretation.",
+      reflection: "In the next English question, ask what the writer is doing with the language, not only what the words say on the surface.",
+      facts: [
+        "Close reading improves comprehension and inference.",
+        "Accuracy in English often comes from paying attention to detail.",
+      ],
+      continueLabel: "Continue English",
+    },
+  ],
+  physics: [
+    {
+      id: "teens-physics-model",
+      title: "Physics Break: Model the Situation",
+      intro: "A quick concept pause can make the next physics question clearer.",
+      formatLabel: "Science method",
+      story:
+        "Secondary-school physics becomes easier when you translate a situation into a simple model. Ask what is moving, what force is acting, what quantity is changing, and what law or relationship fits the case. Physics improves when description becomes structure.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This breather teaches modeling, a major skill in school physics problem solving.",
+      reflection: "As you continue, reduce the next problem to its main quantities, forces, or relationships before choosing an answer.",
+      facts: [
+        "Physics questions often become simpler after careful modeling.",
+        "Strong learners move from story wording to scientific structure quickly.",
+      ],
+      continueLabel: "Continue physics",
+    },
+  ],
+  commerce: [
+    {
+      id: "teens-commerce-practice",
+      title: "Commerce Break: Business in Real Life",
+      intro: "A practical breather can still strengthen your revision.",
+      formatLabel: "Business note",
+      story:
+        "Commerce becomes easier to understand when you connect it to everyday trade. Shops, receipts, banks, transport systems, advertising, and insurance are not isolated terms. They are part of how goods and services move through economic life.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This teaches learners to connect textbook terms to practical business activity.",
+      reflection: "When the next commerce question appears, picture the real transaction or business situation behind it.",
+      facts: [
+        "Commerce is easier when linked to actual business practice.",
+        "Real-life context improves recall of commercial terms.",
+      ],
+      continueLabel: "Continue commerce",
+    },
+  ],
+  "literature-in-english": [
+    {
+      id: "teens-literature-reading",
+      title: "Literature Break: Look Beyond the Plot",
+      intro: "This breather shifts your attention from events to meaning.",
+      formatLabel: "Literary insight",
+      story:
+        "In literature, a strong answer rarely stops at retelling the story. It asks what the writer is showing through character, conflict, imagery, tone, or theme. The more you read for meaning, the more confident your interpretation becomes.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This breather teaches interpretive reading, which is central to literature study.",
+      reflection: "As you continue, ask what idea or effect the writer is building, not only what happened next.",
+      facts: [
+        "Literature questions often reward insight more than simple recall.",
+        "Theme and technique usually matter as much as plot.",
+      ],
+      continueLabel: "Continue literature",
+    },
+  ],
+};
+
+const uniSubjectBreathers: Record<string, BreatherContent[]> = {
+  arithmetic: [
+    {
+      id: "uni-math-abstraction",
+      title: "Mathematics Pause: Structure Matters",
+      intro: "A short pause can help you return to the next problem with more structure.",
+      formatLabel: "Concept reflection",
+      story:
+        "University mathematics is not only about computing an answer. It is about recognizing structure, notation, assumptions, and relationships between ideas. A learner who sees the form of a problem clearly is usually in a stronger position than one who rushes straight into manipulation.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This breather teaches mathematical maturity: looking for structure, conditions, and relationships before performing steps.",
+      reflection: "Before the next mathematics question, identify what the problem is really about: algebraic structure, function behavior, proof logic, or quantitative relationship.",
+      facts: [
+        "Tertiary mathematics rewards structure as much as calculation.",
+        "Good notation and careful assumptions often prevent major errors.",
+      ],
+      continueLabel: "Continue mathematics",
+    },
+  ],
+  law: [
+    {
+      id: "uni-law-reasoning",
+      title: "Law Pause: Issue, Rule, Application",
+      intro: "A short legal breather can sharpen your reasoning for the next set.",
+      formatLabel: "Legal method",
+      story:
+        "Law questions become clearer when you separate the issue, identify the governing rule, and apply that rule carefully to the facts. Strong legal reasoning is rarely about memory alone. It is about disciplined analysis and controlled application.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This breather teaches the core movement of legal analysis from issue to rule to application.",
+      reflection: "As you continue, ask what the real legal issue is before you focus on the answer choices.",
+      facts: [
+        "Legal study depends heavily on analysis of facts and principles.",
+        "A clear method often improves both speed and accuracy in law questions.",
+      ],
+      continueLabel: "Return to law",
+    },
+  ],
+  engineering: [
+    {
+      id: "uni-engineering-systems",
+      title: "Engineering Pause: Think in Systems",
+      intro: "A brief systems view can improve the way you approach the next problem.",
+      formatLabel: "Applied thinking",
+      story:
+        "Engineering questions often test more than one idea at once. A structure, circuit, process, or mechanism usually works as a system with inputs, constraints, behavior, and output. Tertiary engineering becomes stronger when you see interaction rather than isolated facts.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This breather teaches systems thinking, which supports design, diagnosis, and applied problem solving.",
+      reflection: "In the next question, identify the system, the main variables, and the constraint shaping the result.",
+      facts: [
+        "Engineering decisions are often constrained by safety, efficiency, and design limits.",
+        "System thinking improves both technical reasoning and practical judgment.",
+      ],
+      continueLabel: "Continue engineering",
+    },
+  ],
+  medicine: [
+    {
+      id: "uni-medicine-clinical",
+      title: "Medicine Pause: Link Function to Meaning",
+      intro: "A short pause can help you connect facts to clinical understanding.",
+      formatLabel: "Clinical note",
+      story:
+        "Medical learning becomes deeper when facts are linked to function, dysfunction, and patient meaning. Anatomy matters because it shapes physiology, and physiology matters because it helps explain disease, signs, symptoms, and treatment logic. Good medical reasoning connects rather than memorizes in isolation.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This breather teaches integrated medical thinking across normal function, pathology, and clinical interpretation.",
+      reflection: "As you continue, ask how the concept in the next question would matter in understanding a real patient or clinical scenario.",
+      facts: [
+        "Medical understanding improves when structure, function, and disease are studied together.",
+        "Clinical reasoning often begins with careful interpretation of signs and mechanisms.",
+      ],
+      continueLabel: "Continue medicine",
+    },
+  ],
+  "management-studies": [
+    {
+      id: "uni-management-decision",
+      title: "Management Pause: Decision Before Action",
+      intro: "This break keeps the mind engaged while easing the pace.",
+      formatLabel: "Management insight",
+      story:
+        "Management questions often ask what a sound decision should look like under real constraints. Planning, staffing, operations, leadership, and strategy all involve choosing among imperfect options. Strong management thinking weighs goals, people, resources, and consequences together.",
+      teachingTitle: "What this is teaching",
+      teachingPoint: "This breather teaches decision framing, a central skill in management study.",
+      reflection: "In the next management question, ask what the manager is trying to achieve and what trade-off is shaping the decision.",
+      facts: [
+        "Management problems often involve trade-offs rather than perfect choices.",
+        "Clear objectives improve analysis in business and organizational questions.",
+      ],
+      continueLabel: "Return to management studies",
+    },
+  ],
+};
+
+const childrenGeneralBreathers: BreatherContent[] = [
   {
     id: "general-reset",
     title: "Learning Reset: Read, Breathe, Continue",
@@ -446,6 +703,474 @@ const generalBreathers: BreatherContent[] = [
     continueLabel: "Continue your learning streak",
   },
 ];
+
+const localizedBreatherOverrides: Partial<Record<AppLanguage, Record<string, Partial<BreatherContent>>>> = {
+  fr: {
+    "general-reset": {
+      title: "Pause d'apprentissage : lire, respirer, continuer",
+      intro: "Une courte pause peut t'aider a revenir avec plus d'attention.",
+      formatLabel: "Pause d'etude",
+      story:
+        "Les bons apprenants ne travaillent pas seulement dur. Ils savent aussi faire une pause utile. Une respiration d'apprentissage donne au cerveau le temps de se recentrer tout en restant connecte au travail scolaire.",
+      teachingTitle: "Ce que cela enseigne",
+      teachingPoint: "Cela montre que le repos et la reflexion font partie de bonnes habitudes d'etude.",
+      reflection: "Respire calmement puis reviens au prochain exercice avec un esprit plus frais.",
+      facts: [
+        "De courtes pauses peuvent ameliorer la concentration.",
+        "La reflexion aide les connaissances a durer plus longtemps.",
+      ],
+      continueLabel: "Continuer l'apprentissage",
+    },
+    "arith-patterns": {
+      title: "Pause maths : repere le motif",
+      intro: "Cette pause donne a ton cerveau un autre type de defi mathematique.",
+      formatLabel: "Note sur les motifs",
+      story:
+        "2, 4, 8, 16... un motif comme celui-ci grandit en doublant a chaque etape. En arithmetique, les motifs aident l'apprenant a predire la suite sans recommencer tout le raisonnement.",
+      teachingTitle: "Ce que cela enseigne",
+      teachingPoint: "Cette note montre que l'arithmetique ne se limite pas au calcul. Elle demande aussi de voir la structure et les regles qui se repetent.",
+      reflection: "Avant la prochaine question, demande-toi s'il existe un raccourci ou un motif cache.",
+      facts: [
+        "Les motifs aident en multiplication, en division et en calcul mental.",
+        "Un bon apprenant cherche d'abord la structure.",
+      ],
+      continueLabel: "Continuer l'arithmetique",
+    },
+    "eng-poem-rain": {
+      title: "Pause anglais : un court poeme",
+      intro: "Prends une petite pause de lecture avec ce poeme.",
+      formatLabel: "Poeme",
+      story:
+        "La pluie frappe doucement le toit,\nGoutte apres goutte sans grand bruit.\nLes nuages cachent parfois le soleil,\nMais toute tempete finit son reveil.",
+      teachingTitle: "Ce que ce poeme enseigne",
+      teachingPoint: "Ce poeme aide l'apprenant a remarquer le rythme, la rime et l'ambiance en poesie.",
+      reflection: "Quand tu reviens aux questions d'anglais, observe comment les mots creent le sens et le son.",
+      facts: [
+        "Les poemes utilisent souvent rythme et rime pour mieux faire retenir les idees.",
+        "Un court poeme peut enseigner le vocabulaire et l'atmosphere en meme temps.",
+      ],
+      continueLabel: "Continuer l'anglais",
+    },
+    "hist-timeline": {
+      title: "Pause histoire : pourquoi la chronologie compte",
+      intro: "Prends une courte pause avec cette competence d'histoire.",
+      formatLabel: "Competence d'histoire",
+      story:
+        "Quand les evenements sont places dans le bon ordre, l'histoire devient plus claire. Une chronologie aide a voir ce qui est arrive d'abord, ce qui a suivi et comment un evenement a influence un autre.",
+      teachingTitle: "Ce que cela enseigne",
+      teachingPoint: "Cette pause enseigne la chronologie, une competence centrale de la pensee historique.",
+      reflection: "Dans la prochaine question, pense a l'ordre, a la cause et a l'effet.",
+      facts: [
+        "La chronologie aide a comprendre le changement dans le temps.",
+        "L'histoire devient plus claire quand les evenements sont bien ordonnes.",
+      ],
+      continueLabel: "Continuer l'histoire",
+    },
+    "teens-exam-reset": {
+      title: "Pause revision : respire et recadre",
+      intro: "Une courte pause peut t'aider a revenir plus net pour le prochain test.",
+      formatLabel: "Note de revision",
+      story:
+        "Les apprenants solides du secondaire ne repondent pas sans arret aux questions. Ils s'arretent, recadrent le sujet puis reviennent avec une meilleure concentration.",
+      teachingTitle: "Ce que cela enseigne",
+      teachingPoint: "Cette pause montre qu'un arret volontaire peut ameliorer la retention et la maitrise en examen.",
+      reflection: "Avant la reprise, demande-toi quelle idee principale le dernier niveau testait vraiment.",
+      facts: [
+        "De courtes pauses de revision peuvent ameliorer l'attention.",
+        "Comprendre l'idee derriere une question vaut souvent plus qu'apprendre une seule reponse.",
+      ],
+      continueLabel: "Continuer la revision",
+    },
+    "uni-academic-pause": {
+      title: "Pause academique : consolider le concept",
+      intro: "Une courte pause academique peut ameliorer la memorisation et la maitrise conceptuelle.",
+      formatLabel: "Reflexion d'etude",
+      story:
+        "L'apprentissage universitaire ne consiste pas seulement a terminer des questions. Il faut aussi consolider les idees, clarifier les definitions et voir comment les concepts se relient dans un cours.",
+      teachingTitle: "Ce que cela enseigne",
+      teachingPoint: "Cette pause montre que l'enseignement superieur devient plus fort quand l'etudiant organise le savoir au lieu d'accumuler des reponses.",
+      reflection: "Avant de continuer, resume l'idee principale du dernier niveau en une phrase precise.",
+      facts: [
+        "La consolidation conceptuelle favorise la memorisation durable.",
+        "Les definitions claires et les relations entre idees sont essentielles a l'universite.",
+      ],
+      continueLabel: "Continuer la session d'etude",
+    },
+    "uni-law-reasoning": {
+      title: "Pause droit : question, regle, application",
+      intro: "Une courte pause juridique peut affiner ton raisonnement avant la suite.",
+      formatLabel: "Methode juridique",
+      story:
+        "Les questions de droit deviennent plus claires quand on separe la question juridique, la regle applicable et son application aux faits. Le raisonnement juridique solide ne depend pas seulement de la memoire.",
+      teachingTitle: "Ce que cela enseigne",
+      teachingPoint: "Cette pause enseigne le mouvement essentiel du raisonnement juridique : question, regle et application.",
+      reflection: "Pour la prochaine question, identifie d'abord le vrai probleme juridique.",
+      facts: [
+        "L'etude du droit repose sur l'analyse des faits et des principes.",
+        "Une methode claire ameliore souvent la vitesse et la precision.",
+      ],
+      continueLabel: "Retour au droit",
+    },
+  },
+  es: {
+    "general-reset": {
+      title: "Pausa de aprendizaje: leer, respirar y continuar",
+      intro: "Una pausa corta puede ayudarte a volver con mejor atencion.",
+      formatLabel: "Pausa de estudio",
+      story:
+        "Los buenos estudiantes no solo trabajan duro. Tambien saben hacer una pausa con sentido. Un descanso guiado da tiempo al cerebro para reiniciarse sin desconectarse del aprendizaje.",
+      teachingTitle: "Lo que esto ensena",
+      teachingPoint: "Esto muestra que el descanso y la reflexion forman parte de los buenos habitos de estudio.",
+      reflection: "Respira con calma y vuelve al siguiente reto con una mente mas fresca.",
+      facts: [
+        "Las pausas cortas pueden mejorar la concentracion.",
+        "La reflexion ayuda a que la informacion dure mas en la memoria.",
+      ],
+      continueLabel: "Continuar aprendiendo",
+    },
+    "arith-patterns": {
+      title: "Pausa de matematicas: descubre el patron",
+      intro: "Este descanso le da a tu mente otro tipo de reto matematico.",
+      formatLabel: "Nota sobre patrones",
+      story:
+        "2, 4, 8, 16... un patron como este crece duplicandose cada vez. En aritmetica, los patrones ayudan al estudiante a predecir lo que sigue sin resolver todo desde el principio.",
+      teachingTitle: "Lo que esto ensena",
+      teachingPoint: "Esta nota muestra que la aritmetica no es solo calcular. Tambien implica ver estructura y reglas repetidas.",
+      reflection: "Antes de la siguiente pregunta, piensa si hay un atajo o un patron escondido.",
+      facts: [
+        "Los patrones ayudan con multiplicacion, division y calculo mental.",
+        "Un buen estudiante busca primero la estructura.",
+      ],
+      continueLabel: "Continuar con aritmetica",
+    },
+    "eng-poem-rain": {
+      title: "Descanso de ingles: un poema corto",
+      intro: "Toma una breve pausa de lectura con este poema.",
+      formatLabel: "Poema",
+      story:
+        "La lluvia toca suave el tejado,\nGota a gota con ritmo marcado.\nLas nubes pueden tapar el sol,\nPero toda tormenta encuentra control.",
+      teachingTitle: "Lo que ensena este poema",
+      teachingPoint: "Este poema ayuda al estudiante a notar ritmo, rima y ambiente en la poesia.",
+      reflection: "Cuando vuelvas a las preguntas de ingles, observa como las palabras crean significado y sonido.",
+      facts: [
+        "Los poemas suelen usar ritmo y rima para hacer memorables las ideas.",
+        "Un poema corto puede ensenar vocabulario y tono a la vez.",
+      ],
+      continueLabel: "Continuar con ingles",
+    },
+    "hist-timeline": {
+      title: "Pausa de historia: por que importa la linea del tiempo",
+      intro: "Haz una pausa corta con esta habilidad de historia.",
+      formatLabel: "Habilidad historica",
+      story:
+        "Cuando los hechos se colocan en el orden correcto, la historia se entiende mejor. Una linea del tiempo ayuda a ver que ocurrio primero, que vino despues y como un hecho influyo en otro.",
+      teachingTitle: "Lo que esto ensena",
+      teachingPoint: "Este descanso ensena cronologia, una habilidad central del pensamiento historico.",
+      reflection: "En la siguiente pregunta, piensa en secuencia, causa y efecto.",
+      facts: [
+        "La cronologia ayuda a comprender el cambio a lo largo del tiempo.",
+        "La historia se vuelve mas clara cuando los hechos estan bien ordenados.",
+      ],
+      continueLabel: "Continuar con historia",
+    },
+    "teens-exam-reset": {
+      title: "Pausa de repaso: respira y reenfoca",
+      intro: "Una pausa breve puede ayudarte a volver con mas claridad para la siguiente prueba.",
+      formatLabel: "Nota de repaso",
+      story:
+        "Los estudiantes fuertes de secundaria no responden preguntas sin parar. Se detienen, replantean el tema y vuelven con mejor concentracion.",
+      teachingTitle: "Lo que esto ensena",
+      teachingPoint: "Este descanso muestra que una pausa intencional puede mejorar la retencion y el control en examen.",
+      reflection: "Antes de continuar, piensa que idea principal estaba evaluando el ultimo nivel.",
+      facts: [
+        "Las pausas cortas de repaso pueden mejorar la atencion.",
+        "Entender la idea detras de una pregunta suele valer mas que memorizar una sola respuesta.",
+      ],
+      continueLabel: "Continuar el repaso",
+    },
+    "uni-academic-pause": {
+      title: "Pausa academica: consolidar el concepto",
+      intro: "Una pausa academica breve puede mejorar el recuerdo y el control conceptual.",
+      formatLabel: "Reflexion de estudio",
+      story:
+        "El aprendizaje universitario no consiste solo en terminar preguntas. Tambien requiere consolidar ideas, aclarar definiciones y ver como los conceptos se conectan dentro de un curso.",
+      teachingTitle: "Lo que esto ensena",
+      teachingPoint: "Esta pausa muestra que el estudio superior mejora cuando el estudiante organiza el conocimiento en lugar de acumular respuestas.",
+      reflection: "Antes de seguir, resume la idea principal del ultimo nivel en una frase precisa.",
+      facts: [
+        "La consolidacion conceptual mejora la retencion a largo plazo.",
+        "Las definiciones claras y las relaciones importan en el estudio universitario.",
+      ],
+      continueLabel: "Continuar la sesion de estudio",
+    },
+    "uni-law-reasoning": {
+      title: "Pausa de derecho: asunto, regla y aplicacion",
+      intro: "Una breve pausa juridica puede afinar tu razonamiento antes del siguiente bloque.",
+      formatLabel: "Metodo juridico",
+      story:
+        "Las preguntas de derecho se vuelven mas claras cuando separas el asunto juridico, identificas la regla aplicable y la aplicas con cuidado a los hechos. El razonamiento juridico solido no depende solo de la memoria.",
+      teachingTitle: "Lo que esto ensena",
+      teachingPoint: "Esta pausa ensena el movimiento central del analisis juridico: asunto, regla y aplicacion.",
+      reflection: "En la siguiente pregunta, identifica primero el verdadero problema juridico.",
+      facts: [
+        "El estudio del derecho depende del analisis de hechos y principios.",
+        "Un metodo claro suele mejorar la rapidez y la precision.",
+      ],
+      continueLabel: "Volver a derecho",
+    },
+  },
+  pt: {
+    "general-reset": {
+      title: "Pausa de aprendizagem: ler, respirar e continuar",
+      intro: "Uma pausa curta pode ajudar-te a voltar com mais foco.",
+      formatLabel: "Pausa de estudo",
+      story:
+        "Bons estudantes nao apenas trabalham muito. Tambem sabem pausar com sabedoria. Uma pausa guiada da ao cerebro tempo para se reorganizar sem se desligar da aprendizagem.",
+      teachingTitle: "O que isto ensina",
+      teachingPoint: "Isto mostra que descanso e reflexao fazem parte de bons habitos de estudo.",
+      reflection: "Respira com calma e volta ao proximo desafio com a mente mais fresca.",
+      facts: [
+        "Pausas curtas podem melhorar a concentracao.",
+        "A reflexao ajuda a manter a informacao por mais tempo na memoria.",
+      ],
+      continueLabel: "Continuar a aprender",
+    },
+    "arith-patterns": {
+      title: "Pausa de matematica: encontra o padrao",
+      intro: "Esta pausa da ao teu cerebro outro tipo de desafio matematico.",
+      formatLabel: "Nota sobre padroes",
+      story:
+        "2, 4, 8, 16... um padrao como este cresce ao dobrar em cada passo. Na aritmetica, os padroes ajudam o estudante a prever o que vem a seguir sem recomecar todo o raciocinio.",
+      teachingTitle: "O que isto ensina",
+      teachingPoint: "Esta nota mostra que a aritmetica nao e apenas calculo. Ela tambem envolve ver estrutura e regras repetidas.",
+      reflection: "Antes da proxima pergunta, pensa se existe um atalho ou um padrao escondido.",
+      facts: [
+        "Os padroes ajudam na multiplicacao, divisao e calculo mental.",
+        "Um bom estudante procura primeiro a estrutura.",
+      ],
+      continueLabel: "Continuar com aritmetica",
+    },
+    "eng-poem-rain": {
+      title: "Pausa de ingles: um poema curto",
+      intro: "Faz uma curta pausa de leitura com este poema.",
+      formatLabel: "Poema",
+      story:
+        "A chuva toca o telhado devagar,\nGota a gota sem parar.\nAs nuvens podem o sol esconder,\nMas toda tempestade vai ceder.",
+      teachingTitle: "O que este poema ensina",
+      teachingPoint: "Este poema ajuda o estudante a notar ritmo, rima e ambiente na poesia.",
+      reflection: "Quando voltares as perguntas de ingles, observa como as palavras criam sentido e som.",
+      facts: [
+        "Poemas usam ritmo e rima para tornar ideias memoraveis.",
+        "Um poema curto pode ensinar vocabulario e atmosfera ao mesmo tempo.",
+      ],
+      continueLabel: "Continuar com ingles",
+    },
+    "hist-timeline": {
+      title: "Pausa de historia: por que a linha do tempo importa",
+      intro: "Faz uma curta pausa com esta habilidade de historia.",
+      formatLabel: "Habilidade historica",
+      story:
+        "Quando os acontecimentos sao colocados na ordem certa, a historia torna-se mais facil de entender. Uma linha do tempo ajuda a ver o que aconteceu primeiro, o que veio depois e como um acontecimento influenciou outro.",
+      teachingTitle: "O que isto ensina",
+      teachingPoint: "Esta pausa ensina cronologia, uma habilidade central do pensamento historico.",
+      reflection: "Na proxima pergunta, pensa em sequencia, causa e efeito.",
+      facts: [
+        "A cronologia ajuda a compreender a mudanca ao longo do tempo.",
+        "A historia torna-se mais clara quando os acontecimentos sao bem organizados.",
+      ],
+      continueLabel: "Continuar com historia",
+    },
+    "teens-exam-reset": {
+      title: "Pausa de revisao: respira e reenquadra",
+      intro: "Uma pausa breve pode ajudar-te a voltar com mais clareza para o proximo teste.",
+      formatLabel: "Nota de revisao",
+      story:
+        "Os estudantes fortes do ensino secundario nao respondem a perguntas sem parar. Eles param, reenquadram o tema e regressam com melhor concentracao.",
+      teachingTitle: "O que isto ensina",
+      teachingPoint: "Esta pausa mostra que uma interrupcao intencional pode melhorar a retencao e o controlo em exame.",
+      reflection: "Antes de continuares, pensa qual era a ideia principal avaliada no ultimo nivel.",
+      facts: [
+        "Pausas curtas de revisao podem melhorar a atencao.",
+        "Compreender a ideia por tras da pergunta vale muitas vezes mais do que memorizar uma unica resposta.",
+      ],
+      continueLabel: "Continuar a revisao",
+    },
+    "uni-academic-pause": {
+      title: "Pausa academica: consolidar o conceito",
+      intro: "Uma curta pausa academica pode melhorar a recordacao e o controlo conceptual.",
+      formatLabel: "Reflexao de estudo",
+      story:
+        "A aprendizagem universitaria nao consiste apenas em terminar perguntas. Tambem exige consolidar ideias, clarificar definicoes e ver como os conceitos se ligam num curso.",
+      teachingTitle: "O que isto ensina",
+      teachingPoint: "Esta pausa mostra que o ensino superior melhora quando o estudante organiza o conhecimento em vez de acumular respostas.",
+      reflection: "Antes de continuar, resume a ideia principal do ultimo nivel numa frase precisa.",
+      facts: [
+        "A consolidacao conceptual melhora a retencao a longo prazo.",
+        "Definicoes claras e relacoes entre ideias sao importantes no ensino superior.",
+      ],
+      continueLabel: "Continuar a sessao de estudo",
+    },
+    "uni-law-reasoning": {
+      title: "Pausa de direito: questao, regra e aplicacao",
+      intro: "Uma breve pausa juridica pode afinar o teu raciocinio antes da proxima serie.",
+      formatLabel: "Metodo juridico",
+      story:
+        "As perguntas de direito ficam mais claras quando separas a questao juridica, identificas a regra aplicavel e a aplicas com cuidado aos factos. O raciocinio juridico solido nao depende apenas da memoria.",
+      teachingTitle: "O que isto ensina",
+      teachingPoint: "Esta pausa ensina o movimento central da analise juridica: questao, regra e aplicacao.",
+      reflection: "Na proxima pergunta, identifica primeiro qual e o verdadeiro problema juridico.",
+      facts: [
+        "O estudo do direito depende da analise de factos e principios.",
+        "Um metodo claro melhora muitas vezes a rapidez e a precisao.",
+      ],
+      continueLabel: "Voltar ao direito",
+    },
+  },
+  sw: {
+    "general-reset": {
+      title: "Mapumziko ya kujifunza: soma, pumua, endelea",
+      intro: "Mapumziko mafupi yanaweza kukusaidia kurudi ukiwa makini zaidi.",
+      formatLabel: "Mapumziko ya kusoma",
+      story:
+        "Wanafunzi wazuri hawafanyi kazi kwa bidii tu. Pia wanajua kupumzika kwa busara. Mapumziko haya huipa akili nafasi ya kujipanga upya bila kuacha mwelekeo wa kujifunza.",
+      teachingTitle: "Hiki kinafundisha nini",
+      teachingPoint: "Hii inaonyesha kuwa kupumzika na kutafakari ni sehemu ya tabia nzuri za kusoma.",
+      reflection: "Pumua kwa utulivu kisha rudi kwenye changamoto inayofuata ukiwa mwepesi zaidi kiakili.",
+      facts: [
+        "Mapumziko mafupi yanaweza kuboresha umakini.",
+        "Kutafakari husaidia taarifa kukaa kwa muda mrefu kwenye kumbukumbu.",
+      ],
+      continueLabel: "Endelea kujifunza",
+    },
+    "arith-patterns": {
+      title: "Pumziko la hesabu: tambua muundo",
+      intro: "Pumziko hili linaipa akili yako aina nyingine ya changamoto ya hesabu.",
+      formatLabel: "Dokezo la muundo",
+      story:
+        "2, 4, 8, 16... muundo kama huu hukua kwa kuongezeka maradufu kila hatua. Katika hesabu, miundo humsaidia mwanafunzi kutabiri kinachofuata bila kuanza upya kila mara.",
+      teachingTitle: "Hiki kinafundisha nini",
+      teachingPoint: "Dokezo hili linaonyesha kuwa hesabu si kufanya mahesabu tu. Pia inahusisha kuona mpangilio na kanuni zinazorudiwa.",
+      reflection: "Kabla ya swali linalofuata, jiulize kama kuna njia ya mkato au muundo uliojificha.",
+      facts: [
+        "Miundo husaidia katika kuzidisha, kugawa na hesabu za haraka.",
+        "Mwanafunzi mzuri hutafuta mpangilio kwanza.",
+      ],
+      continueLabel: "Endelea na hesabu",
+    },
+    "eng-poem-rain": {
+      title: "Pumziko la Kiingereza: shairi fupi",
+      intro: "Chukua mapumziko mafupi ya usomaji kwa shairi hili.",
+      formatLabel: "Shairi",
+      story:
+        "Mvua yapiga paa taratibu,\nTone kwa tone kwa sauti hafifu.\nMawingu yaweza jua kuficha,\nLakini dhoruba nayo huisha.",
+      teachingTitle: "Shairi hili linafundisha nini",
+      teachingPoint: "Shairi hili humsaidia mwanafunzi kuona mpigo, vina na hali ya kishairi.",
+      reflection: "Ukirudi kwenye maswali ya Kiingereza, angalia jinsi maneno yanavyounda maana na sauti.",
+      facts: [
+        "Mashairi hutumia mpigo na vina kufanya mawazo yakumbukike.",
+        "Shairi fupi linaweza kufundisha msamiati na hisia kwa wakati mmoja.",
+      ],
+      continueLabel: "Endelea na Kiingereza",
+    },
+    "hist-timeline": {
+      title: "Pumziko la historia: kwa nini mfuatano wa wakati ni muhimu",
+      intro: "Pumzika kidogo kwa stadi hii ya historia.",
+      formatLabel: "Stadi ya historia",
+      story:
+        "Matukio yanapowekwa katika mpangilio sahihi, historia huwa rahisi kuelewa. Mfuatano wa wakati humsaidia mwanafunzi kuona nini kilitokea kwanza, kilichofuata na jinsi tukio moja lilivyoathiri jingine.",
+      teachingTitle: "Hiki kinafundisha nini",
+      teachingPoint: "Mapumziko haya yanafundisha kronolojia, mojawapo ya stadi kuu za kufikiri kihistoria.",
+      reflection: "Katika swali linalofuata, fikiria mpangilio, sababu na matokeo.",
+      facts: [
+        "Kronolojia husaidia kuelewa mabadiliko kwa muda.",
+        "Historia huwa wazi zaidi matukio yanapopangwa vizuri.",
+      ],
+      continueLabel: "Endelea na historia",
+    },
+    "teens-exam-reset": {
+      title: "Pumziko la marudio: pumua na panga upya",
+      intro: "Mapumziko mafupi yanaweza kukusaidia kurudi ukiwa wazi zaidi kwa jaribio linalofuata.",
+      formatLabel: "Dokezo la marudio",
+      story:
+        "Wanafunzi imara wa sekondari hawajibu maswali mfululizo bila kusimama. Wanasimama kidogo, wanapanga upya mada, kisha wanarudi wakiwa makini zaidi.",
+      teachingTitle: "Hiki kinafundisha nini",
+      teachingPoint: "Mapumziko haya yanaonyesha kuwa kusimama kwa makusudi kunaweza kuboresha kumbukumbu na udhibiti wa mtihani.",
+      reflection: "Kabla ya kuendelea, jiulize wazo kuu lililokuwa linajaribiwa kwenye ngazi iliyopita.",
+      facts: [
+        "Mapumziko mafupi ya marudio yanaweza kuongeza umakini.",
+        "Kuelewa wazo lililo nyuma ya swali ni bora kuliko kukariri jibu moja tu.",
+      ],
+      continueLabel: "Endelea na marudio",
+    },
+    "uni-academic-pause": {
+      title: "Pumziko la kitaaluma: imarisha dhana",
+      intro: "Pumziko fupi la kitaaluma linaweza kuboresha ukumbukaji na umiliki wa dhana.",
+      formatLabel: "Tafakari ya masomo",
+      story:
+        "Masomo ya chuo kikuu si kumaliza maswali tu. Yanahitaji kuimarisha mawazo, kufafanua maana na kuona jinsi dhana zinavyoungana ndani ya kozi.",
+      teachingTitle: "Hiki kinafundisha nini",
+      teachingPoint: "Mapumziko haya yanaonyesha kuwa elimu ya juu huwa imara zaidi mwanafunzi anapopanga maarifa badala ya kukusanya majibu tu.",
+      reflection: "Kabla ya kuendelea, fupisha wazo kuu la ngazi iliyopita katika sentensi moja sahihi.",
+      facts: [
+        "Kuimarisha dhana huongeza kumbukumbu ya muda mrefu.",
+        "Maana wazi na uhusiano wa mawazo ni muhimu katika masomo ya juu.",
+      ],
+      continueLabel: "Endelea na kipindi cha kusoma",
+    },
+    "uni-law-reasoning": {
+      title: "Pumziko la sheria: suala, kanuni na matumizi",
+      intro: "Mapumziko mafupi ya kisheria yanaweza kunoa hoja zako kabla ya seti inayofuata.",
+      formatLabel: "Mbinu ya kisheria",
+      story:
+        "Maswali ya sheria huwa wazi zaidi unapobainisha suala la kisheria, kanuni inayotumika na namna ya kuitumia kwa uangalifu kwenye ukweli wa kesi. Hoja nzuri ya sheria haitokani na kukariri pekee.",
+      teachingTitle: "Hiki kinafundisha nini",
+      teachingPoint: "Mapumziko haya yanafundisha hatua kuu ya uchambuzi wa sheria: suala, kanuni na matumizi.",
+      reflection: "Katika swali linalofuata, tambua kwanza tatizo halisi la kisheria.",
+      facts: [
+        "Masomo ya sheria hutegemea uchambuzi wa ukweli na misingi.",
+        "Mbinu iliyo wazi huongeza kasi na usahihi.",
+      ],
+      continueLabel: "Rudi kwenye sheria",
+    },
+  },
+};
+
+function localizeBreatherContent(content: BreatherContent, language: AppLanguage): BreatherContent {
+  const localized = localizedBreatherOverrides[language]?.[content.id];
+  if (!localized) {
+    return content;
+  }
+
+  return {
+    ...content,
+    ...localized,
+    facts: localized.facts ?? content.facts,
+  };
+}
+
+function getVariantSubjectBreathers() {
+  if (appVariant.id === "teens") {
+    return teenSubjectBreathers;
+  }
+
+  if (appVariant.id === "uni") {
+    return uniSubjectBreathers;
+  }
+
+  return childrenSubjectBreathers;
+}
+
+function getVariantGeneralBreathers() {
+  if (appVariant.id === "teens") {
+    return teenGeneralBreathers;
+  }
+
+  if (appVariant.id === "uni") {
+    return uniGeneralBreathers;
+  }
+
+  return childrenGeneralBreathers;
+}
 
 export function getSubjectPassStreak(results: SessionResult[], subjectId: string) {
   const subjectResults = results.filter((result) => result.subjectId === subjectId);
@@ -472,8 +1197,11 @@ export function shouldOfferBreather(results: SessionResult[], currentResult: Ses
   return streak >= BREATHER_INTERVAL && streak % BREATHER_INTERVAL === 0;
 }
 
-export function getBreatherContent(subjectId: string, level: number, streak: number) {
+export function getBreatherContent(subjectId: string, level: number, streak: number, language: AppLanguage = "en") {
+  const subjectBreathers = getVariantSubjectBreathers();
+  const generalBreathers = getVariantGeneralBreathers();
   const candidates = subjectBreathers[subjectId] ?? generalBreathers;
   const indexSeed = Math.max(level * 2 + streak - 1, 0);
-  return candidates[indexSeed % candidates.length] ?? generalBreathers[0];
+  const chosen = candidates[indexSeed % candidates.length] ?? generalBreathers[0];
+  return localizeBreatherContent(chosen, language);
 }

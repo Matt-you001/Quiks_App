@@ -6,13 +6,58 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "children"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "children"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "children"
+      }
+    },
+    "children-preview": {
+      "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "children"
+      }
+    },
+    "children-production": {
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "children"
+      }
+    },
+    "teens-preview": {
+      "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "teens"
+      }
+    },
+    "teens-production": {
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "teens"
+      }
+    },
+    "uni-preview": {
+      "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "uni"
+      }
+    },
+    "uni-production": {
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "uni"
+      }
     }
   },
   "submit": {

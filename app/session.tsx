@@ -1,16 +1,37 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { appVariant } from "../lib/app-variant";
+import { getDifficultyLabel, t } from "../lib/i18n";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState } from "../lib/storage";
-import { calculateQuizTime, getNextDifficulty, getUnlockedLevelsForGrade, normalizeQuestions, scoreQuestions } from "../lib/quiz";
-import { getSubjectById, grades, QUESTIONS_PER_LEVEL } from "../lib/subjects";
+import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
+import { getSubjectById, getTopicById, grades, QUESTIONS_PER_LEVEL } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
-import { generateCoachPlan, generateFeedback, generateQuestions } from "../services/ai";
-import type { Difficulty, Question, QuestionResponse, SessionResult, TestMode, UserProfile } from "../types/app";
+import {
+  generateCoachPlan,
+  generateFeedback,
+  generateQuestions,
+  getCompetitionStatus,
+  sendCompetitionChat,
+  submitCompetitionResult,
+  updateCompetitionProgress,
+} from "../services/ai";
+import type {
+  CompetitionChatMessage,
+  CompetitionLiveProgress,
+  Difficulty,
+  Question,
+  QuestionFocusMode,
+  QuestionResponse,
+  SessionResult,
+  TestMode,
+  UserProfile,
+} from "../types/app";
 
-type SessionPhase = "setup" | "loading" | "active" | "review";
+type SessionPhase = "setup" | "loading" | "countdown" | "active" | "review" | "awaitingResult";
 
 export default function SessionScreen() {
   const params = useLocalSearchParams<{
@@ -19,24 +40,31 @@ export default function SessionScreen() {
     level?: string;
     grade?: string;
     difficulty?: Difficulty;
+    focusMode?: QuestionFocusMode;
+    topicId?: string;
     autoStart?: string;
+    competitionId?: string;
+    competitionOpponentName?: string;
   }>();
 
-  const subject = getSubjectById(params.subjectId);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const language = profile?.language ?? "en";
+  const subject = getSubjectById(params.subjectId, language);
   const mode: TestMode = params.mode === "training" ? "training" : "quiz";
   const presetLevel = Number(params.level ?? 1);
   const hasPresetGrade = typeof params.grade === "string" && grades.includes(params.grade);
-
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [grade, setGrade] = useState(() =>
     typeof params.grade === "string" && grades.includes(params.grade) ? params.grade : grades[0]
   );
+  const [focusMode, setFocusMode] = useState<QuestionFocusMode>(params.focusMode === "topic" ? "topic" : "general");
+  const [topicId, setTopicId] = useState<string | null>(typeof params.topicId === "string" ? params.topicId : null);
+  const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(Math.max(1, presetLevel));
   const [difficulty, setDifficulty] = useState<Difficulty>(() =>
     params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)
       ? params.difficulty
-      : "Beginner"
+      : appVariant.defaultDifficulty
   );
   const [phase, setPhase] = useState<SessionPhase>("setup");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -46,7 +74,40 @@ export default function SessionScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [questionSource, setQuestionSource] = useState<QuestionResponse["source"] | null>(null);
+  const [competitionChats, setCompetitionChats] = useState<CompetitionChatMessage[]>([]);
+  const [competitionLiveProgress, setCompetitionLiveProgress] = useState<CompetitionLiveProgress[]>([]);
+  const [competitionStartAt, setCompetitionStartAt] = useState<number | null>(null);
+  const [competitionEndAt, setCompetitionEndAt] = useState<number | null>(null);
+  const [pendingCompetitionResult, setPendingCompetitionResult] = useState<SessionResult | null>(null);
   const hasAutoStartedRef = useRef(false);
+  const isCompetition = typeof params.competitionId === "string";
+  const competitionOpponentName =
+    typeof params.competitionOpponentName === "string" ? params.competitionOpponentName : undefined;
+  const competitionQuickMessages = useMemo(
+    () =>
+      appVariant.id === "uni"
+        ? [
+            "Challenge accepted.",
+            "Strong start.",
+            "Well played.",
+            "This is intense.",
+            "I'm not done yet.",
+            "Respect.",
+          ]
+        : [
+            "Bring it on!",
+            "I'm ready!",
+            "Nice one!",
+            "This is close!",
+            "I won that round!",
+            "Good game!",
+          ],
+    []
+  );
+  const competitionQuickEmojis = useMemo(
+    () => ["\u{1F525}", "\u{1F4AA}", "\u{1F44F}", "\u{1F605}", "\u{1F60E}", "\u{1F91D}", "\u{26A1}", "\u{1F3AF}"],
+    []
+  );
 
   useEffect(() => {
     readAppState().then((state) => {
@@ -64,35 +125,68 @@ export default function SessionScreen() {
       setGrade(params.grade);
     }
 
+    if (params.focusMode === "topic" || params.focusMode === "general") {
+      setFocusMode(params.focusMode);
+    }
+
+    if (typeof params.topicId === "string") {
+      setTopicId(params.topicId);
+    }
+
     if (params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)) {
       setDifficulty(params.difficulty);
     }
-  }, [params.grade, params.difficulty]);
+  }, [params.grade, params.difficulty, params.focusMode, params.topicId]);
 
-  const unlockedLevels = useMemo(() => {
+  const levelProgress = useMemo(() => {
     if (!subject) {
-      return [1];
+      return [{ level: 1, isPassed: false, isNextUnlocked: true }];
     }
 
-    return getUnlockedLevelsForGrade(results, subject.id, grade);
+    return getLevelProgressForGrade(results, subject.id, grade);
   }, [grade, results, subject]);
 
+  const selectedTopic = useMemo(() => getTopicById(subject, topicId ?? undefined), [subject, topicId]);
+
   useEffect(() => {
-    if (unlockedLevels.length === 0) {
+    if (!subject) {
+      return;
+    }
+
+    if (focusMode === "topic") {
+      const hasCurrentTopic = topicId && subject.topics.some((topic) => topic.id === topicId);
+      if (!hasCurrentTopic) {
+        setTopicId(subject.topics[0]?.id ?? null);
+      }
+      return;
+    }
+
+    setIsTopicDropdownOpen(false);
+    setTopicId(null);
+  }, [focusMode, subject, topicId]);
+
+  useEffect(() => {
+    const availableLevels = levelProgress.map((entry) => entry.level);
+    if (availableLevels.length === 0) {
       setSelectedLevel(1);
       return;
     }
 
     if (typeof params.level === "string" && params.autoStart === "1") {
       const requestedLevel = Number(params.level);
-      if (unlockedLevels.includes(requestedLevel)) {
+      if (availableLevels.includes(requestedLevel)) {
         setSelectedLevel(requestedLevel);
         return;
       }
     }
 
-    setSelectedLevel(unlockedLevels[unlockedLevels.length - 1]);
-  }, [grade, unlockedLevels, params.autoStart, params.level]);
+    setSelectedLevel((current) => {
+      if (availableLevels.includes(current)) {
+        return current;
+      }
+      return availableLevels[availableLevels.length - 1];
+    });
+  }, [levelProgress, params.autoStart, params.level]);
 
   useEffect(() => {
     if (phase !== "active") {
@@ -117,15 +211,121 @@ export default function SessionScreen() {
     return () => clearInterval(interval);
   }, [phase, mode]);
 
+  useEffect(() => {
+    if (phase !== "countdown" || !competitionStartAt) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const secondsUntilStart = Math.max(0, Math.ceil((competitionStartAt - Date.now()) / 1000));
+      if (secondsUntilStart <= 0) {
+        clearInterval(interval);
+        setPhase("active");
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [competitionStartAt, phase]);
+
+  useEffect(() => {
+    if (!isCompetition || !profile || !["countdown", "active", "review", "awaitingResult"].includes(phase)) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await getCompetitionStatus({
+          playerId: profile.id,
+          competitionId: params.competitionId,
+        });
+        if (response.competition?.chats) {
+          setCompetitionChats(response.competition.chats);
+        }
+        if (response.competition?.liveProgress) {
+          setCompetitionLiveProgress(response.competition.liveProgress);
+        }
+        if (response.competition?.startAt) {
+          setCompetitionStartAt(response.competition.startAt);
+        }
+        if (response.competition?.endAt) {
+          setCompetitionEndAt(response.competition.endAt);
+        }
+
+        if (pendingCompetitionResult && response.status === "completed") {
+          const finalResult: SessionResult = {
+            ...pendingCompetitionResult,
+            competitionOutcome: response.outcome ?? pendingCompetitionResult.competitionOutcome ?? "pending",
+            competitionOpponentName: response.opponentName ?? pendingCompetitionResult.competitionOpponentName,
+            competitionPlayerScore: response.playerScore ?? pendingCompetitionResult.competitionPlayerScore,
+            competitionOpponentScore: response.opponentScore ?? pendingCompetitionResult.competitionOpponentScore,
+          };
+          await appendResult(profile.id, finalResult);
+          setPendingCompetitionResult(null);
+          router.replace({
+            pathname: "/results",
+            params: {
+              result: JSON.stringify(finalResult),
+              nextDifficulty: getNextDifficulty(difficulty),
+            },
+          });
+        }
+      } catch {
+        // Keep the existing chat list on screen.
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [difficulty, isCompetition, params.competitionId, pendingCompetitionResult, phase, profile]);
+
   const currentQuestion = useMemo(() => questions[currentIndex], [questions, currentIndex]);
+  const opponentProgress = useMemo(
+    () => competitionLiveProgress.find((entry) => entry.playerId !== profile?.id),
+    [competitionLiveProgress, profile?.id]
+  );
+  const ownCompetitionProgress = useMemo(
+    () => competitionLiveProgress.find((entry) => entry.playerId === profile?.id),
+    [competitionLiveProgress, profile?.id]
+  );
 
   const loadQuestions = async () => {
-    if (!subject) {
+    if (!subject || !profile) {
       return;
     }
 
     setPhase("loading");
     try {
+      if (isCompetition) {
+        const competitionStatus = await getCompetitionStatus({
+          playerId: profile.id,
+          competitionId: params.competitionId,
+        });
+
+        if (!["matched", "completed"].includes(competitionStatus.status) || !competitionStatus.competition) {
+          throw new Error("Competition match is not ready.");
+        }
+
+        const nextQuestions = normalizeQuestions(competitionStatus.competition.questions);
+        setQuestionSource("remote");
+        setCompetitionChats(competitionStatus.competition.chats ?? []);
+        setCompetitionLiveProgress(competitionStatus.competition.liveProgress ?? []);
+        setCompetitionStartAt(competitionStatus.competition.startAt ?? null);
+        setCompetitionEndAt(competitionStatus.competition.endAt ?? null);
+        setQuestions(nextQuestions);
+        setAnswers(Array(nextQuestions.length).fill(null));
+        setCurrentIndex(0);
+        setSelectedAnswer(null);
+        setElapsed(0);
+        setTimeLeft(
+          competitionStatus.competition.endAt && competitionStatus.competition.startAt
+            ? Math.max(0, Math.floor((competitionStatus.competition.endAt - competitionStatus.competition.startAt) / 1000))
+            : calculateQuizTime(selectedLevel)
+        );
+        setPhase(
+          competitionStatus.competition.startAt && competitionStatus.competition.startAt > Date.now() ? "countdown" : "active"
+        );
+        return;
+      }
+
       const recentQuestionIds = profile ? await getRecentQuestionIds(profile.id, subject.id) : [];
       const response = await generateQuestions({
         subject,
@@ -134,6 +334,9 @@ export default function SessionScreen() {
         mode,
         level: selectedLevel,
         questionCount: QUESTIONS_PER_LEVEL,
+        focusMode,
+        topicId: selectedTopic?.id,
+        topicLabel: selectedTopic?.label,
         profile,
         recentQuestionIds,
       });
@@ -156,7 +359,7 @@ export default function SessionScreen() {
       setPhase("active");
     } catch (error) {
       setQuestionSource(null);
-      Alert.alert("Unable to start session", "Question generation failed. Check your AI configuration or use demo mode.");
+      Alert.alert(t(language, "unableToStartSession"), t(language, "questionGenerationFailed"));
       setPhase("setup");
     }
   };
@@ -188,11 +391,51 @@ export default function SessionScreen() {
     setAnswers(nextAnswers);
     setSelectedAnswer(option);
     setPhase("review");
+    void syncCompetitionProgress(nextAnswers);
 
     if (mode === "quiz") {
       setTimeout(() => {
         advance(nextAnswers);
       }, 1100);
+    }
+  };
+
+  const handleCompetitionQuickMessage = async (message: string) => {
+    if (!isCompetition || !params.competitionId || !profile) {
+      return;
+    }
+
+    try {
+      const response = await sendCompetitionChat({
+        competitionId: params.competitionId,
+        playerId: profile.id,
+        message,
+      });
+      setCompetitionChats(response.chats);
+    } catch {
+      // Keep the session flowing even if chat fails.
+    }
+  };
+
+  const syncCompetitionProgress = async (nextAnswers: Array<string | null>, finished = false) => {
+    if (!isCompetition || !params.competitionId || !profile) {
+      return;
+    }
+
+    const score = scoreQuestions(questions, nextAnswers);
+    try {
+      const response = await updateCompetitionProgress({
+        competitionId: params.competitionId,
+        playerId: profile.id,
+        answeredCount: nextAnswers.filter(Boolean).length,
+        correctAnswers: score.correctAnswers,
+        score: score.score,
+        finished,
+      });
+      setCompetitionLiveProgress(response.competition.liveProgress ?? []);
+      setCompetitionChats(response.competition.chats ?? competitionChats);
+    } catch {
+      // Live score updates should never block the session.
     }
   };
 
@@ -212,10 +455,12 @@ export default function SessionScreen() {
     }
 
     const score = scoreQuestions(questions, finalAnswers);
+    const timeTakenSeconds = mode === "quiz" ? calculateQuizTime(selectedLevel) - timeLeft : elapsed;
     const bonusCoins = mode === "quiz" && score.score === 100 ? Math.floor(Math.max(timeLeft, 0) * 0.05) : 0;
-    let feedback = `You completed your ${subject.name} session. Keep building your confidence one level at a time.`;
+    const practiceLabel = selectedTopic?.label ?? subject.name;
+    let feedback = `You completed your ${practiceLabel} session. Keep building your confidence one level at a time.`;
     let studyPlan = [
-      `Review the key ideas from ${subject.name.toLowerCase()} before your next session.`,
+      `Review the key ideas from ${practiceLabel.toLowerCase()} before your next session.`,
       `Repeat this level in training mode if any question felt difficult.`,
       `Move steadily and focus on accuracy first, then speed.`,
     ];
@@ -225,6 +470,8 @@ export default function SessionScreen() {
         score: score.score,
         subject,
         grade,
+        focusMode,
+        topicLabel: selectedTopic?.label,
         profile,
       });
     } catch {
@@ -237,13 +484,15 @@ export default function SessionScreen() {
         subject,
         grade,
         level: selectedLevel,
+        focusMode,
+        topicLabel: selectedTopic?.label,
         profile,
       });
     } catch {
       // Keep the local fallback study plan.
     }
 
-    const result = {
+    const result: SessionResult = {
       id: `${Date.now()}`,
       date: new Date().toISOString(),
       subjectId: subject.id,
@@ -252,14 +501,51 @@ export default function SessionScreen() {
       difficulty,
       grade,
       mode,
+      focusMode,
+      topicId: selectedTopic?.id,
+      topicLabel: selectedTopic?.label,
       score: score.score,
-      timeTakenSeconds: mode === "quiz" ? calculateQuizTime(selectedLevel) - timeLeft : elapsed,
+      timeTakenSeconds,
       correctAnswers: score.correctAnswers,
       totalQuestions: score.totalQuestions,
       coinsEarned: bonusCoins,
       aiFeedback: feedback,
       aiStudyPlan: studyPlan,
     };
+
+    if (isCompetition && params.competitionId) {
+      await syncCompetitionProgress(finalAnswers, true);
+      try {
+        const competitionResult = await submitCompetitionResult({
+          competitionId: params.competitionId,
+          playerId: profile.id,
+          score: score.score,
+          correctAnswers: score.correctAnswers,
+          totalQuestions: score.totalQuestions,
+          timeTakenSeconds,
+        });
+
+        result.competitionId = params.competitionId;
+        result.competitionOpponentName = competitionResult.opponentName || competitionOpponentName;
+        result.competitionOutcome = competitionResult.outcome;
+        result.competitionPlayerScore = competitionResult.playerScore;
+        result.competitionOpponentScore = competitionResult.opponentScore;
+
+        if (competitionResult.status === "submitted" || competitionResult.outcome === "pending") {
+          setPendingCompetitionResult(result);
+          setPhase("awaitingResult");
+          return;
+        }
+      } catch {
+        result.competitionId = params.competitionId;
+        result.competitionOpponentName = competitionOpponentName;
+        result.competitionOutcome = "pending";
+        result.competitionPlayerScore = score.score;
+        setPendingCompetitionResult(result);
+        setPhase("awaitingResult");
+        return;
+      }
+    }
 
     await appendResult(profile.id, result);
     router.replace({
@@ -275,8 +561,8 @@ export default function SessionScreen() {
     return (
       <AppBackground>
         <View style={styles.panel}>
-          <Text style={styles.title}>Subject not found</Text>
-          <PrimaryButton label="Return home" onPress={() => router.replace("/")} />
+          <Text style={styles.title}>{t(language, appVariant.curriculumSingular === "course" ? "courseNotFound" : "subjectNotFound")}</Text>
+          <PrimaryButton label={t(language, "backHome")} onPress={() => router.replace("/")} />
         </View>
       </AppBackground>
     );
@@ -286,14 +572,21 @@ export default function SessionScreen() {
     return (
       <AppBackground>
         <View style={styles.panel}>
-          <Text style={styles.title}>{subject.name} session</Text>
+          <Text style={styles.title}>{t(language, "sessionTitle", { subject: subject.name })}</Text>
           <Text style={styles.subtitle}>
-            {hasPresetGrade ? `Selected grade: ${grade}. Choose difficulty and start your ${mode} session.` : `Choose grade and start your ${mode} session.`}
+            {hasPresetGrade
+              ? t(language, "selectedGradeStartHint", {
+                  grade,
+                  mode: mode === "training" ? appVariant.trainingLabel.toLowerCase() : appVariant.quizLabel.toLowerCase(),
+                })
+              : t(language, "chooseGradeStartHint", {
+                  mode: mode === "training" ? appVariant.trainingLabel.toLowerCase() : appVariant.quizLabel.toLowerCase(),
+                })}
           </Text>
 
           {!hasPresetGrade ? (
             <>
-              <Text style={styles.label}>Grade</Text>
+              <Text style={styles.label}>{t(language, "grade")}</Text>
               <View style={styles.choiceWrap}>
                 {grades.slice(0, 8).map((entry) => (
                   <Pressable
@@ -308,20 +601,95 @@ export default function SessionScreen() {
             </>
           ) : null}
 
-          <Text style={styles.label}>Unlocked Levels</Text>
+          <Text style={styles.label}>{t(language, "questionFocus")}</Text>
           <View style={styles.choiceWrap}>
-            {unlockedLevels.map((entry) => (
+            <Pressable
+              onPress={() => setFocusMode("general")}
+              style={[styles.choiceChip, focusMode === "general" ? styles.choiceChipActive : null]}
+            >
+              <Text style={[styles.choiceText, focusMode === "general" ? styles.choiceTextActive : null]}>{t(language, "general")}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setFocusMode("topic")}
+              style={[styles.choiceChip, focusMode === "topic" ? styles.choiceChipActive : null]}
+            >
+              <Text style={[styles.choiceText, focusMode === "topic" ? styles.choiceTextActive : null]}>
+                {appVariant.id === "uni" ? t(language, "specialized") : t(language, "topicFocus")}
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={styles.hintText}>
+            {focusMode === "general"
+              ? t(language, "generalHint", { item: appVariant.curriculumSingular })
+              : appVariant.id === "uni"
+                ? t(language, "specializedHint")
+                : t(language, "topicHint")}
+          </Text>
+
+          {focusMode === "topic" ? (
+            <>
+              <Text style={styles.label}>{t(language, "chooseTopic")}</Text>
               <Pressable
-                key={`${grade}-level-${entry}`}
-                onPress={() => setSelectedLevel(entry)}
-                style={[styles.levelChip, selectedLevel === entry ? styles.choiceChipActive : null]}
+                onPress={() => setIsTopicDropdownOpen((value) => !value)}
+                style={[styles.dropdownTrigger, isTopicDropdownOpen ? styles.dropdownTriggerActive : null]}
               >
-                <Text style={[styles.levelText, selectedLevel === entry ? styles.choiceTextActive : null]}>Level {entry}</Text>
+                <View style={styles.dropdownTextWrap}>
+                  <Text style={styles.dropdownLabel}>{selectedTopic?.label ?? t(language, "selectTopic")}</Text>
+                  <Text style={styles.dropdownHint}>{t(language, "topicPickerHint")}</Text>
+                </View>
+                <MaterialCommunityIcons
+                  name={isTopicDropdownOpen ? "chevron-up" : "chevron-down"}
+                  size={24}
+                  color={palette.navy}
+                />
+              </Pressable>
+              {isTopicDropdownOpen ? (
+                <View style={styles.dropdownMenu}>
+                  <ScrollView nestedScrollEnabled style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+                    {subject.topics.map((topic) => (
+                      <Pressable
+                        key={topic.id}
+                        onPress={() => {
+                          setTopicId(topic.id);
+                          setIsTopicDropdownOpen(false);
+                        }}
+                        style={[styles.dropdownItem, topic.id === topicId ? styles.dropdownItemActive : null]}
+                      >
+                        <Text style={[styles.dropdownItemTitle, topic.id === topicId ? styles.dropdownItemTitleActive : null]}>
+                          {topic.label}
+                        </Text>
+                        <Text style={[styles.dropdownItemText, topic.id === topicId ? styles.dropdownItemTextActive : null]}>
+                          {topic.description}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
+              {selectedTopic ? <Text style={styles.hintText}>{selectedTopic.description}</Text> : null}
+            </>
+          ) : null}
+
+          <Text style={styles.label}>{t(language, "unlockedLevels")}</Text>
+          <Text style={styles.hintText}>{t(language, "highestUnlockedSelected", { grade })}</Text>
+          <View style={styles.levelList}>
+            {levelProgress.map((entry) => (
+              <Pressable
+                key={`${grade}-level-${entry.level}`}
+                onPress={() => setSelectedLevel(entry.level)}
+                style={[styles.levelRow, selectedLevel === entry.level ? styles.levelRowActive : null]}
+              >
+                <Text style={[styles.levelText, selectedLevel === entry.level ? styles.choiceTextActive : null]}>
+                  {t(language, "levelLabel")} {entry.level}
+                </Text>
+                <Text style={[styles.levelBadge, selectedLevel === entry.level ? styles.levelBadgeActive : null]}>
+                  {entry.isPassed ? t(language, "passedLevelBadge") : t(language, "nextLevelBadge")}
+                </Text>
               </Pressable>
             ))}
           </View>
 
-          <Text style={styles.label}>Difficulty</Text>
+          <Text style={styles.label}>{t(language, "difficulty")}</Text>
           <View style={styles.choiceWrap}>
             {(["Beginner", "Intermediate", "Advanced", "Expert"] as Difficulty[]).map((entry) => (
               <Pressable
@@ -329,12 +697,17 @@ export default function SessionScreen() {
                 onPress={() => setDifficulty(entry)}
                 style={[styles.choiceChip, difficulty === entry ? styles.choiceChipActive : null]}
               >
-                <Text style={[styles.choiceText, difficulty === entry ? styles.choiceTextActive : null]}>{entry}</Text>
+                <Text style={[styles.choiceText, difficulty === entry ? styles.choiceTextActive : null]}>
+                  {getDifficultyLabel(language, entry)}
+                </Text>
               </Pressable>
             ))}
           </View>
 
-          <PrimaryButton label={`Start ${mode}`} onPress={loadQuestions} />
+          <PrimaryButton
+            label={t(language, "start", { mode: mode === "training" ? appVariant.trainingLabel : appVariant.quizLabel })}
+            onPress={loadQuestions}
+          />
         </View>
       </AppBackground>
     );
@@ -344,8 +717,33 @@ export default function SessionScreen() {
     return (
       <AppBackground scroll={false}>
         <View style={styles.centerPanel}>
-          <Text style={styles.title}>Preparing your session</Text>
-          <Text style={styles.subtitle}>Loading questions for {subject.name}.</Text>
+          <Text style={styles.title}>{t(language, "preparingSession")}</Text>
+          <Text style={styles.subtitle}>{t(language, "loadingQuestionsFor", { subject: subject.name })}</Text>
+        </View>
+      </AppBackground>
+    );
+  }
+
+  if (phase === "countdown") {
+    const countdown = Math.max(1, Math.ceil(((competitionStartAt ?? Date.now()) - Date.now()) / 1000));
+    return (
+      <AppBackground scroll={false}>
+        <View style={styles.centerPanel}>
+          <Text style={styles.title}>{subject.name}</Text>
+          <Text style={styles.subtitle}>{t(language, "challengeAccepted")}</Text>
+          <Text style={styles.countdownText}>{countdown}</Text>
+          <Text style={styles.subtitle}>{t(language, "countdownToStart", { count: countdown })}</Text>
+        </View>
+      </AppBackground>
+    );
+  }
+
+  if (phase === "awaitingResult") {
+    return (
+      <AppBackground scroll={false}>
+        <View style={styles.centerPanel}>
+          <Text style={styles.title}>{t(language, "competitionSummary")}</Text>
+          <Text style={styles.subtitle}>{t(language, "waitingOpponentResult")}</Text>
         </View>
       </AppBackground>
     );
@@ -358,14 +756,22 @@ export default function SessionScreen() {
           <View>
             <Text style={styles.titleSmall}>{subject.name}</Text>
             <Text style={styles.subtitle}>
-              {grade} | Level {selectedLevel} | {difficulty}
+              {grade} | {t(language, "levelLabel")} {selectedLevel} | {getDifficultyLabel(language, difficulty)}
             </Text>
+            <Text style={styles.focusLine}>
+              {focusMode === "topic" && selectedTopic ? `Topic focus: ${selectedTopic.label}` : "General mixed practice"}
+            </Text>
+            {isCompetition && competitionOpponentName ? (
+              <Text style={styles.competitionLine}>
+                {t(language, "opponent")}: {competitionOpponentName}
+              </Text>
+            ) : null}
           </View>
           <View style={styles.topRight}>
             {questionSource ? (
               <View style={[styles.sourceBadge, questionSource === "remote" ? styles.sourceBadgeRemote : null]}>
                 <Text style={[styles.sourceBadgeText, questionSource === "remote" ? styles.sourceBadgeTextRemote : null]}>
-                  Test source: {questionSource === "remote" ? "AI" : questionSource === "local" ? "Local bank" : "Demo"}
+                  {questionSource === "remote" ? t(language, "testSourceAi") : questionSource === "local" ? t(language, "testSourceLocal") : t(language, "testSourceDemo")}
                 </Text>
               </View>
             ) : null}
@@ -375,8 +781,66 @@ export default function SessionScreen() {
           </View>
         </View>
 
+        {isCompetition ? (
+          <View style={styles.chatCard}>
+            <Text style={styles.chatTitle}>{t(language, "competitionChat")}</Text>
+            {competitionChats.length > 0 ? (
+              <View style={styles.chatFeed}>
+                {competitionChats.slice(-3).map((chat) => (
+                  <View
+                    key={chat.id}
+                    style={[
+                      styles.chatBubble,
+                      chat.senderId === profile?.id ? styles.chatBubbleOwn : styles.chatBubbleOpponent,
+                    ]}
+                  >
+                    <Text style={styles.chatSender}>{chat.senderId === profile?.id ? "You" : chat.senderName}</Text>
+                    <Text style={styles.chatMessage}>{chat.message}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.chatEmpty}>{t(language, "noMessagesYet")}</Text>
+            )}
+
+            <Text style={styles.chatSectionLabel}>{t(language, "quickMessages")}</Text>
+            <View style={styles.chatChipWrap}>
+              {competitionQuickMessages.map((message) => (
+                <Pressable
+                  key={message}
+                  onPress={() => handleCompetitionQuickMessage(message)}
+                  style={styles.chatChip}
+                >
+                  <Text style={styles.chatChipText}>{message}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.chatSectionLabel}>{t(language, "quickEmojis")}</Text>
+            <View style={styles.chatChipWrap}>
+              {competitionQuickEmojis.map((emoji) => (
+                <Pressable key={emoji} onPress={() => handleCompetitionQuickMessage(emoji)} style={styles.emojiChip}>
+                  <Text style={styles.emojiChipText}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {isCompetition ? (
+          <View style={styles.liveScoreCard}>
+            <Text style={styles.chatTitle}>{t(language, "liveScores")}</Text>
+            <Text style={styles.liveScoreLine}>
+              You: {ownCompetitionProgress?.score ?? 0}% ({ownCompetitionProgress?.answeredCount ?? 0}/{questions.length})
+            </Text>
+            <Text style={styles.liveScoreLine}>
+              {competitionOpponentName ?? t(language, "opponent")}: {opponentProgress?.score ?? 0}% ({opponentProgress?.answeredCount ?? 0}/{questions.length})
+            </Text>
+          </View>
+        ) : null}
+
         <Text style={styles.progressText}>
-          Question {currentIndex + 1} of {questions.length}
+          {t(language, "questionCount", { current: currentIndex + 1, total: questions.length })}
         </Text>
         <Text style={styles.question}>{currentQuestion?.prompt}</Text>
 
@@ -408,10 +872,10 @@ export default function SessionScreen() {
         {phase === "review" ? (
           <View style={styles.explanationCard}>
             <Text style={styles.explanationTitle}>
-              {selectedAnswer === currentQuestion?.answer ? "Correct" : "Keep going"}
+              {selectedAnswer === currentQuestion?.answer ? t(language, "correct") : t(language, "keepGoing")}
             </Text>
             <Text style={styles.explanationText}>{currentQuestion?.explanation}</Text>
-            {mode === "training" ? <PrimaryButton label="Next question" onPress={() => advance()} /> : null}
+            {mode === "training" ? <PrimaryButton label={t(language, "nextQuestion")} onPress={() => advance()} /> : null}
           </View>
         ) : null}
       </View>
@@ -481,14 +945,120 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
-  levelChip: {
+  levelList: {
+    gap: 10,
+  },
+  levelRow: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#F4F8FB",
+    borderWidth: 1,
+    borderColor: "#DCE6EE",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  levelRowActive: {
+    backgroundColor: palette.navy,
+    borderColor: palette.navy,
+  },
+  levelText: {
+    color: palette.navy,
+    fontWeight: "700",
+  },
+  levelBadge: {
+    color: "#0A7D58",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  levelBadgeActive: {
+    color: "#DDF7EA",
+  },
+  topicChip: {
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: "#F2F5F8",
   },
-  levelText: {
+  topicText: {
     color: palette.navy,
+    fontWeight: "700",
+  },
+  dropdownTrigger: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: "#F9FBFD",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  dropdownTriggerActive: {
+    borderColor: palette.navy,
+  },
+  dropdownTextWrap: {
+    flex: 1,
+  },
+  dropdownLabel: {
+    color: palette.ink,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  dropdownHint: {
+    color: palette.slate,
+    marginTop: 4,
+    lineHeight: 18,
+    fontSize: 12,
+  },
+  dropdownMenu: {
+    marginTop: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: palette.white,
+    overflow: "hidden",
+  },
+  dropdownScroll: {
+    maxHeight: 260,
+  },
+  dropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3F7",
+  },
+  dropdownItemActive: {
+    backgroundColor: "#EAF7FD",
+  },
+  dropdownItemTitle: {
+    color: palette.ink,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  dropdownItemTitleActive: {
+    color: palette.navy,
+  },
+  dropdownItemText: {
+    color: palette.slate,
+    marginTop: 4,
+    lineHeight: 18,
+    fontSize: 12,
+  },
+  dropdownItemTextActive: {
+    color: palette.navy,
+  },
+  focusLine: {
+    color: palette.navy,
+    marginTop: 6,
+    fontWeight: "700",
+  },
+  competitionLine: {
+    color: "#0A7D58",
+    marginTop: 6,
     fontWeight: "700",
   },
   topRow: {
@@ -536,10 +1106,107 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 16,
   },
+  countdownText: {
+    color: palette.white,
+    fontSize: 72,
+    fontWeight: "900",
+    marginVertical: 10,
+  },
   progressText: {
     marginTop: 16,
     color: palette.slate,
     fontWeight: "700",
+  },
+  chatCard: {
+    marginTop: 18,
+    borderRadius: 20,
+    backgroundColor: "#F4F9FC",
+    padding: 14,
+  },
+  chatTitle: {
+    color: palette.navy,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  chatFeed: {
+    gap: 8,
+    marginTop: 10,
+  },
+  chatBubble: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  chatBubbleOwn: {
+    backgroundColor: "#DDF7EA",
+    alignSelf: "flex-end",
+  },
+  chatBubbleOpponent: {
+    backgroundColor: palette.white,
+    alignSelf: "flex-start",
+  },
+  chatSender: {
+    color: palette.navy,
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  chatMessage: {
+    color: palette.ink,
+    lineHeight: 20,
+  },
+  chatEmpty: {
+    color: palette.slate,
+    marginTop: 10,
+    lineHeight: 20,
+  },
+  chatSectionLabel: {
+    color: palette.slate,
+    fontWeight: "700",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  chatChipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chatChip: {
+    borderRadius: 999,
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  chatChipText: {
+    color: palette.navy,
+    fontWeight: "700",
+  },
+  liveScoreCard: {
+    marginTop: 12,
+    borderRadius: 20,
+    backgroundColor: "#EEF7FB",
+    padding: 14,
+  },
+  liveScoreLine: {
+    color: palette.navy,
+    marginTop: 8,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  emojiChip: {
+    borderRadius: 999,
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emojiChipText: {
+    fontSize: 22,
   },
   question: {
     color: palette.ink,

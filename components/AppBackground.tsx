@@ -18,7 +18,7 @@ export function AppBackground({ children, scroll = true }: AppBackgroundProps) {
   );
 
   return (
-    <LinearGradient colors={[palette.navy, "#102A43", "#F6F8FB"]} style={styles.fill}>
+    <LinearGradient colors={[palette.gradientTop, palette.gradientMid, palette.gradientBottom]} style={styles.fill}>
       <SafeAreaView style={styles.fill}>
         {scroll ? (
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 999,
-    backgroundColor: "rgba(122, 215, 240, 0.22)",
+    backgroundColor: palette.glowTop,
   },
   glowBottom: {
     position: "absolute",
@@ -61,6 +61,6 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 999,
-    backgroundColor: "rgba(53, 183, 215, 0.18)",
+    backgroundColor: palette.glowBottom,
   },
 });

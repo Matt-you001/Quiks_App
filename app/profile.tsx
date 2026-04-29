@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { getLanguageLabel, t } from "../lib/i18n";
 import { readAppState } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -54,12 +55,13 @@ export default function ProfileScreen() {
   );
 
   const bestScore = results.length > 0 ? `${Math.max(...results.map((result) => result.score))}%` : "0%";
-  const latestPerformance = results[0] ? `${results[0].score}% in ${results[0].subjectName}` : "No sessions yet";
+  const language = activeProfile?.language ?? "en";
+  const latestPerformance = results[0] ? `${results[0].score}% in ${results[0].subjectName}` : t(language, "noSessionsYet");
 
   const highestAttainment = useMemo(() => {
     const passedResults = results.filter((result) => result.score >= SCORE_THRESHOLD);
     if (passedResults.length === 0) {
-      return { grade: "Not reached yet", level: "-" };
+      return { grade: t(language, "notReachedYet"), level: "-" };
     }
 
     const best = passedResults.reduce((currentBest, result) => {
@@ -83,20 +85,22 @@ export default function ProfileScreen() {
       grade: best.grade,
       level: String(best.level),
     };
-  }, [results]);
+  }, [language, results]);
 
   const todaySeconds = results.filter((result) => isSameLocalDay(result.date)).reduce((sum, result) => sum + result.timeTakenSeconds, 0);
   const todayMinutes = Math.round(todaySeconds / 60);
   const goalMinutes = activeProfile?.dailyGoalMinutes ?? 0;
+  const competitionResults = results.filter((result) => Boolean(result.competitionId));
+  const competitionWins = competitionResults.filter((result) => result.competitionOutcome === "won").length;
 
-  let goalFeedback = "No study target available yet.";
+  let goalFeedback = t(language, "noTargetYet");
   if (activeProfile) {
     if (todayMinutes > goalMinutes) {
-      goalFeedback = "Daily target exceeded. Excellent consistency today.";
+      goalFeedback = t(language, "targetExceeded");
     } else if (todayMinutes === goalMinutes) {
-      goalFeedback = "Daily target reached. Well done.";
+      goalFeedback = t(language, "targetReached");
     } else {
-      goalFeedback = `Daily target not reached yet. ${Math.max(goalMinutes - todayMinutes, 0)} minute(s) to go.`;
+      goalFeedback = t(language, "targetNotReached", { minutes: Math.max(goalMinutes - todayMinutes, 0) });
     }
   }
 
@@ -104,14 +108,14 @@ export default function ProfileScreen() {
     return (
       <AppBackground>
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No student selected</Text>
-            <Text style={styles.emptyText}>Create a profile first or return home and choose a learner.</Text>
+          <Text style={styles.emptyTitle}>{t(language, "profileNoSelection")}</Text>
+            <Text style={styles.emptyText}>{t(language, "profileCreateOrChoose")}</Text>
             <View style={styles.actionColumn}>
             <PrimaryButton
-              label="Create profile"
+              label={t(language, "createProfile")}
               onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
             />
-            <PrimaryButton label="Back Home" variant="ghost" onPress={() => router.replace("/")} />
+            <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
           </View>
         </View>
       </AppBackground>
@@ -125,22 +129,22 @@ export default function ProfileScreen() {
           <View style={styles.heroIdentity}>
             <Text style={styles.heroTitle}>{activeProfile.name}</Text>
             <Text style={styles.heroSubtitle}>
-              Age {activeProfile.age} | {activeProfile.targetExam}
+              {t(language, "age")} {activeProfile.age} | {activeProfile.targetExam}
             </Text>
           </View>
         </View>
         <View>
-          <Text style={styles.heroText}>Goal: {activeProfile.dailyGoalMinutes} minutes</Text>
+          <Text style={styles.heroText}>{t(language, "dailyTarget")}: {activeProfile.dailyGoalMinutes} minutes</Text>
           <View style={styles.attainmentCard}>
-            <Text style={styles.attainmentLabel}>Highest attained</Text>
+            <Text style={styles.attainmentLabel}>{t(language, "highestAttained")}</Text>
             <Text style={styles.attainmentValue}>{highestAttainment.grade}</Text>
-            <Text style={styles.attainmentSubtext}>Level {highestAttainment.level}</Text>
+            <Text style={styles.attainmentSubtext}>{t(language, "levelLabel")} {highestAttainment.level}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Today&apos;s study time</Text>
+        <Text style={styles.cardTitle}>{t(language, "todaysStudyTime")}</Text>
         <Text style={styles.metricHighlight}>
           {todayMinutes} min / {goalMinutes} min
         </Text>
@@ -148,26 +152,40 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Learning record</Text>
-        <Text style={styles.metricText}>Best score: {bestScore}</Text>
-        <Text style={styles.metricText}>Sessions completed: {results.length}</Text>
-        <Text style={styles.metricText}>Latest score: {latestPerformance}</Text>
+        <Text style={styles.cardTitle}>{t(language, "learningRecord")}</Text>
+        <Text style={styles.metricText}>{t(language, "bestScore")}: {bestScore}</Text>
+        <Text style={styles.metricText}>{t(language, "sessionsCompleted")}: {results.length}</Text>
+        <Text style={styles.metricText}>{t(language, "latestScore")}: {latestPerformance}</Text>
       </View>
 
+      {competitionResults.length > 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t(language, "competitionSummary")}</Text>
+          <Text style={styles.metricText}>Wins: {competitionWins}</Text>
+          <Text style={styles.metricText}>Challenges played: {competitionResults.length}</Text>
+          {competitionResults.slice(0, 3).map((result) => (
+            <Text key={result.id} style={styles.metricText}>
+              {result.subjectName}: {result.competitionOutcome ?? "pending"} vs {result.competitionOpponentName ?? "-"} ({result.score}%)
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Profile details</Text>
-        <Text style={styles.metricText}>Target exam: {activeProfile.targetExam}</Text>
-        <Text style={styles.metricText}>Daily target: {activeProfile.dailyGoalMinutes} minutes</Text>
+        <Text style={styles.cardTitle}>{t(language, "profileDetails")}</Text>
+        <Text style={styles.metricText}>{t(language, "targetExam")}: {activeProfile.targetExam}</Text>
+        <Text style={styles.metricText}>{t(language, "dailyTarget")}: {activeProfile.dailyGoalMinutes} minutes</Text>
+        <Text style={styles.metricText}>{t(language, "currentLanguage")}: {getLanguageLabel(activeProfile.language)}</Text>
       </View>
 
       <View style={styles.actionColumn}>
-        <PrimaryButton label="Edit Profile" onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "edit" } } as never)} />
+        <PrimaryButton label={t(language, "editProfileAction")} onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "edit" } } as never)} />
         <PrimaryButton
-          label="Create Another Profile"
+          label={t(language, "createAnotherProfile")}
           variant="secondary"
           onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
         />
-        <PrimaryButton label="Back Home" variant="ghost" onPress={() => router.replace("/")} />
+        <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
       </View>
     </AppBackground>
   );

@@ -1,0 +1,54 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="150" y1="100" x2="1040" y2="1100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7A2CC8"/>
+      <stop offset="0.62" stop-color="#C74BB1"/>
+      <stop offset="1" stop-color="#F46BB5"/>
+    </linearGradient>
+    <linearGradient id="qstroke" x1="350" y1="278" x2="870" y2="850" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFD7F0"/>
+      <stop offset="1" stop-color="#F46BB5"/>
+    </linearGradient>
+    <linearGradient id="book" x1="424" y1="420" x2="776" y2="780" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF6FC"/>
+    </linearGradient>
+    <linearGradient id="bookmark" x1="636" y1="410" x2="636" y2="595" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F2B851"/>
+      <stop offset="1" stop-color="#F29E38"/>
+    </linearGradient>
+    <filter id="shadow" x="176" y="170" width="852" height="864" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="26"/>
+      <feGaussianBlur stdDeviation="34"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0313725 0 0 0 0 0.0666667 0 0 0 0 0.121569 0 0 0 0.22 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="1200" rx="320" fill="url(#bg)"/>
+  <circle cx="224" cy="232" r="142" fill="#FFFFFF" fill-opacity="0.06"/>
+  <circle cx="994" cy="944" r="210" fill="#FFFFFF" fill-opacity="0.07"/>
+
+  <g filter="url(#shadow)">
+    <path d="M600 298C754.639 298 880 423.361 880 578C880 726.208 764.873 847.525 621.086 857.404L690.263 938.367C705.782 956.525 703.652 983.833 685.494 999.353C667.337 1014.87 640.028 1012.74 624.509 994.584L526.534 879.951C423.364 850.864 348 755.94 348 643C348 507.69 458.609 398 593.919 398H758" stroke="url(#qstroke)" stroke-width="78" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <path d="M432 430C490 409 541.333 409 600 430V762C541.333 738 490 738 432 762V430Z" fill="url(#book)"/>
+    <path d="M768 430C710 409 658.667 409 600 430V762C658.667 738 710 738 768 762V430Z" fill="url(#book)"/>
+    <path d="M432 430C490 409 541.333 409 600 430C658.667 409 710 409 768 430V762C710 738 658.667 738 600 762C541.333 738 490 738 432 762V430Z" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M600 428V766" stroke="#D9E6F2" stroke-width="10" stroke-linecap="round"/>
+
+    <path d="M640 404H696V551L668 528L640 551V404Z" fill="url(#bookmark)"/>
+
+    <path d="M480 516H558" stroke="#F46BB5" stroke-width="26" stroke-linecap="round"/>
+    <path d="M480 580H544" stroke="#F3A62A" stroke-width="22" stroke-linecap="round"/>
+    <path d="M642 516H720" stroke="#F46BB5" stroke-width="26" stroke-linecap="round"/>
+    <path d="M656 580H720" stroke="#F3A62A" stroke-width="22" stroke-linecap="round"/>
+
+    <path d="M846 326L860 367L901 381L860 395L846 436L832 395L791 381L832 367L846 326Z" fill="#F2B851"/>
+    <path d="M754 288L762 312L786 320L762 328L754 352L746 328L722 320L746 312L754 288Z" fill="#FFD7F0"/>
+  </g>
+</svg>
+

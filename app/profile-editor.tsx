@@ -1,17 +1,20 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { appVariant } from "../lib/app-variant";
+import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, t } from "../lib/i18n";
 import { readAppState, upsertProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
-import type { UserProfile } from "../types/app";
+import type { AppLanguage, UserProfile } from "../types/app";
 
 const defaultForm = {
   name: "",
   age: "",
-  targetExam: "General school prep",
-  dailyGoalMinutes: "20",
+  targetExam: appVariant.defaultTargetExam,
+  dailyGoalMinutes: String(appVariant.defaultDailyGoalMinutes),
+  language: DEFAULT_LANGUAGE as AppLanguage,
 };
 
 function createId() {
@@ -37,6 +40,7 @@ export default function ProfileEditorScreen() {
           age: String(activeProfile.age),
           targetExam: activeProfile.targetExam,
           dailyGoalMinutes: String(activeProfile.dailyGoalMinutes),
+          language: activeProfile.language ?? DEFAULT_LANGUAGE,
         });
         return;
       }
@@ -48,7 +52,7 @@ export default function ProfileEditorScreen() {
 
   const saveProfile = async () => {
     if (!form.name.trim()) {
-      Alert.alert("Name required", "Please enter a learner name.");
+      Alert.alert(t(form.language, "nameRequiredTitle"), t(form.language, "nameRequiredMessage"));
       return;
     }
 
@@ -56,12 +60,12 @@ export default function ProfileEditorScreen() {
     const goal = Number(form.dailyGoalMinutes);
 
     if (!Number.isFinite(age) || age < 3) {
-      Alert.alert("Invalid age", "Please enter a valid age.");
+      Alert.alert(t(form.language, "invalidAgeTitle"), t(form.language, "invalidAgeMessage"));
       return;
     }
 
     if (!Number.isFinite(goal) || goal < 5) {
-      Alert.alert("Invalid goal", "Please enter at least 5 minutes for the daily goal.");
+      Alert.alert(t(form.language, "invalidGoalTitle"), t(form.language, "invalidGoalMessage"));
       return;
     }
 
@@ -73,6 +77,7 @@ export default function ProfileEditorScreen() {
       age,
       targetExam: form.targetExam.trim() || "General school prep",
       dailyGoalMinutes: goal,
+      language: form.language,
     };
 
     await upsertProfile(profile);
@@ -83,56 +88,73 @@ export default function ProfileEditorScreen() {
   return (
     <AppBackground>
       <View style={styles.heroCard}>
-        <Text style={styles.title}>{isEditMode ? "Edit profile" : "Create profile"}</Text>
+        <Text style={styles.title}>{isEditMode ? t(form.language, "editProfile") : t(form.language, "createProfile")}</Text>
         <Text style={styles.subtitle}>
-          {isEditMode
-            ? "Update this learner's details and save the changes."
-            : "Create a dedicated student profile so progress and results stay personal."}
+          {isEditMode ? t(form.language, "updateLearnerDetails") : appVariant.profileEditorSubtitle}
         </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.label}>Name</Text>
+        <Text style={styles.label}>{t(form.language, "name")}</Text>
         <TextInput
           value={form.name}
           onChangeText={(value) => setForm((current) => ({ ...current, name: value }))}
           style={styles.input}
-          placeholder="Enter learner name"
+          placeholder={t(form.language, "enterLearnerName")}
           placeholderTextColor="#7C8EA3"
         />
 
-        <Text style={styles.label}>Age</Text>
+        <Text style={styles.label}>{t(form.language, "age")}</Text>
         <TextInput
           value={form.age}
           onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
           style={styles.input}
-          placeholder="Age"
+          placeholder={t(form.language, "age")}
           keyboardType="number-pad"
           placeholderTextColor="#7C8EA3"
         />
 
-        <Text style={styles.label}>Target exam</Text>
+        <Text style={styles.label}>{t(form.language, "targetExam")}</Text>
         <TextInput
           value={form.targetExam}
           onChangeText={(value) => setForm((current) => ({ ...current, targetExam: value }))}
           style={styles.input}
-          placeholder="WAEC, school prep, olympiad..."
+          placeholder={appVariant.targetExamPlaceholder}
           placeholderTextColor="#7C8EA3"
         />
 
-        <Text style={styles.label}>Daily goal in minutes</Text>
+        <Text style={styles.label}>{t(form.language, "dailyGoalMinutes")}</Text>
         <TextInput
           value={form.dailyGoalMinutes}
           onChangeText={(value) => setForm((current) => ({ ...current, dailyGoalMinutes: value }))}
           style={styles.input}
-          placeholder="20"
+          placeholder={String(appVariant.defaultDailyGoalMinutes)}
           keyboardType="number-pad"
           placeholderTextColor="#7C8EA3"
         />
 
+        <Text style={styles.label}>{t(form.language, "language")}</Text>
+        <View style={styles.languageWrap}>
+          {LANGUAGE_OPTIONS.map((entry) => (
+            <Pressable
+              key={entry.code}
+              onPress={() => setForm((current) => ({ ...current, language: entry.code }))}
+              style={[styles.languageChip, form.language === entry.code ? styles.languageChipActive : null]}
+            >
+              <Text style={[styles.languageChipText, form.language === entry.code ? styles.languageChipTextActive : null]}>
+                {entry.nativeLabel}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.actionColumn}>
-          <PrimaryButton label={isEditMode ? "Save changes" : "Create profile"} onPress={saveProfile} loading={saving} />
-          <PrimaryButton label="Cancel" variant="ghost" onPress={() => router.back()} />
+          <PrimaryButton
+            label={isEditMode ? t(form.language, "saveChanges") : t(form.language, "createProfile")}
+            onPress={saveProfile}
+            loading={saving}
+          />
+          <PrimaryButton label={t(form.language, "cancel")} variant="ghost" onPress={() => router.back()} />
         </View>
       </View>
     </AppBackground>
@@ -178,6 +200,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FBFD",
     paddingHorizontal: 14,
     color: palette.ink,
+  },
+  languageWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  languageChip: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#F2F5F8",
+  },
+  languageChipActive: {
+    backgroundColor: palette.navy,
+  },
+  languageChipText: {
+    color: palette.navy,
+    fontWeight: "700",
+  },
+  languageChipTextActive: {
+    color: palette.white,
   },
   actionColumn: {
     marginTop: 18,

@@ -9,7 +9,7 @@ const variantConfig: Record<AppVariant, { name: string; slug: string; scheme: st
     name: "Quiks Children",
     slug: "quiks",
     scheme: "quiks-children",
-    androidPackage: "com.quiks.children",
+    androidPackage: "com.quiks.mobile",
   },
   teens: {
     name: "Quiks Teens",
@@ -32,6 +32,15 @@ const variantBackgrounds: Record<AppVariant, string> = {
   uni: "#0B1F33",
 };
 const backgroundColor = variantBackgrounds[variant] ?? variantBackgrounds.children;
+const variantProjectIds: Partial<Record<AppVariant, string>> = {
+  children: "f2fa2ea0-d0d5-4f61-a469-0eb14602adfa",
+  teens: "26af832f-3b36-4b19-9bae-3be8183c3731",
+  uni: "75486e6a-cc21-44a6-abb8-8c565611a9ba",
+};
+const envProjectId =
+  process.env.EAS_PROJECT_ID ??
+  process.env[`EAS_PROJECT_ID_${variant.toUpperCase()}` as keyof NodeJS.ProcessEnv];
+const easProjectId = envProjectId || variantProjectIds[variant];
 
 const config: ExpoConfig = {
   name: current.name,
@@ -71,9 +80,13 @@ const config: ExpoConfig = {
     router: {
       root: "./app",
     },
-    eas: {
-      projectId: "f2fa2ea0-d0d5-4f61-a469-0eb14602adfa",
-    },
+    ...(easProjectId
+      ? {
+          eas: {
+            projectId: easProjectId,
+          },
+        }
+      : {}),
   },
 };
 

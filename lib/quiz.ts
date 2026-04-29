@@ -1,6 +1,12 @@
 import { BASE_QUIZ_TIME_SECONDS, SCORE_THRESHOLD, TIME_INCREMENT_PER_LEVEL, difficulties } from "./subjects";
 import type { Difficulty, Question, SessionResult } from "../types/app";
 
+export interface LevelProgressOption {
+  level: number;
+  isPassed: boolean;
+  isNextUnlocked: boolean;
+}
+
 export function shuffleOptions(options: string[]) {
   const next = [...options];
   for (let i = next.length - 1; i > 0; i -= 1) {
@@ -48,6 +54,21 @@ export function getUnlockedLevelsForGrade(results: SessionResult[], subjectId: s
     }
   }
   return Array.from({ length: maxUnlocked }, (_, index) => index + 1);
+}
+
+export function getLevelProgressForGrade(results: SessionResult[], subjectId: string, grade: string): LevelProgressOption[] {
+  const unlockedLevels = getUnlockedLevelsForGrade(results, subjectId, grade);
+  const passedLevels = new Set(
+    results
+      .filter((result) => result.subjectId === subjectId && result.grade === grade && result.score >= SCORE_THRESHOLD)
+      .map((result) => result.level)
+  );
+
+  return unlockedLevels.map((level, index) => ({
+    level,
+    isPassed: passedLevels.has(level),
+    isNextUnlocked: index === unlockedLevels.length - 1 && !passedLevels.has(level),
+  }));
 }
 
 export function scoreQuestions(questions: Question[], answers: Array<string | null>) {
