@@ -61,6 +61,7 @@ export default function SessionScreen() {
   const [topicId, setTopicId] = useState<string | null>(typeof params.topicId === "string" ? params.topicId : null);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(Math.max(1, presetLevel));
+  const [levelTouched, setLevelTouched] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>(() =>
     params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)
       ? params.difficulty
@@ -138,6 +139,10 @@ export default function SessionScreen() {
     }
   }, [params.grade, params.difficulty, params.focusMode, params.topicId]);
 
+  useEffect(() => {
+    setLevelTouched(false);
+  }, [grade]);
+
   const levelProgress = useMemo(() => {
     if (!subject) {
       return [{ level: 1, isPassed: false, isNextUnlocked: true }];
@@ -167,6 +172,7 @@ export default function SessionScreen() {
 
   useEffect(() => {
     const availableLevels = levelProgress.map((entry) => entry.level);
+    const preferredLevel = availableLevels[availableLevels.length - 1];
     if (availableLevels.length === 0) {
       setSelectedLevel(1);
       return;
@@ -181,12 +187,17 @@ export default function SessionScreen() {
     }
 
     setSelectedLevel((current) => {
+      if (!levelTouched) {
+        return preferredLevel;
+      }
+
       if (availableLevels.includes(current)) {
         return current;
       }
-      return availableLevels[availableLevels.length - 1];
+
+      return preferredLevel;
     });
-  }, [levelProgress, params.autoStart, params.level]);
+  }, [levelProgress, levelTouched, params.autoStart, params.level]);
 
   useEffect(() => {
     if (phase !== "active") {
@@ -672,18 +683,18 @@ export default function SessionScreen() {
 
           <Text style={styles.label}>{t(language, "unlockedLevels")}</Text>
           <Text style={styles.hintText}>{t(language, "highestUnlockedSelected", { grade })}</Text>
-          <View style={styles.levelList}>
+          <View style={styles.choiceWrap}>
             {levelProgress.map((entry) => (
               <Pressable
                 key={`${grade}-level-${entry.level}`}
-                onPress={() => setSelectedLevel(entry.level)}
-                style={[styles.levelRow, selectedLevel === entry.level ? styles.levelRowActive : null]}
+                onPress={() => {
+                  setLevelTouched(true);
+                  setSelectedLevel(entry.level);
+                }}
+                style={[styles.levelChip, selectedLevel === entry.level ? styles.choiceChipActive : null]}
               >
                 <Text style={[styles.levelText, selectedLevel === entry.level ? styles.choiceTextActive : null]}>
                   {t(language, "levelLabel")} {entry.level}
-                </Text>
-                <Text style={[styles.levelBadge, selectedLevel === entry.level ? styles.levelBadgeActive : null]}>
-                  {entry.isPassed ? t(language, "passedLevelBadge") : t(language, "nextLevelBadge")}
                 </Text>
               </Pressable>
             ))}
@@ -945,35 +956,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
-  levelList: {
-    gap: 10,
-  },
-  levelRow: {
-    borderRadius: 18,
+  levelChip: {
+    borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "#F4F8FB",
-    borderWidth: 1,
-    borderColor: "#DCE6EE",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  levelRowActive: {
-    backgroundColor: palette.navy,
-    borderColor: palette.navy,
+    paddingVertical: 10,
+    backgroundColor: "#F2F5F8",
   },
   levelText: {
     color: palette.navy,
     fontWeight: "700",
-  },
-  levelBadge: {
-    color: "#0A7D58",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  levelBadgeActive: {
-    color: "#DDF7EA",
   },
   topicChip: {
     borderRadius: 16,

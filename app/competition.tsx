@@ -8,32 +8,36 @@ import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { calculateQuizTime, getLevelProgressForGrade } from "../lib/quiz";
 import { readAppState } from "../lib/storage";
-import { getSubjectById, getTopicById, grades } from "../lib/subjects";
+import { getLocalizedSubjects, getSubjectById, getTopicById, grades } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import {
   acceptCompetitionChallenge,
   createCompetitionChallenge,
   getCompetitionChallengeStatus,
+  getCompetitionLeaderboard,
   listCompetitionChallenges,
 } from "../services/ai";
 import type {
   CompetitionChallengeSummary,
+  CompetitionTopPerformer,
   Difficulty,
   QuestionFocusMode,
   SessionResult,
   UserProfile,
 } from "../types/app";
 
-type CompetitionScreenMode = "menu" | "create" | "accept" | "waiting";
+type CompetitionScreenMode = "create" | "accept" | "waiting";
 
 export default function CompetitionScreen() {
   const params = useLocalSearchParams<{ subjectId?: string; grade?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
-  const [screenMode, setScreenMode] = useState<CompetitionScreenMode>("menu");
+  const [screenMode, setScreenMode] = useState<CompetitionScreenMode>("accept");
   const [isBusy, setIsBusy] = useState(false);
   const [challenges, setChallenges] = useState<CompetitionChallengeSummary[]>([]);
+  const [topPerformers, setTopPerformers] = useState<CompetitionTopPerformer[]>([]);
   const [activeChallenge, setActiveChallenge] = useState<CompetitionChallengeSummary | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(params.subjectId ?? null);
   const [grade, setGrade] = useState(() =>
     typeof params.grade === "string" && grades.includes(params.grade) ? params.grade : grades[0]
   );
@@ -41,100 +45,102 @@ export default function CompetitionScreen() {
   const [topicId, setTopicId] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>(appVariant.defaultDifficulty);
   const [selectedLevel, setSelectedLevel] = useState(1);
+  const [levelTouched, setLevelTouched] = useState(false);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const notifiedAcceptedRef = useRef(false);
   const language = profile?.language ?? "en";
-  const subject = getSubjectById(params.subjectId, language);
+  const localizedSubjects = useMemo(() => getLocalizedSubjects(language), [language]);
+  const subject = getSubjectById(selectedSubjectId ?? undefined, language) ?? null;
+  const setupSubject = subject ?? localizedSubjects[0] ?? null;
 
   useEffect(() => {
     readAppState().then((state) => {
       const current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
       setProfile(current);
       setResults(current ? state.results[current.id] ?? [] : []);
-      if (!current && params.subjectId) {
-        router.replace({ pathname: "/select-profile", params: { subject: params.subjectId } });
-      }
     });
-  }, [params.subjectId]);
+  }, []);
 
   const levelProgress = useMemo(() => {
-    if (!subject) {
+    if (!setupSubject) {
       return [{ level: 1, isPassed: false, isNextUnlocked: true }];
     }
+    return getLevelProgressForGrade(results, setupSubject.id, grade);
+  }, [grade, results, setupSubject]);
 
-    return getLevelProgressForGrade(results, subject.id, grade);
-  }, [grade, results, subject]);
+  useEffect(() => {
+    setLevelTouched(false);
+  }, [grade, setupSubject?.id]);
 
   useEffect(() => {
     const availableLevels = levelProgress.map((entry) => entry.level);
+    const preferredLevel = availableLevels[availableLevels.length - 1];
     if (availableLevels.length === 0) {
       setSelectedLevel(1);
       return;
     }
 
     setSelectedLevel((current) => {
+      if (!levelTouched) {
+        return preferredLevel;
+      }
+
       if (availableLevels.includes(current)) {
         return current;
       }
-      return availableLevels[availableLevels.length - 1];
+      return preferredLevel;
     });
-  }, [levelProgress]);
+  }, [levelProgress, levelTouched]);
 
   useEffect(() => {
-    if (!subject) {
+    if (!setupSubject) {
       return;
     }
 
     if (focusMode === "topic") {
-      const hasCurrentTopic = topicId && subject.topics.some((topic) => topic.id === topicId);
+      const hasCurrentTopic = topicId && setupSubject.topics.some((topic) => topic.id === topicId);
       if (!hasCurrentTopic) {
-        setTopicId(subject.topics[0]?.id ?? null);
+        setTopicId(setupSubject.topics[0]?.id ?? null);
       }
       return;
     }
 
     setTopicId(null);
     setIsTopicDropdownOpen(false);
-  }, [focusMode, subject, topicId]);
+  }, [focusMode, setupSubject, topicId]);
 
-  const selectedTopic = useMemo(() => getTopicById(subject, topicId ?? undefined), [subject, topicId]);
-
-  const loadChallenges = async () => {
-    if (!profile) {
-      return;
-    }
-
-    const response = await listCompetitionChallenges({
-      playerId: profile.id,
-      subjectId: subject?.id,
-    });
-    setChallenges(response.challenges);
-  };
+  const selectedTopic = useMemo(() => getTopicById(setupSubject, topicId ?? undefined), [setupSubject, topicId]);
 
   useEffect(() => {
     if (screenMode !== "accept" || !profile) {
       return;
     }
 
-    let isCancelled = false;
+    let cancelled = false;
     const tick = async () => {
       try {
-        const response = await listCompetitionChallenges({
-          playerId: profile.id,
-          subjectId: subject?.id,
-        });
-        if (!isCancelled) {
-          setChallenges(response.challenges);
+        const [challengeResponse, leaderboardResponse] = await Promise.all([
+          listCompetitionChallenges({
+            playerId: profile.id,
+            subjectId: subject?.id,
+          }),
+          getCompetitionLeaderboard({
+            playerId: profile.id,
+          }),
+        ]);
+        if (!cancelled) {
+          setChallenges(challengeResponse.challenges);
+          setTopPerformers(leaderboardResponse.performers);
         }
       } catch {
-        // Keep the last fetched list.
+        // Keep the current list on screen.
       }
     };
 
     tick();
     const interval = setInterval(tick, 4000);
     return () => {
-      isCancelled = true;
+      cancelled = true;
       clearInterval(interval);
     };
   }, [profile, screenMode, subject?.id]);
@@ -160,7 +166,7 @@ export default function CompetitionScreen() {
           router.replace({
             pathname: "/session",
             params: {
-              subjectId: subject?.id,
+              subjectId: activeChallenge.subjectId,
               grade: activeChallenge.grade,
               level: String(activeChallenge.level),
               difficulty: activeChallenge.difficulty,
@@ -174,22 +180,22 @@ export default function CompetitionScreen() {
           });
         }
       } catch {
-        // Stay on the waiting screen.
+        // Stay on the waiting page.
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [activeChallenge, language, profile, screenMode, subject?.id]);
+  }, [activeChallenge, language, profile, screenMode]);
 
   const createChallenge = async () => {
-    if (!profile || !subject) {
+    if (!profile || !setupSubject) {
       return;
     }
 
     setIsBusy(true);
     try {
       const response = await createCompetitionChallenge({
-        subject,
+        subject: setupSubject,
         grade,
         level: selectedLevel,
         difficulty,
@@ -252,30 +258,55 @@ export default function CompetitionScreen() {
     );
   }
 
-  if (!subject) {
+  if (!profile) {
     return (
       <AppBackground>
         <View style={styles.card}>
-          <Text style={styles.title}>{t(language, appVariant.curriculumSingular === "course" ? "courseNotFound" : "subjectNotFound")}</Text>
+          <Text style={styles.title}>{t(language, "chooseLearner")}</Text>
+          <Text style={styles.text}>{t(language, "pickLearnerFirst")}</Text>
           <PrimaryButton label={t(language, "backHome")} onPress={() => router.replace("/")} />
         </View>
       </AppBackground>
     );
   }
 
+  const subjectSelector = (
+    <View style={styles.card}>
+      <Text style={styles.sectionTitle}>{appVariant.curriculumSingular === "course" ? "Course" : "Subject"}</Text>
+      <View style={styles.choiceWrap}>
+        {screenMode === "accept" ? (
+          <Pressable
+            key="all-subjects"
+            onPress={() => setSelectedSubjectId(null)}
+            style={[styles.choiceChip, !subject ? styles.choiceChipActive : null]}
+          >
+            <Text style={[styles.choiceText, !subject ? styles.choiceTextActive : null]}>{t(language, "competitionArena")}</Text>
+          </Pressable>
+        ) : null}
+        {localizedSubjects.map((entry) => (
+          <Pressable
+            key={entry.id}
+            onPress={() => setSelectedSubjectId(entry.id)}
+            style={[styles.choiceChip, subject?.id === entry.id ? styles.choiceChipActive : null]}
+          >
+            <Text style={[styles.choiceText, subject?.id === entry.id ? styles.choiceTextActive : null]}>{entry.name}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
   if (screenMode === "waiting" && activeChallenge) {
     return (
       <AppBackground>
         <View style={styles.heroCard}>
           <Text style={styles.eyebrow}>{t(language, "challengeCreated")}</Text>
-          <Text style={styles.title}>{subject.name}</Text>
+          <Text style={styles.title}>{activeChallenge.subjectName}</Text>
           <Text style={styles.heroText}>{t(language, "waitingForAcceptance")}</Text>
           <Text style={styles.heroText}>
             {activeChallenge.grade} | {t(language, "levelLabel")} {activeChallenge.level} | {getDifficultyLabel(language, activeChallenge.difficulty)}
           </Text>
-          {activeChallenge.topicLabel ? <Text style={styles.heroText}>{t(language, "topicFocusLabel", { topic: activeChallenge.topicLabel })}</Text> : null}
         </View>
-
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
       </AppBackground>
     );
@@ -286,9 +317,46 @@ export default function CompetitionScreen() {
       <AppBackground>
         <View style={styles.heroCard}>
           <Text style={styles.eyebrow}>{t(language, "challengeBoard")}</Text>
-          <Text style={styles.title}>{subject.name}</Text>
+          <Text style={styles.title}>{subject?.name ?? t(language, "competitionArena")}</Text>
           <Text style={styles.heroText}>{t(language, "challengeBoardHint")}</Text>
         </View>
+
+        <View style={styles.topActionRow}>
+          <PrimaryButton
+            label={t(language, "createChallenge")}
+            onPress={() => {
+              if (!selectedSubjectId && localizedSubjects[0]) {
+                setSelectedSubjectId(localizedSubjects[0].id);
+              }
+              setScreenMode("create");
+            }}
+            style={styles.topActionButton}
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t(language, "topPerformers")}</Text>
+          <Text style={styles.text}>{t(language, "topPerformersHint")}</Text>
+          {topPerformers.length > 0 ? (
+            <View style={styles.performerList}>
+              {topPerformers.map((performer, index) => (
+                <View key={performer.playerId} style={styles.performerRow}>
+                  <View style={styles.performerRankBadge}>
+                    <Text style={styles.performerRankText}>#{index + 1}</Text>
+                  </View>
+                  <View style={styles.performerMeta}>
+                    <Text style={styles.performerName}>{performer.playerName}</Text>
+                    <Text style={styles.performerWins}>{t(language, "dailyWins", { count: performer.wins })}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.text}>{t(language, "noTopPerformersYet")}</Text>
+          )}
+        </View>
+
+        {subjectSelector}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "openChallenges")}</Text>
@@ -298,10 +366,10 @@ export default function CompetitionScreen() {
                 <View key={challenge.challengeId} style={styles.challengeCard}>
                   <Text style={styles.challengeTitle}>{challenge.creatorName}</Text>
                   <Text style={styles.challengeMeta}>
-                    {challenge.grade} | {t(language, "levelLabel")} {challenge.level} | {getDifficultyLabel(language, challenge.difficulty)}
+                    {challenge.subjectName} | {challenge.grade} | {t(language, "levelLabel")} {challenge.level}
                   </Text>
                   <Text style={styles.challengeMeta}>
-                    {challenge.topicLabel ?? t(language, "generalMixedPractice")}
+                    {getDifficultyLabel(language, challenge.difficulty)} | {challenge.topicLabel ?? t(language, "generalMixedPractice")}
                   </Text>
                   <PrimaryButton label={t(language, "acceptChallenge")} variant="secondary" onPress={() => acceptChallenge(challenge)} />
                 </View>
@@ -313,31 +381,28 @@ export default function CompetitionScreen() {
         </View>
 
         <View style={styles.actionColumn}>
-          <PrimaryButton label={t(language, "createChallenge")} onPress={() => setScreenMode("create")} />
           <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
         </View>
       </AppBackground>
     );
   }
 
-  if (screenMode === "create") {
+  if (screenMode === "create" && setupSubject) {
     return (
       <AppBackground>
         <View style={styles.heroCard}>
           <Text style={styles.eyebrow}>{t(language, "createChallenge")}</Text>
-          <Text style={styles.title}>{subject.name}</Text>
+          <Text style={styles.title}>{setupSubject.name}</Text>
           <Text style={styles.heroText}>{t(language, "createChallengeHint")}</Text>
         </View>
+
+        {subjectSelector}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "grade")}</Text>
           <View style={styles.choiceWrap}>
             {grades.slice(0, 8).map((entry) => (
-              <Pressable
-                key={entry}
-                onPress={() => setGrade(entry)}
-                style={[styles.choiceChip, grade === entry ? styles.choiceChipActive : null]}
-              >
+              <Pressable key={entry} onPress={() => setGrade(entry)} style={[styles.choiceChip, grade === entry ? styles.choiceChipActive : null]}>
                 <Text style={[styles.choiceText, grade === entry ? styles.choiceTextActive : null]}>{entry}</Text>
               </Pressable>
             ))}
@@ -347,16 +412,10 @@ export default function CompetitionScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "questionFocus")}</Text>
           <View style={styles.choiceWrap}>
-            <Pressable
-              onPress={() => setFocusMode("general")}
-              style={[styles.choiceChip, focusMode === "general" ? styles.choiceChipActive : null]}
-            >
+            <Pressable onPress={() => setFocusMode("general")} style={[styles.choiceChip, focusMode === "general" ? styles.choiceChipActive : null]}>
               <Text style={[styles.choiceText, focusMode === "general" ? styles.choiceTextActive : null]}>{t(language, "general")}</Text>
             </Pressable>
-            <Pressable
-              onPress={() => setFocusMode("topic")}
-              style={[styles.choiceChip, focusMode === "topic" ? styles.choiceChipActive : null]}
-            >
+            <Pressable onPress={() => setFocusMode("topic")} style={[styles.choiceChip, focusMode === "topic" ? styles.choiceChipActive : null]}>
               <Text style={[styles.choiceText, focusMode === "topic" ? styles.choiceTextActive : null]}>
                 {appVariant.id === "uni" ? t(language, "specialized") : t(language, "topicFocus")}
               </Text>
@@ -366,24 +425,17 @@ export default function CompetitionScreen() {
           {focusMode === "topic" ? (
             <>
               <Text style={styles.sectionTitle}>{t(language, "chooseTopic")}</Text>
-              <Pressable
-                onPress={() => setIsTopicDropdownOpen((value) => !value)}
-                style={[styles.dropdownTrigger, isTopicDropdownOpen ? styles.dropdownTriggerActive : null]}
-              >
+              <Pressable onPress={() => setIsTopicDropdownOpen((value) => !value)} style={[styles.dropdownTrigger, isTopicDropdownOpen ? styles.dropdownTriggerActive : null]}>
                 <View style={styles.dropdownTextWrap}>
                   <Text style={styles.dropdownLabel}>{selectedTopic?.label ?? t(language, "selectTopic")}</Text>
                   <Text style={styles.dropdownHint}>{t(language, "topicPickerHint")}</Text>
                 </View>
-                <MaterialCommunityIcons
-                  name={isTopicDropdownOpen ? "chevron-up" : "chevron-down"}
-                  size={24}
-                  color={palette.navy}
-                />
+                <MaterialCommunityIcons name={isTopicDropdownOpen ? "chevron-up" : "chevron-down"} size={24} color={palette.navy} />
               </Pressable>
               {isTopicDropdownOpen ? (
                 <View style={styles.dropdownMenu}>
                   <ScrollView nestedScrollEnabled style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
-                    {subject.topics.map((topic) => (
+                    {setupSubject.topics.map((topic) => (
                       <Pressable
                         key={topic.id}
                         onPress={() => {
@@ -392,12 +444,8 @@ export default function CompetitionScreen() {
                         }}
                         style={[styles.dropdownItem, topic.id === topicId ? styles.dropdownItemActive : null]}
                       >
-                        <Text style={[styles.dropdownItemTitle, topic.id === topicId ? styles.dropdownItemTitleActive : null]}>
-                          {topic.label}
-                        </Text>
-                        <Text style={[styles.dropdownItemText, topic.id === topicId ? styles.dropdownItemTextActive : null]}>
-                          {topic.description}
-                        </Text>
+                        <Text style={[styles.dropdownItemTitle, topic.id === topicId ? styles.dropdownItemTitleActive : null]}>{topic.label}</Text>
+                        <Text style={[styles.dropdownItemText, topic.id === topicId ? styles.dropdownItemTextActive : null]}>{topic.description}</Text>
                       </Pressable>
                     ))}
                   </ScrollView>
@@ -409,18 +457,19 @@ export default function CompetitionScreen() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "unlockedLevels")}</Text>
-          <View style={styles.levelList}>
+          <Text style={styles.text}>{t(language, "highestUnlockedSelected", { grade })}</Text>
+          <View style={styles.choiceWrap}>
             {levelProgress.map((entry) => (
               <Pressable
                 key={`${grade}-challenge-level-${entry.level}`}
-                onPress={() => setSelectedLevel(entry.level)}
-                style={[styles.levelRow, selectedLevel === entry.level ? styles.levelRowActive : null]}
+                onPress={() => {
+                  setLevelTouched(true);
+                  setSelectedLevel(entry.level);
+                }}
+                style={[styles.levelChip, selectedLevel === entry.level ? styles.choiceChipActive : null]}
               >
                 <Text style={[styles.choiceText, selectedLevel === entry.level ? styles.choiceTextActive : null]}>
                   {t(language, "levelLabel")} {entry.level}
-                </Text>
-                <Text style={[styles.levelBadge, selectedLevel === entry.level ? styles.levelBadgeActive : null]}>
-                  {entry.isPassed ? t(language, "passedLevelBadge") : t(language, "nextLevelBadge")}
                 </Text>
               </Pressable>
             ))}
@@ -431,56 +480,31 @@ export default function CompetitionScreen() {
           <Text style={styles.sectionTitle}>{t(language, "difficulty")}</Text>
           <View style={styles.choiceWrap}>
             {(["Beginner", "Intermediate", "Advanced", "Expert"] as Difficulty[]).map((entry) => (
-              <Pressable
-                key={entry}
-                onPress={() => setDifficulty(entry)}
-                style={[styles.choiceChip, difficulty === entry ? styles.choiceChipActive : null]}
-              >
-                <Text style={[styles.choiceText, difficulty === entry ? styles.choiceTextActive : null]}>
-                  {getDifficultyLabel(language, entry)}
-                </Text>
+              <Pressable key={entry} onPress={() => setDifficulty(entry)} style={[styles.choiceChip, difficulty === entry ? styles.choiceChipActive : null]}>
+                <Text style={[styles.choiceText, difficulty === entry ? styles.choiceTextActive : null]}>{getDifficultyLabel(language, entry)}</Text>
               </Pressable>
             ))}
           </View>
         </View>
 
         <View style={styles.actionColumn}>
-          <PrimaryButton label={t(language, "createChallenge")} onPress={createChallenge} />
-          <PrimaryButton label={t(language, "acceptChallenge")} variant="secondary" onPress={() => setScreenMode("accept")} />
+          <PrimaryButton label={t(language, "createChallenge")} onPress={createChallenge} disabled={isBusy} />
+          <PrimaryButton
+            label={t(language, "acceptChallenge")}
+            variant="secondary"
+            onPress={() => {
+              setSelectedSubjectId(null);
+              setScreenMode("accept");
+            }}
+            disabled={isBusy}
+          />
           <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
         </View>
       </AppBackground>
     );
   }
 
-  return (
-    <AppBackground>
-      <View style={styles.heroCard}>
-        <Text style={styles.eyebrow}>{t(language, "competitionArena")}</Text>
-        <Text style={styles.title}>{subject.name}</Text>
-        <Text style={styles.heroText}>{t(language, "challengeBoardHint")}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t(language, "liveScores")}</Text>
-        <Text style={styles.text}>{t(language, "competitionArenaHint")}</Text>
-      </View>
-
-      <View style={styles.actionColumn}>
-        <PrimaryButton label={t(language, "createChallenge")} onPress={() => setScreenMode("create")} disabled={isBusy} />
-        <PrimaryButton
-          label={t(language, "acceptChallenge")}
-          variant="secondary"
-          onPress={async () => {
-            setScreenMode("accept");
-            await loadChallenges();
-          }}
-          disabled={isBusy}
-        />
-        <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
-      </View>
-    </AppBackground>
-  );
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -515,6 +539,13 @@ const styles = StyleSheet.create({
     padding: 18,
     ...shadows.card,
   },
+  topActionRow: {
+    marginTop: 18,
+    alignItems: "flex-start",
+  },
+  topActionButton: {
+    minWidth: 190,
+  },
   sectionTitle: {
     color: palette.ink,
     fontSize: 20,
@@ -545,6 +576,12 @@ const styles = StyleSheet.create({
   },
   choiceTextActive: {
     color: palette.white,
+  },
+  levelChip: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#F2F5F8",
   },
   dropdownTrigger: {
     borderRadius: 18,
@@ -612,32 +649,6 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     color: palette.navy,
   },
-  levelList: {
-    gap: 10,
-  },
-  levelRow: {
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "#F4F8FB",
-    borderWidth: 1,
-    borderColor: "#DCE6EE",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  levelRowActive: {
-    backgroundColor: palette.navy,
-    borderColor: palette.navy,
-  },
-  levelBadge: {
-    color: "#0A7D58",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  levelBadgeActive: {
-    color: "#DDF7EA",
-  },
   challengeList: {
     gap: 12,
   },
@@ -653,6 +664,45 @@ const styles = StyleSheet.create({
     color: palette.ink,
     fontSize: 17,
     fontWeight: "800",
+  },
+  performerList: {
+    gap: 10,
+    marginTop: 14,
+  },
+  performerRow: {
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#F7FBFD",
+    borderWidth: 1,
+    borderColor: "#DFE8F0",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  performerRankBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.navy,
+  },
+  performerRankText: {
+    color: palette.white,
+    fontWeight: "900",
+  },
+  performerMeta: {
+    flex: 1,
+  },
+  performerName: {
+    color: palette.ink,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  performerWins: {
+    color: palette.slate,
+    marginTop: 4,
+    lineHeight: 20,
   },
   challengeMeta: {
     color: palette.slate,

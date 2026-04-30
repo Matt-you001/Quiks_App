@@ -297,3 +297,17 @@ export interface CompetitionProgressUpdateResponse {
   ok: true;
   competition: CompetitionQuestionPayload;
 }
+
+export interface CompetitionTopPerformer {
+  playerId: string;
+  playerName: string;
+  wins: number;
+}
+
+export interface CompetitionLeaderboardRequest {
+  playerId: string;
+}
+
+export interface CompetitionLeaderboardResponse {
+  performers: CompetitionTopPerformer[];
+}

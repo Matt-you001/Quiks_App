@@ -15,6 +15,8 @@ import type {
   CompetitionChallengeCreateResponse,
   CompetitionChallengeListRequest,
   CompetitionChallengeListResponse,
+  CompetitionLeaderboardRequest,
+  CompetitionLeaderboardResponse,
   CompetitionChallengeStatusRequest,
   CompetitionChallengeStatusResponse,
   CompetitionProgressUpdateRequest,
@@ -395,9 +397,8 @@ export async function generateCoachPlan(request: CoachPlanRequest): Promise<stri
   }
 
   return [
-    `Review ${(request.topicLabel ?? request.subject.name).toLowerCase()} foundations for 10 minutes before the next session.`,
-    `Redo level ${request.level} in training mode and read each explanation out loud.`,
-    `Ask the AI coach for one more practice set focused on ${request.grade} weak spots.`,
+    `Review ${(request.topicLabel ?? request.subject.name).toLowerCase()} for 10 minutes.`,
+    `Redo level ${request.level} in training mode.`,
   ];
 }
 
@@ -433,6 +434,12 @@ export async function acceptCompetitionChallenge(
   request: CompetitionChallengeAcceptRequest
 ): Promise<CompetitionChallengeAcceptResponse> {
   return postJson("/competition/challenge/accept", withVariantMeta(request));
+}
+
+export async function getCompetitionLeaderboard(
+  request: CompetitionLeaderboardRequest
+): Promise<CompetitionLeaderboardResponse> {
+  return postJson("/competition/leaderboard", withVariantMeta(request));
 }
 
 export async function getCompetitionChallengeStatus(

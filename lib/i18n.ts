@@ -173,7 +173,11 @@ type TranslationKey =
   | "competitionChat"
   | "quickMessages"
   | "quickEmojis"
-  | "noMessagesYet";
+  | "noMessagesYet"
+  | "topPerformers"
+  | "topPerformersHint"
+  | "dailyWins"
+  | "noTopPerformersYet";
 
 type TranslationMap = Record<TranslationKey, string>;
 
@@ -368,6 +372,10 @@ const english: TranslationMap = {
   quickMessages: "Quick messages",
   quickEmojis: "Quick emojis",
   noMessagesYet: "No messages yet. Use a quick message to break the ice.",
+  topPerformers: "Top Performers",
+  topPerformersHint: "Today's top 5 competitors by wins.",
+  dailyWins: "{count} win(s) today",
+  noTopPerformersYet: "No competition wins recorded yet today.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = {

@@ -12,6 +12,16 @@ const competitionMatches = new Map();
 const competitionMatchByPlayer = new Map();
 const competitionChallenges = new Map();
 
+function isSameUtcDay(leftTimestamp, rightTimestamp) {
+  const left = new Date(leftTimestamp);
+  const right = new Date(rightTimestamp);
+  return (
+    left.getUTCFullYear() === right.getUTCFullYear() &&
+    left.getUTCMonth() === right.getUTCMonth() &&
+    left.getUTCDate() === right.getUTCDate()
+  );
+}
+
 function describeDifficultyRigour(body) {
   if (body.difficulty === "Beginner") {
     return [
@@ -240,8 +250,8 @@ function buildPlanSchema() {
     properties: {
       plan: {
         type: "array",
-        minItems: 3,
-        maxItems: 5,
+        minItems: 2,
+        maxItems: 3,
         items: { type: "string" },
       },
     },
@@ -376,6 +386,50 @@ function getCompetitionOutcome(match, playerId) {
     playerScore: own.score,
     opponentScore: rival.score,
   };
+}
+
+function buildCompetitionLeaderboard() {
+  const today = Date.now();
+  const winMap = new Map();
+
+  for (const match of competitionMatches.values()) {
+    if (!isSameUtcDay(match.createdAt ?? today, today)) {
+      continue;
+    }
+
+    ensureCompetitionResolved(match);
+    if (Object.keys(match.submissions ?? {}).length < 2) {
+      continue;
+    }
+
+    for (const player of match.players) {
+      const outcome = getCompetitionOutcome(match, player.playerId);
+      if (outcome.outcome !== "won") {
+        continue;
+      }
+
+      const existing = winMap.get(player.playerId);
+      if (existing) {
+        existing.wins += 1;
+        continue;
+      }
+
+      winMap.set(player.playerId, {
+        playerId: player.playerId,
+        playerName: player.name,
+        wins: 1,
+      });
+    }
+  }
+
+  return Array.from(winMap.values())
+    .sort((left, right) => {
+      if (right.wins !== left.wins) {
+        return right.wins - left.wins;
+      }
+      return left.playerName.localeCompare(right.playerName);
+    })
+    .slice(0, 5);
 }
 
 async function generateQuestionSet(body) {
@@ -648,8 +702,8 @@ async function handlePlan(body, response) {
     schema: buildPlanSchema(),
     instructions: [
       "Create a short practical study plan for a learner after a quiz session.",
-      "Return 3 to 5 action steps.",
-      "Each action should be concrete, realistic, and written in simple language.",
+      "Return only 2 to 3 action steps.",
+      "Keep each action concise, concrete, and under about 12 words.",
     ].join(" "),
     input: [
       {
@@ -1023,6 +1077,12 @@ async function handleCompetitionChat(body, response) {
   sendJson(response, 200, { ok: true, chats: match.chats });
 }
 
+async function handleCompetitionLeaderboard(_body, response) {
+  sendJson(response, 200, {
+    performers: buildCompetitionLeaderboard(),
+  });
+}
+
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
@@ -1116,6 +1176,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/competition/chat") {
       await handleCompetitionChat(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/leaderboard") {
+      await handleCompetitionLeaderboard(body, response);
       return;
     }
 

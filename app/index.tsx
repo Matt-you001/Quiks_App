@@ -254,6 +254,21 @@ export default function HomeScreen() {
         )}
       </View>
 
+      {appVariant.id !== "children" ? (
+        <View style={styles.homeCompetitionCard}>
+          <Text style={styles.homeCompetitionTitle}>{t(language, "competitionArena")}</Text>
+          <Text style={styles.homeCompetitionText}>{t(language, "competitionArenaHint")}</Text>
+          <PrimaryButton
+            label={t(language, "enterCompetition")}
+            onPress={() =>
+              activeProfile
+                ? router.push("/competition" as never)
+                : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
+            }
+          />
+        </View>
+      ) : null}
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{appVariant.curriculumPlural}</Text>
         <Text style={styles.sectionHint}>
@@ -501,6 +516,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
+  },
+  homeCompetitionCard: {
+    marginTop: 18,
+    borderRadius: 24,
+    backgroundColor: palette.white,
+    padding: 18,
+    ...shadows.card,
+  },
+  homeCompetitionTitle: {
+    color: palette.ink,
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  homeCompetitionText: {
+    color: palette.slate,
+    marginTop: 8,
+    marginBottom: 14,
+    lineHeight: 22,
   },
   sectionHeader: {
     marginTop: 26,

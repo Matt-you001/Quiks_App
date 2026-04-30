@@ -122,23 +122,6 @@ export default function SubjectDetailScreen() {
           }
         />
       </View>
-
-      {appVariant.id !== "children" ? (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t(language, "competitionArena")}</Text>
-          <Text style={styles.coachText}>{t(language, "competitionArenaHint")}</Text>
-          <PrimaryButton
-            label={t(language, "enterCompetition")}
-            variant="secondary"
-            onPress={() =>
-              router.push({
-                pathname: "/competition" as never,
-                params: { subjectId: subject.id, grade: selectedGrade },
-              })
-            }
-          />
-        </View>
-      ) : null}
     </AppBackground>
   );
 }
