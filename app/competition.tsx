@@ -122,7 +122,6 @@ export default function CompetitionScreen() {
         const [challengeResponse, leaderboardResponse] = await Promise.all([
           listCompetitionChallenges({
             playerId: profile.id,
-            subjectId: subject?.id,
           }),
           getCompetitionLeaderboard({
             playerId: profile.id,
@@ -317,7 +316,7 @@ export default function CompetitionScreen() {
       <AppBackground>
         <View style={styles.heroCard}>
           <Text style={styles.eyebrow}>{t(language, "challengeBoard")}</Text>
-          <Text style={styles.title}>{subject?.name ?? t(language, "competitionArena")}</Text>
+          <Text style={styles.title}>{t(language, "competitionArena")}</Text>
           <Text style={styles.heroText}>{t(language, "challengeBoardHint")}</Text>
         </View>
 
@@ -355,8 +354,6 @@ export default function CompetitionScreen() {
             <Text style={styles.text}>{t(language, "noTopPerformersYet")}</Text>
           )}
         </View>
-
-        {subjectSelector}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "openChallenges")}</Text>
