@@ -267,8 +267,13 @@ export default function SessionScreen() {
             ...pendingCompetitionResult,
             competitionOutcome: response.outcome ?? pendingCompetitionResult.competitionOutcome ?? "pending",
             competitionOpponentName: response.opponentName ?? pendingCompetitionResult.competitionOpponentName,
+            competitionOpponentId: response.opponentId ?? pendingCompetitionResult.competitionOpponentId,
             competitionPlayerScore: response.playerScore ?? pendingCompetitionResult.competitionPlayerScore,
             competitionOpponentScore: response.opponentScore ?? pendingCompetitionResult.competitionOpponentScore,
+            competitionPlayerTimeSeconds:
+              response.playerTimeTakenSeconds ?? pendingCompetitionResult.competitionPlayerTimeSeconds,
+            competitionOpponentTimeSeconds:
+              response.opponentTimeTakenSeconds ?? pendingCompetitionResult.competitionOpponentTimeSeconds,
           };
           await appendResult(profile.id, finalResult);
           setPendingCompetitionResult(null);
@@ -538,9 +543,12 @@ export default function SessionScreen() {
 
         result.competitionId = params.competitionId;
         result.competitionOpponentName = competitionResult.opponentName || competitionOpponentName;
+        result.competitionOpponentId = competitionResult.opponentId;
         result.competitionOutcome = competitionResult.outcome;
         result.competitionPlayerScore = competitionResult.playerScore;
         result.competitionOpponentScore = competitionResult.opponentScore;
+        result.competitionPlayerTimeSeconds = competitionResult.playerTimeTakenSeconds;
+        result.competitionOpponentTimeSeconds = competitionResult.opponentTimeTakenSeconds;
 
         if (competitionResult.status === "submitted" || competitionResult.outcome === "pending") {
           setPendingCompetitionResult(result);
@@ -793,52 +801,6 @@ export default function SessionScreen() {
         </View>
 
         {isCompetition ? (
-          <View style={styles.chatCard}>
-            <Text style={styles.chatTitle}>{t(language, "competitionChat")}</Text>
-            {competitionChats.length > 0 ? (
-              <View style={styles.chatFeed}>
-                {competitionChats.slice(-3).map((chat) => (
-                  <View
-                    key={chat.id}
-                    style={[
-                      styles.chatBubble,
-                      chat.senderId === profile?.id ? styles.chatBubbleOwn : styles.chatBubbleOpponent,
-                    ]}
-                  >
-                    <Text style={styles.chatSender}>{chat.senderId === profile?.id ? "You" : chat.senderName}</Text>
-                    <Text style={styles.chatMessage}>{chat.message}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.chatEmpty}>{t(language, "noMessagesYet")}</Text>
-            )}
-
-            <Text style={styles.chatSectionLabel}>{t(language, "quickMessages")}</Text>
-            <View style={styles.chatChipWrap}>
-              {competitionQuickMessages.map((message) => (
-                <Pressable
-                  key={message}
-                  onPress={() => handleCompetitionQuickMessage(message)}
-                  style={styles.chatChip}
-                >
-                  <Text style={styles.chatChipText}>{message}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.chatSectionLabel}>{t(language, "quickEmojis")}</Text>
-            <View style={styles.chatChipWrap}>
-              {competitionQuickEmojis.map((emoji) => (
-                <Pressable key={emoji} onPress={() => handleCompetitionQuickMessage(emoji)} style={styles.emojiChip}>
-                  <Text style={styles.emojiChipText}>{emoji}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {isCompetition ? (
           <View style={styles.liveScoreCard}>
             <Text style={styles.chatTitle}>{t(language, "liveScores")}</Text>
             <Text style={styles.liveScoreLine}>
@@ -887,6 +849,52 @@ export default function SessionScreen() {
             </Text>
             <Text style={styles.explanationText}>{currentQuestion?.explanation}</Text>
             {mode === "training" ? <PrimaryButton label={t(language, "nextQuestion")} onPress={() => advance()} /> : null}
+          </View>
+        ) : null}
+
+        {isCompetition ? (
+          <View style={styles.chatCard}>
+            <Text style={styles.chatTitle}>{t(language, "competitionChat")}</Text>
+            {competitionChats.length > 0 ? (
+              <View style={styles.chatFeed}>
+                {competitionChats.slice(-3).map((chat) => (
+                  <View
+                    key={chat.id}
+                    style={[
+                      styles.chatBubble,
+                      chat.senderId === profile?.id ? styles.chatBubbleOwn : styles.chatBubbleOpponent,
+                    ]}
+                  >
+                    <Text style={styles.chatSender}>{chat.senderId === profile?.id ? "You" : chat.senderName}</Text>
+                    <Text style={styles.chatMessage}>{chat.message}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.chatEmpty}>{t(language, "noMessagesYet")}</Text>
+            )}
+
+            <Text style={styles.chatSectionLabel}>{t(language, "quickMessages")}</Text>
+            <View style={styles.chatChipWrap}>
+              {competitionQuickMessages.map((message) => (
+                <Pressable
+                  key={message}
+                  onPress={() => handleCompetitionQuickMessage(message)}
+                  style={styles.chatChip}
+                >
+                  <Text style={styles.chatChipText}>{message}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.chatSectionLabel}>{t(language, "quickEmojis")}</Text>
+            <View style={styles.chatChipWrap}>
+              {competitionQuickEmojis.map((emoji) => (
+                <Pressable key={emoji} onPress={() => handleCompetitionQuickMessage(emoji)} style={styles.emojiChip}>
+                  <Text style={styles.emojiChipText}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         ) : null}
       </View>

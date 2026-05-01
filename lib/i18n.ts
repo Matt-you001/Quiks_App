@@ -177,7 +177,13 @@ type TranslationKey =
   | "topPerformers"
   | "topPerformersHint"
   | "dailyWins"
-  | "noTopPerformersYet";
+  | "noTopPerformersYet"
+  | "requestRematch"
+  | "acceptRematch"
+  | "rematchRequested"
+  | "rematchIncoming"
+  | "waitingRematchAcceptance"
+  | "rematchStarting";
 
 type TranslationMap = Record<TranslationKey, string>;
 
@@ -376,6 +382,12 @@ const english: TranslationMap = {
   topPerformersHint: "Today's top 5 competitors by wins.",
   dailyWins: "{count} win(s) today",
   noTopPerformersYet: "No competition wins recorded yet today.",
+  requestRematch: "Request Rematch",
+  acceptRematch: "Accept Rematch",
+  rematchRequested: "Rematch requested",
+  rematchIncoming: "Your opponent wants another challenge on the next level.",
+  waitingRematchAcceptance: "Waiting for your opponent to accept the rematch.",
+  rematchStarting: "Rematch accepted. The next round is starting.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = {

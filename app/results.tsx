@@ -1,14 +1,20 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { getSubjectPassStreak, shouldOfferBreather } from "../lib/breathers";
 import { t } from "../lib/i18n";
+import { calculateQuizTime } from "../lib/quiz";
 import { readAppState } from "../lib/storage";
-import { SCORE_THRESHOLD } from "../lib/subjects";
+import { getSubjectById, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
-import type { AppLanguage, Difficulty, SessionResult } from "../types/app";
+import {
+  acceptCompetitionRematch,
+  getCompetitionRematchStatus,
+  requestCompetitionRematch,
+} from "../services/ai";
+import type { AppLanguage, CompetitionRematchResponse, Difficulty, SessionResult, UserProfile } from "../types/app";
 
 const allowedDifficulties: Difficulty[] = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
@@ -17,6 +23,11 @@ export default function ResultsScreen() {
   const [showBreather, setShowBreather] = useState(false);
   const [passStreak, setPassStreak] = useState(0);
   const [language, setLanguage] = useState<AppLanguage>("en");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [rematchState, setRematchState] = useState<CompetitionRematchResponse | null>(null);
+  const [isRequestingRematch, setIsRequestingRematch] = useState(false);
+  const [isAcceptingRematch, setIsAcceptingRematch] = useState(false);
+  const rematchNavigatedRef = useRef(false);
 
   const result = useMemo(() => {
     if (!params.result || Array.isArray(params.result)) {
@@ -50,6 +61,7 @@ export default function ResultsScreen() {
       const streak = getSubjectPassStreak(profileResults, result.subjectId);
 
       setLanguage(profile?.language ?? "en");
+      setProfile(profile);
       setPassStreak(streak);
       setShowBreather(shouldOfferBreather(profileResults, result));
     });
@@ -58,6 +70,83 @@ export default function ResultsScreen() {
       cancelled = true;
     };
   }, [result]);
+
+  const passed = result ? result.score >= SCORE_THRESHOLD : false;
+  const rematchSubject = result ? getSubjectById(result.subjectId, language) : null;
+  const nextDifficulty =
+    result && params.nextDifficulty && !Array.isArray(params.nextDifficulty) && allowedDifficulties.includes(params.nextDifficulty as Difficulty)
+      ? (params.nextDifficulty as Difficulty)
+      : result?.difficulty ?? "Beginner";
+
+  const heading = result ? (passed ? (result.score === 100 ? t(language, "excellentWork") : t(language, "greatJob")) : t(language, "keepTrying")) : t(language, "noResultFound");
+  const summary = result && passed
+    ? t(language, "passedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName })
+    : result
+      ? t(language, "notPassedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName })
+      : "";
+  const isCompetition = Boolean(result?.competitionId);
+  const canUseRematch = Boolean(
+    result?.competitionId &&
+      profile &&
+      rematchSubject &&
+      result?.competitionOutcome &&
+      result.competitionOutcome !== "pending"
+  );
+  const competitionOutcomeText =
+    result?.competitionOutcome === "won"
+      ? t(language, "wonCompetition")
+      : result?.competitionOutcome === "lost"
+        ? t(language, "lostCompetition")
+        : result?.competitionOutcome === "draw"
+          ? t(language, "drewCompetition")
+          : t(language, "waitingOpponentResult");
+
+  useEffect(() => {
+    if (!canUseRematch || !result?.competitionId || !profile) {
+      return;
+    }
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const response = await getCompetitionRematchStatus({
+          sourceCompetitionId: result.competitionId!,
+          playerId: profile.id,
+        });
+        if (cancelled) {
+          return;
+        }
+        setRematchState(response);
+        if (response.status === "accepted" && response.competition && !rematchNavigatedRef.current) {
+          rematchNavigatedRef.current = true;
+          router.replace({
+            pathname: "/session",
+            params: {
+              subjectId: result.subjectId,
+              grade: result.grade,
+              level: String(response.nextLevel ?? result.level + 1),
+              difficulty: result.difficulty,
+              focusMode: result.focusMode ?? "general",
+              topicId: result.topicId,
+              competitionId: response.competition.competitionId,
+              competitionOpponentName: response.competition.opponentName,
+              autoStart: "1",
+              mode: "quiz",
+            },
+          });
+        }
+      } catch {
+        // Keep the results screen stable if rematch status fails.
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [canUseRematch, profile, result]);
 
   if (!result) {
     return (
@@ -69,26 +158,6 @@ export default function ResultsScreen() {
       </AppBackground>
     );
   }
-
-  const passed = result.score >= SCORE_THRESHOLD;
-  const nextDifficulty =
-    params.nextDifficulty && !Array.isArray(params.nextDifficulty) && allowedDifficulties.includes(params.nextDifficulty as Difficulty)
-      ? (params.nextDifficulty as Difficulty)
-      : result.difficulty;
-
-  const heading = passed ? (result.score === 100 ? t(language, "excellentWork") : t(language, "greatJob")) : t(language, "keepTrying");
-  const summary = passed
-    ? t(language, "passedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName })
-    : t(language, "notPassedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName });
-  const isCompetition = Boolean(result.competitionId);
-  const competitionOutcomeText =
-    result.competitionOutcome === "won"
-      ? t(language, "wonCompetition")
-      : result.competitionOutcome === "lost"
-        ? t(language, "lostCompetition")
-        : result.competitionOutcome === "draw"
-          ? t(language, "drewCompetition")
-          : t(language, "waitingOpponentResult");
 
   const backHome = () => {
     router.replace("/");
@@ -145,6 +214,68 @@ export default function ResultsScreen() {
     });
   };
 
+  const requestRematch = async () => {
+    if (!canUseRematch || !profile || !result.competitionId || !rematchSubject) {
+      return;
+    }
+
+    setIsRequestingRematch(true);
+    try {
+      const response = await requestCompetitionRematch({
+        sourceCompetitionId: result.competitionId,
+        playerId: profile.id,
+        subject: rematchSubject,
+        grade: result.grade,
+        level: result.level + 1,
+        difficulty: result.difficulty,
+        focusMode: result.focusMode,
+        topicId: result.topicId,
+        topicLabel: result.topicLabel,
+        durationSeconds: calculateQuizTime(result.level + 1),
+        profile,
+      });
+      setRematchState(response);
+    } finally {
+      setIsRequestingRematch(false);
+    }
+  };
+
+  const acceptRematch = async () => {
+    if (!canUseRematch || !profile || !result.competitionId) {
+      return;
+    }
+
+    setIsAcceptingRematch(true);
+    try {
+      const response = await acceptCompetitionRematch({
+        sourceCompetitionId: result.competitionId,
+        playerId: profile.id,
+        profile,
+      });
+      setRematchState(response);
+      if (response.competition) {
+        rematchNavigatedRef.current = true;
+        router.replace({
+          pathname: "/session",
+          params: {
+            subjectId: result.subjectId,
+            grade: result.grade,
+            level: String(response.nextLevel ?? result.level + 1),
+            difficulty: result.difficulty,
+            focusMode: result.focusMode ?? "general",
+            topicId: result.topicId,
+            competitionId: response.competition.competitionId,
+            competitionOpponentName: response.competition.opponentName,
+            autoStart: "1",
+            mode: "quiz",
+          },
+        });
+      }
+    } finally {
+      setIsAcceptingRematch(false);
+    }
+  };
+
   return (
     <AppBackground>
       <View style={styles.heroCard}>
@@ -178,11 +309,31 @@ export default function ResultsScreen() {
             {t(language, "opponent")}: {result.competitionOpponentName ?? "-"}
           </Text>
           <Text style={styles.summaryLine}>{competitionOutcomeText}</Text>
-          <Text style={styles.summaryLine}>You: {result.competitionPlayerScore ?? result.score}%</Text>
+          <Text style={styles.summaryLine}>
+            You: {result.competitionPlayerScore ?? result.score}% in {result.competitionPlayerTimeSeconds ?? result.timeTakenSeconds}s
+          </Text>
           {typeof result.competitionOpponentScore === "number" ? (
             <Text style={styles.summaryLine}>
-              {result.competitionOpponentName ?? t(language, "opponent")}: {result.competitionOpponentScore}%
+              {result.competitionOpponentName ?? t(language, "opponent")}: {result.competitionOpponentScore}% in{" "}
+              {result.competitionOpponentTimeSeconds ?? 0}s
             </Text>
+          ) : null}
+          {canUseRematch ? (
+            <View style={styles.rematchActions}>
+              {rematchState?.status === "incoming" ? (
+                <>
+                  <Text style={styles.rematchHint}>{t(language, "rematchIncoming")}</Text>
+                  <PrimaryButton label={t(language, "acceptRematch")} onPress={acceptRematch} loading={isAcceptingRematch} />
+                </>
+              ) : rematchState?.status === "requested" ? (
+                <>
+                  <Text style={styles.rematchHint}>{t(language, "waitingRematchAcceptance")}</Text>
+                  <PrimaryButton label={t(language, "rematchRequested")} variant="secondary" onPress={() => {}} disabled />
+                </>
+              ) : (
+                <PrimaryButton label={t(language, "requestRematch")} variant="secondary" onPress={requestRematch} loading={isRequestingRematch} />
+              )}
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -306,6 +457,14 @@ const styles = StyleSheet.create({
   summaryLine: {
     color: palette.slate,
     lineHeight: 24,
+  },
+  rematchActions: {
+    marginTop: 14,
+    gap: 10,
+  },
+  rematchHint: {
+    color: palette.slate,
+    lineHeight: 22,
   },
   planLine: {
     color: palette.slate,

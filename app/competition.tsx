@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAudioPlayer } from "expo-audio";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -33,7 +34,8 @@ export default function CompetitionScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [screenMode, setScreenMode] = useState<CompetitionScreenMode>("accept");
-  const [isBusy, setIsBusy] = useState(false);
+  const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
+  const [acceptingChallengeId, setAcceptingChallengeId] = useState<string | null>(null);
   const [challenges, setChallenges] = useState<CompetitionChallengeSummary[]>([]);
   const [topPerformers, setTopPerformers] = useState<CompetitionTopPerformer[]>([]);
   const [activeChallenge, setActiveChallenge] = useState<CompetitionChallengeSummary | null>(null);
@@ -48,6 +50,7 @@ export default function CompetitionScreen() {
   const [levelTouched, setLevelTouched] = useState(false);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const notifiedAcceptedRef = useRef(false);
+  const acceptedSoundPlayer = useAudioPlayer(require("../assets/audio/challenge-accepted.wav"));
   const language = profile?.language ?? "en";
   const localizedSubjects = useMemo(() => getLocalizedSubjects(language), [language]);
   const subject = getSubjectById(selectedSubjectId ?? undefined, language) ?? null;
@@ -159,6 +162,12 @@ export default function CompetitionScreen() {
         if (response.status === "accepted" && response.competition) {
           if (!notifiedAcceptedRef.current) {
             notifiedAcceptedRef.current = true;
+            try {
+              acceptedSoundPlayer.seekTo(0);
+              acceptedSoundPlayer.play();
+            } catch {
+              // Keep the acceptance notification visible even if audio fails.
+            }
             Alert.alert(t(language, "challengeAccepted"));
           }
 
@@ -191,7 +200,7 @@ export default function CompetitionScreen() {
       return;
     }
 
-    setIsBusy(true);
+    setIsCreatingChallenge(true);
     try {
       const response = await createCompetitionChallenge({
         subject: setupSubject,
@@ -209,7 +218,7 @@ export default function CompetitionScreen() {
       setScreenMode("waiting");
       Alert.alert(t(language, "challengeCreated"), t(language, "challengeCreatedHint"));
     } finally {
-      setIsBusy(false);
+      setIsCreatingChallenge(false);
     }
   };
 
@@ -218,7 +227,7 @@ export default function CompetitionScreen() {
       return;
     }
 
-    setIsBusy(true);
+    setAcceptingChallengeId(challenge.challengeId);
     try {
       const response = await acceptCompetitionChallenge({
         challengeId: challenge.challengeId,
@@ -241,7 +250,7 @@ export default function CompetitionScreen() {
         },
       });
     } finally {
-      setIsBusy(false);
+      setAcceptingChallengeId(null);
     }
   };
 
@@ -368,7 +377,12 @@ export default function CompetitionScreen() {
                   <Text style={styles.challengeMeta}>
                     {getDifficultyLabel(language, challenge.difficulty)} | {challenge.topicLabel ?? t(language, "generalMixedPractice")}
                   </Text>
-                  <PrimaryButton label={t(language, "acceptChallenge")} variant="secondary" onPress={() => acceptChallenge(challenge)} />
+                  <PrimaryButton
+                    label={t(language, "acceptChallenge")}
+                    variant="secondary"
+                    onPress={() => acceptChallenge(challenge)}
+                    loading={acceptingChallengeId === challenge.challengeId}
+                  />
                 </View>
               ))}
             </View>
@@ -485,7 +499,7 @@ export default function CompetitionScreen() {
         </View>
 
         <View style={styles.actionColumn}>
-          <PrimaryButton label={t(language, "createChallenge")} onPress={createChallenge} disabled={isBusy} />
+          <PrimaryButton label={t(language, "createChallenge")} onPress={createChallenge} loading={isCreatingChallenge} />
           <PrimaryButton
             label={t(language, "acceptChallenge")}
             variant="secondary"
@@ -493,7 +507,7 @@ export default function CompetitionScreen() {
               setSelectedSubjectId(null);
               setScreenMode("accept");
             }}
-            disabled={isBusy}
+            disabled={isCreatingChallenge}
           />
           <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
         </View>

@@ -17,6 +17,10 @@ import type {
   CompetitionChallengeListResponse,
   CompetitionLeaderboardRequest,
   CompetitionLeaderboardResponse,
+  CompetitionRematchAcceptRequest,
+  CompetitionRematchRequest,
+  CompetitionRematchResponse,
+  CompetitionRematchStatusRequest,
   CompetitionChallengeStatusRequest,
   CompetitionChallengeStatusResponse,
   CompetitionProgressUpdateRequest,
@@ -440,6 +444,24 @@ export async function getCompetitionLeaderboard(
   request: CompetitionLeaderboardRequest
 ): Promise<CompetitionLeaderboardResponse> {
   return postJson("/competition/leaderboard", withVariantMeta(request));
+}
+
+export async function requestCompetitionRematch(
+  request: CompetitionRematchRequest
+): Promise<CompetitionRematchResponse> {
+  return postJson("/competition/rematch/request", withVariantMeta(request));
+}
+
+export async function getCompetitionRematchStatus(
+  request: CompetitionRematchStatusRequest
+): Promise<CompetitionRematchResponse> {
+  return postJson("/competition/rematch/status", withVariantMeta(request));
+}
+
+export async function acceptCompetitionRematch(
+  request: CompetitionRematchAcceptRequest
+): Promise<CompetitionRematchResponse> {
+  return postJson("/competition/rematch/accept", withVariantMeta(request));
 }
 
 export async function getCompetitionChallengeStatus(

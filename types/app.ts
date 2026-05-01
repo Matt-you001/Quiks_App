@@ -62,9 +62,12 @@ export interface SessionResult {
   aiStudyPlan: string[];
   competitionId?: string;
   competitionOpponentName?: string;
+  competitionOpponentId?: string;
   competitionOutcome?: "won" | "lost" | "draw" | "pending";
   competitionPlayerScore?: number;
   competitionOpponentScore?: number;
+  competitionPlayerTimeSeconds?: number;
+  competitionOpponentTimeSeconds?: number;
 }
 
 export interface BreatherContent {
@@ -170,6 +173,7 @@ export interface CompetitionLiveProgress {
 export interface CompetitionQuestionPayload {
   competitionId: string;
   opponentName: string;
+  opponentId?: string;
   questions: Question[];
   chats?: CompetitionChatMessage[];
   startAt?: number;
@@ -212,8 +216,11 @@ export interface CompetitionStatusResponse {
   competition?: CompetitionQuestionPayload;
   outcome?: "won" | "lost" | "draw" | "pending";
   opponentName?: string;
+  opponentId?: string;
   playerScore?: number;
   opponentScore?: number;
+  playerTimeTakenSeconds?: number;
+  opponentTimeTakenSeconds?: number;
 }
 
 export interface CompetitionSubmitRequest {
@@ -229,8 +236,11 @@ export interface CompetitionSubmitResponse {
   status: "submitted" | "completed";
   outcome: "won" | "lost" | "draw" | "pending";
   opponentName: string;
+  opponentId?: string;
   playerScore: number;
   opponentScore?: number;
+  playerTimeTakenSeconds?: number;
+  opponentTimeTakenSeconds?: number;
 }
 
 export interface CompetitionChatSendRequest {
@@ -310,4 +320,39 @@ export interface CompetitionLeaderboardRequest {
 
 export interface CompetitionLeaderboardResponse {
   performers: CompetitionTopPerformer[];
+}
+
+export interface CompetitionRematchRequest {
+  sourceCompetitionId: string;
+  playerId: string;
+  subject: Subject;
+  grade: string;
+  level: number;
+  difficulty: Difficulty;
+  focusMode?: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  durationSeconds: number;
+  profile: UserProfile;
+}
+
+export interface CompetitionRematchStatusRequest {
+  sourceCompetitionId: string;
+  playerId: string;
+}
+
+export interface CompetitionRematchAcceptRequest {
+  sourceCompetitionId: string;
+  playerId: string;
+  profile: UserProfile;
+}
+
+export interface CompetitionRematchResponse {
+  status: "none" | "requested" | "incoming" | "accepted";
+  requesterId?: string;
+  requesterName?: string;
+  targetId?: string;
+  targetName?: string;
+  nextLevel?: number;
+  competition?: CompetitionQuestionPayload;
 }

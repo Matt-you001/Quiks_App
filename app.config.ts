@@ -70,6 +70,7 @@ const config: ExpoConfig = {
         root: "./app",
       },
     ],
+    "expo-audio",
   ],
   experiments: {
     typedRoutes: true,

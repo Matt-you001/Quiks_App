@@ -11,6 +11,7 @@ const competitionWaiterByPlayer = new Map();
 const competitionMatches = new Map();
 const competitionMatchByPlayer = new Map();
 const competitionChallenges = new Map();
+const competitionRematches = new Map();
 
 function isSameUtcDay(leftTimestamp, rightTimestamp) {
   const left = new Date(leftTimestamp);
@@ -276,6 +277,7 @@ function buildCompetitionPayload(match, playerId) {
   return {
     competitionId: match.id,
     opponentName: opponent?.name ?? "Opponent",
+    opponentId: opponent?.playerId,
     questions: match.questions,
     chats: match.chats ?? [],
     startAt: match.startAt,
@@ -335,7 +337,9 @@ function getCompetitionOutcome(match, playerId) {
       status: "submitted",
       outcome: "pending",
       opponentName: opponent?.name ?? "Opponent",
+      opponentId: opponent?.playerId,
       playerScore: own?.score ?? 0,
+      playerTimeTakenSeconds: own?.timeTakenSeconds,
     };
   }
 
@@ -344,8 +348,11 @@ function getCompetitionOutcome(match, playerId) {
       status: "completed",
       outcome: "won",
       opponentName: opponent.name,
+      opponentId: opponent.playerId,
       playerScore: own.score,
       opponentScore: rival.score,
+      playerTimeTakenSeconds: own.timeTakenSeconds,
+      opponentTimeTakenSeconds: rival.timeTakenSeconds,
     };
   }
 
@@ -354,8 +361,11 @@ function getCompetitionOutcome(match, playerId) {
       status: "completed",
       outcome: "lost",
       opponentName: opponent.name,
+      opponentId: opponent.playerId,
       playerScore: own.score,
       opponentScore: rival.score,
+      playerTimeTakenSeconds: own.timeTakenSeconds,
+      opponentTimeTakenSeconds: rival.timeTakenSeconds,
     };
   }
 
@@ -364,8 +374,11 @@ function getCompetitionOutcome(match, playerId) {
       status: "completed",
       outcome: "won",
       opponentName: opponent.name,
+      opponentId: opponent.playerId,
       playerScore: own.score,
       opponentScore: rival.score,
+      playerTimeTakenSeconds: own.timeTakenSeconds,
+      opponentTimeTakenSeconds: rival.timeTakenSeconds,
     };
   }
 
@@ -374,8 +387,11 @@ function getCompetitionOutcome(match, playerId) {
       status: "completed",
       outcome: "lost",
       opponentName: opponent.name,
+      opponentId: opponent.playerId,
       playerScore: own.score,
       opponentScore: rival.score,
+      playerTimeTakenSeconds: own.timeTakenSeconds,
+      opponentTimeTakenSeconds: rival.timeTakenSeconds,
     };
   }
 
@@ -383,8 +399,39 @@ function getCompetitionOutcome(match, playerId) {
     status: "completed",
     outcome: "draw",
     opponentName: opponent.name,
+    opponentId: opponent.playerId,
     playerScore: own.score,
     opponentScore: rival.score,
+    playerTimeTakenSeconds: own.timeTakenSeconds,
+    opponentTimeTakenSeconds: rival.timeTakenSeconds,
+  };
+}
+
+function buildRematchResponse(rematch, playerId) {
+  if (!rematch) {
+    return { status: "none" };
+  }
+
+  if (rematch.status === "accepted" && rematch.competitionId) {
+    const match = competitionMatches.get(rematch.competitionId);
+    return {
+      status: "accepted",
+      requesterId: rematch.requesterId,
+      requesterName: rematch.requesterName,
+      targetId: rematch.targetId,
+      targetName: rematch.targetName,
+      nextLevel: rematch.level,
+      competition: match ? buildCompetitionPayload(match, playerId) : undefined,
+    };
+  }
+
+  return {
+    status: rematch.targetId === playerId ? "incoming" : "requested",
+    requesterId: rematch.requesterId,
+    requesterName: rematch.requesterName,
+    targetId: rematch.targetId,
+    targetName: rematch.targetName,
+    nextLevel: rematch.level,
   };
 }
 
@@ -580,6 +627,59 @@ async function createChallengeCompetition(challenge, accepterProfile) {
   challenge.acceptedById = accepterProfile.id;
   challenge.acceptedByName = accepterProfile.name ?? "Learner";
   challenge.competitionId = match.id;
+  return match;
+}
+
+async function createRematchCompetition(rematch) {
+  const questions = await generateQuestionSet(rematch.body);
+  const startAt = Date.now() + 5000;
+  const endAt = startAt + (rematch.durationSeconds * 1000);
+  const match = {
+    id: randomUUID(),
+    rematchSourceCompetitionId: rematch.sourceCompetitionId,
+    subjectId: rematch.subjectId,
+    grade: rematch.grade,
+    level: rematch.level,
+    difficulty: rematch.difficulty,
+    focusMode: rematch.focusMode ?? "general",
+    topicId: rematch.topicId,
+    topicLabel: rematch.topicLabel,
+    questions,
+    players: [
+      { playerId: rematch.requesterId, name: rematch.requesterName },
+      { playerId: rematch.targetId, name: rematch.targetName },
+    ],
+    chats: [],
+    liveProgress: {
+      [rematch.requesterId]: {
+        playerId: rematch.requesterId,
+        playerName: rematch.requesterName,
+        answeredCount: 0,
+        correctAnswers: 0,
+        score: 0,
+        finished: false,
+      },
+      [rematch.targetId]: {
+        playerId: rematch.targetId,
+        playerName: rematch.targetName,
+        answeredCount: 0,
+        correctAnswers: 0,
+        score: 0,
+        finished: false,
+      },
+    },
+    submissions: {},
+    createdAt: Date.now(),
+    startAt,
+    endAt,
+  };
+
+  competitionMatches.set(match.id, match);
+  competitionMatchByPlayer.set(rematch.requesterId, match.id);
+  competitionMatchByPlayer.set(rematch.targetId, match.id);
+  rematch.status = "accepted";
+  rematch.acceptedAt = Date.now();
+  rematch.competitionId = match.id;
   return match;
 }
 
@@ -1083,6 +1183,81 @@ async function handleCompetitionLeaderboard(_body, response) {
   });
 }
 
+async function handleCompetitionRematchRequest(body, response) {
+  const sourceCompetitionId = body.sourceCompetitionId;
+  const playerId = body.playerId;
+  const profile = body.profile;
+  const match = competitionMatches.get(sourceCompetitionId);
+
+  if (!match || !playerId || !profile?.id || playerId !== profile.id) {
+    sendJson(response, 400, { error: "Invalid rematch request." });
+    return;
+  }
+
+  ensureCompetitionResolved(match);
+  const requester = match.players.find((player) => player.playerId === playerId);
+  const target = match.players.find((player) => player.playerId !== playerId);
+  if (!requester || !target) {
+    sendJson(response, 400, { error: "Competition players could not be resolved." });
+    return;
+  }
+
+  const existing = competitionRematches.get(sourceCompetitionId);
+  if (existing) {
+    sendJson(response, 200, buildRematchResponse(existing, playerId));
+    return;
+  }
+
+  const rematch = {
+    id: randomUUID(),
+    sourceCompetitionId,
+    requesterId: requester.playerId,
+    requesterName: requester.name,
+    targetId: target.playerId,
+    targetName: target.name,
+    subjectId: body.subject?.id ?? match.subjectId,
+    grade: body.grade ?? match.grade,
+    level: body.level ?? ((match.level ?? 1) + 1),
+    difficulty: body.difficulty ?? match.difficulty ?? "Beginner",
+    focusMode: body.focusMode ?? match.focusMode ?? "general",
+    topicId: body.topicId ?? match.topicId,
+    topicLabel: body.topicLabel ?? match.topicLabel,
+    durationSeconds: Math.max(30, Number(body.durationSeconds ?? 120)),
+    body,
+    status: "requested",
+    createdAt: Date.now(),
+  };
+
+  competitionRematches.set(sourceCompetitionId, rematch);
+  sendJson(response, 200, buildRematchResponse(rematch, playerId));
+}
+
+async function handleCompetitionRematchStatus(body, response) {
+  const rematch = competitionRematches.get(body.sourceCompetitionId);
+  sendJson(response, 200, buildRematchResponse(rematch, body.playerId));
+}
+
+async function handleCompetitionRematchAccept(body, response) {
+  const rematch = competitionRematches.get(body.sourceCompetitionId);
+  if (!rematch || rematch.status !== "requested") {
+    sendJson(response, 404, { error: "Rematch is no longer available." });
+    return;
+  }
+
+  if (!body.playerId || !body.profile?.id || body.playerId !== body.profile.id || rematch.targetId !== body.playerId) {
+    sendJson(response, 400, { error: "Only the challenged opponent can accept this rematch." });
+    return;
+  }
+
+  rematch.targetName = body.profile.name ?? rematch.targetName;
+  rematch.body = {
+    ...rematch.body,
+    profile: rematch.body.profile ?? body.profile,
+  };
+  const match = await createRematchCompetition(rematch);
+  sendJson(response, 200, buildRematchResponse(rematch, body.playerId));
+}
+
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
@@ -1181,6 +1356,21 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/competition/leaderboard") {
       await handleCompetitionLeaderboard(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/rematch/request") {
+      await handleCompetitionRematchRequest(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/rematch/status") {
+      await handleCompetitionRematchStatus(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/rematch/accept") {
+      await handleCompetitionRematchAccept(body, response);
       return;
     }
 
