@@ -6,6 +6,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { getSubjectPassStreak, shouldOfferBreather } from "../lib/breathers";
 import { t } from "../lib/i18n";
 import { calculateQuizTime } from "../lib/quiz";
+import { isProTier } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getSubjectById, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -14,7 +15,7 @@ import {
   getCompetitionRematchStatus,
   requestCompetitionRematch,
 } from "../services/ai";
-import type { AppLanguage, CompetitionRematchResponse, Difficulty, SessionResult, UserProfile } from "../types/app";
+import type { AppLanguage, CompetitionRematchResponse, Difficulty, SessionResult, SubscriptionTier, UserProfile } from "../types/app";
 
 const allowedDifficulties: Difficulty[] = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
@@ -24,6 +25,7 @@ export default function ResultsScreen() {
   const [passStreak, setPassStreak] = useState(0);
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [rematchState, setRematchState] = useState<CompetitionRematchResponse | null>(null);
   const [isRequestingRematch, setIsRequestingRematch] = useState(false);
   const [isAcceptingRematch, setIsAcceptingRematch] = useState(false);
@@ -62,6 +64,7 @@ export default function ResultsScreen() {
 
       setLanguage(profile?.language ?? "en");
       setProfile(profile);
+      setSubscriptionTier(state.subscriptionTier);
       setPassStreak(streak);
       setShowBreather(shouldOfferBreather(profileResults, result));
     });
@@ -88,6 +91,7 @@ export default function ResultsScreen() {
   const canUseRematch = Boolean(
     result?.competitionId &&
       profile &&
+      isProTier(subscriptionTier) &&
       rematchSubject &&
       result?.competitionOutcome &&
       result.competitionOutcome !== "pending"
@@ -333,6 +337,15 @@ export default function ResultsScreen() {
               ) : (
                 <PrimaryButton label={t(language, "requestRematch")} variant="secondary" onPress={requestRematch} loading={isRequestingRematch} />
               )}
+            </View>
+          ) : isCompetition && !isProTier(subscriptionTier) ? (
+            <View style={styles.rematchActions}>
+              <Text style={styles.rematchHint}>{t(language, "manageSubscription")}</Text>
+              <PrimaryButton
+                label={t(language, "upgradeToPro")}
+                variant="secondary"
+                onPress={() => router.push({ pathname: "/subscription" } as never)}
+              />
             </View>
           ) : null}
         </View>

@@ -8,6 +8,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { calculateQuizTime, getLevelProgressForGrade } from "../lib/quiz";
+import { canJoinCompetitionToday, shouldShowUpgradePrompts } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getLocalizedSubjects, getSubjectById, getTopicById, grades } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -24,6 +25,7 @@ import type {
   Difficulty,
   QuestionFocusMode,
   SessionResult,
+  SubscriptionTier,
   UserProfile,
 } from "../types/app";
 
@@ -33,6 +35,7 @@ export default function CompetitionScreen() {
   const params = useLocalSearchParams<{ subjectId?: string; grade?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [screenMode, setScreenMode] = useState<CompetitionScreenMode>("accept");
   const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
   const [acceptingChallengeId, setAcceptingChallengeId] = useState<string | null>(null);
@@ -55,12 +58,14 @@ export default function CompetitionScreen() {
   const localizedSubjects = useMemo(() => getLocalizedSubjects(language), [language]);
   const subject = getSubjectById(selectedSubjectId ?? undefined, language) ?? null;
   const setupSubject = subject ?? localizedSubjects[0] ?? null;
+  const canJoinMoreCompetitions = canJoinCompetitionToday(subscriptionTier, results);
 
   useEffect(() => {
     readAppState().then((state) => {
       const current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
       setProfile(current);
       setResults(current ? state.results[current.id] ?? [] : []);
+      setSubscriptionTier(state.subscriptionTier);
     });
   }, []);
 
@@ -199,6 +204,11 @@ export default function CompetitionScreen() {
     if (!profile || !setupSubject) {
       return;
     }
+    if (!canJoinMoreCompetitions) {
+      Alert.alert(t(language, "freeCompetitionLimitReached"), t(language, "upgradeToPro"));
+      router.push({ pathname: "/subscription" } as never);
+      return;
+    }
 
     setIsCreatingChallenge(true);
     try {
@@ -224,6 +234,11 @@ export default function CompetitionScreen() {
 
   const acceptChallenge = async (challenge: CompetitionChallengeSummary) => {
     if (!profile) {
+      return;
+    }
+    if (!canJoinMoreCompetitions) {
+      Alert.alert(t(language, "freeCompetitionLimitReached"), t(language, "upgradeToPro"));
+      router.push({ pathname: "/subscription" } as never);
       return;
     }
 
@@ -339,6 +354,7 @@ export default function CompetitionScreen() {
               setScreenMode("create");
             }}
             style={styles.topActionButton}
+            disabled={!canJoinMoreCompetitions}
           />
         </View>
 
@@ -364,6 +380,18 @@ export default function CompetitionScreen() {
           )}
         </View>
 
+        {shouldShowUpgradePrompts(subscriptionTier) ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>{t(language, "currentPlan")}</Text>
+            <Text style={styles.text}>{t(language, "freeCompetitionLimitReached")}</Text>
+            <PrimaryButton
+              label={t(language, "upgradeToPro")}
+              variant="secondary"
+              onPress={() => router.push({ pathname: "/subscription" } as never)}
+            />
+          </View>
+        ) : null}
+
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "openChallenges")}</Text>
           {challenges.length > 0 ? (
@@ -382,6 +410,7 @@ export default function CompetitionScreen() {
                     variant="secondary"
                     onPress={() => acceptChallenge(challenge)}
                     loading={acceptingChallengeId === challenge.challengeId}
+                    disabled={!canJoinMoreCompetitions}
                   />
                 </View>
               ))}
@@ -499,7 +528,12 @@ export default function CompetitionScreen() {
         </View>
 
         <View style={styles.actionColumn}>
-          <PrimaryButton label={t(language, "createChallenge")} onPress={createChallenge} loading={isCreatingChallenge} />
+          <PrimaryButton
+            label={t(language, "createChallenge")}
+            onPress={createChallenge}
+            loading={isCreatingChallenge}
+            disabled={!canJoinMoreCompetitions}
+          />
           <PrimaryButton
             label={t(language, "acceptChallenge")}
             variant="secondary"

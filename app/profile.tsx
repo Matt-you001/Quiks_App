@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { getLanguageLabel, t } from "../lib/i18n";
+import { canCreateAnotherProfile } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -40,12 +41,16 @@ function isSameLocalDay(dateIso: string) {
 export default function ProfileScreen() {
   const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
+  const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
+  const [profileCount, setProfileCount] = useState(0);
 
   const load = useCallback(async () => {
     const state = await readAppState();
     const profile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
     setActiveProfile(profile);
     setResults(profile ? state.results[profile.id] ?? [] : []);
+    setSubscriptionTier(state.subscriptionTier);
+    setProfileCount(state.profiles.length);
   }, []);
 
   useFocusEffect(
@@ -92,6 +97,7 @@ export default function ProfileScreen() {
   const goalMinutes = activeProfile?.dailyGoalMinutes ?? 0;
   const competitionResults = results.filter((result) => Boolean(result.competitionId));
   const competitionWins = competitionResults.filter((result) => result.competitionOutcome === "won").length;
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profileCount);
 
   let goalFeedback = t(language, "noTargetYet");
   if (activeProfile) {
@@ -183,7 +189,16 @@ export default function ProfileScreen() {
         <PrimaryButton
           label={t(language, "createAnotherProfile")}
           variant="secondary"
-          onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
+          onPress={() =>
+            canCreateMoreProfiles
+              ? router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
+              : router.push({ pathname: "/subscription" } as never)
+          }
+        />
+        <PrimaryButton
+          label={t(language, "manageSubscription")}
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/subscription" } as never)}
         />
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
       </View>

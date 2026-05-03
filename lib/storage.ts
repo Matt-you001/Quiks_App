@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DEFAULT_LANGUAGE, normalizeLanguage } from "./i18n";
-import type { SessionResult, StoredAppState, UserProfile } from "../types/app";
+import type { SessionResult, StoredAppState, SubscriptionTier, UserProfile } from "../types/app";
 
 const STORAGE_KEY = "quiks_mobile_state_v1";
 const QUESTION_HISTORY_KEY = "quiks_question_history_v1";
@@ -9,6 +9,7 @@ const defaultState: StoredAppState = {
   profiles: [],
   currentProfileId: null,
   results: {},
+  subscriptionTier: "free",
 };
 
 function normalizeProfile(profile: UserProfile): UserProfile {
@@ -30,6 +31,7 @@ export async function readAppState(): Promise<StoredAppState> {
       profiles: (parsed.profiles ?? []).map(normalizeProfile),
       currentProfileId: parsed.currentProfileId ?? null,
       results: parsed.results ?? {},
+      subscriptionTier: parsed.subscriptionTier === "pro" ? "pro" : "free",
     };
   } catch {
     return defaultState;
@@ -78,6 +80,13 @@ export async function appendResult(profileId: string, result: SessionResult) {
   const state = await readAppState();
   const existing = state.results[profileId] ?? [];
   state.results[profileId] = [result, ...existing];
+  await writeAppState(state);
+  return state;
+}
+
+export async function setSubscriptionTier(subscriptionTier: SubscriptionTier) {
+  const state = await readAppState();
+  state.subscriptionTier = subscriptionTier;
   await writeAppState(state);
   return state;
 }

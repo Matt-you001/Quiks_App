@@ -4,20 +4,23 @@ import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { getLanguageLabel, t } from "../lib/i18n";
+import { canCreateAnotherProfile } from "../lib/subscription";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getSubjectById } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
-import type { UserProfile } from "../types/app";
+import type { SubscriptionTier, UserProfile } from "../types/app";
 
 export default function SelectProfileScreen() {
   const { subject } = useLocalSearchParams<{ subject?: string }>();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const language = profiles[0]?.language ?? "en";
   const selectedSubject = getSubjectById(subject, language);
 
   const load = useCallback(async () => {
     const state = await readAppState();
     setProfiles(state.profiles);
+    setSubscriptionTier(state.subscriptionTier);
     if (state.profiles.length === 0 && subject) {
       router.replace({ pathname: "/profile-editor", params: { mode: "create" } } as never);
     }
@@ -35,6 +38,8 @@ export default function SelectProfileScreen() {
       router.replace({ pathname: "/subject/[slug]", params: { slug: subject } });
     }
   };
+
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
 
   return (
     <AppBackground>
@@ -60,7 +65,11 @@ export default function SelectProfileScreen() {
         <PrimaryButton
           label={t(language, "createLearner")}
           variant="secondary"
-          onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
+          onPress={() =>
+            canCreateMoreProfiles
+              ? router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
+              : router.push({ pathname: "/subscription" } as never)
+          }
         />
       </View>
     </AppBackground>

@@ -6,7 +6,9 @@ import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
+import { getLocalQuestions } from "../lib/question-bank";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState } from "../lib/storage";
+import { canUseAiToday, isProTier } from "../lib/subscription";
 import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
 import { getSubjectById, getTopicById, grades, QUESTIONS_PER_LEVEL } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -27,6 +29,7 @@ import type {
   QuestionFocusMode,
   QuestionResponse,
   SessionResult,
+  SubscriptionTier,
   TestMode,
   UserProfile,
 } from "../types/app";
@@ -48,6 +51,7 @@ export default function SessionScreen() {
   }>();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const language = profile?.language ?? "en";
   const subject = getSubjectById(params.subjectId, language);
   const mode: TestMode = params.mode === "training" ? "training" : "quiz";
@@ -115,6 +119,7 @@ export default function SessionScreen() {
       const current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
       setProfile(current);
       setResults(current ? state.results[current.id] ?? [] : []);
+      setSubscriptionTier(state.subscriptionTier);
       if (!current && params.subjectId) {
         router.replace({ pathname: "/select-profile", params: { subject: params.subjectId } });
       }
@@ -343,7 +348,7 @@ export default function SessionScreen() {
       }
 
       const recentQuestionIds = profile ? await getRecentQuestionIds(profile.id, subject.id) : [];
-      const response = await generateQuestions({
+      const request = {
         subject,
         grade,
         difficulty,
@@ -355,7 +360,18 @@ export default function SessionScreen() {
         topicLabel: selectedTopic?.label,
         profile,
         recentQuestionIds,
-      });
+      };
+      const allowAi = isProTier(subscriptionTier) || canUseAiToday(subscriptionTier, results);
+      const response = allowAi
+        ? await generateQuestions(request)
+        : {
+            questions: getLocalQuestions(request),
+            source: "local" as const,
+          };
+
+      if (!allowAi) {
+        Alert.alert(t(language, "freeAiLimitReached"), t(language, "upgradeToPro"));
+      }
 
       const nextQuestions = normalizeQuestions(response.questions);
       setQuestionSource(response.source);
@@ -481,31 +497,33 @@ export default function SessionScreen() {
       `Move steadily and focus on accuracy first, then speed.`,
     ];
 
-    try {
-      feedback = await generateFeedback({
-        score: score.score,
-        subject,
-        grade,
-        focusMode,
-        topicLabel: selectedTopic?.label,
-        profile,
-      });
-    } catch {
-      // Keep the local fallback message.
-    }
+    if (isProTier(subscriptionTier)) {
+      try {
+        feedback = await generateFeedback({
+          score: score.score,
+          subject,
+          grade,
+          focusMode,
+          topicLabel: selectedTopic?.label,
+          profile,
+        });
+      } catch {
+        // Keep the local fallback message.
+      }
 
-    try {
-      studyPlan = await generateCoachPlan({
-        resultScore: score.score,
-        subject,
-        grade,
-        level: selectedLevel,
-        focusMode,
-        topicLabel: selectedTopic?.label,
-        profile,
-      });
-    } catch {
-      // Keep the local fallback study plan.
+      try {
+        studyPlan = await generateCoachPlan({
+          resultScore: score.score,
+          subject,
+          grade,
+          level: selectedLevel,
+          focusMode,
+          topicLabel: selectedTopic?.label,
+          profile,
+        });
+      } catch {
+        // Keep the local fallback study plan.
+      }
     }
 
     const result: SessionResult = {
@@ -527,6 +545,7 @@ export default function SessionScreen() {
       coinsEarned: bonusCoins,
       aiFeedback: feedback,
       aiStudyPlan: studyPlan,
+      questionSource: questionSource ?? undefined,
     };
 
     if (isCompetition && params.competitionId) {
@@ -565,6 +584,8 @@ export default function SessionScreen() {
         return;
       }
     }
+
+    result.aiStudyPlan = isProTier(subscriptionTier) ? studyPlan : studyPlan.slice(0, 2);
 
     await appendResult(profile.id, result);
     router.replace({

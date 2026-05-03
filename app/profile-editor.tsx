@@ -5,6 +5,7 @@ import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, t } from "../lib/i18n";
+import { canCreateAnotherProfile } from "../lib/subscription";
 import { readAppState, upsertProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import type { AppLanguage, UserProfile } from "../types/app";
@@ -67,6 +68,15 @@ export default function ProfileEditorScreen() {
     if (!Number.isFinite(goal) || goal < 5) {
       Alert.alert(t(form.language, "invalidGoalTitle"), t(form.language, "invalidGoalMessage"));
       return;
+    }
+
+    if (!editingProfile) {
+      const state = await readAppState();
+      if (!canCreateAnotherProfile(state.subscriptionTier, state.profiles.length)) {
+        Alert.alert(t(form.language, "profileLimitReachedTitle"), t(form.language, "profileLimitReachedMessage"));
+        router.push({ pathname: "/subscription" } as never);
+        return;
+      }
     }
 
     setSaving(true);

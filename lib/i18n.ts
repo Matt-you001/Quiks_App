@@ -183,7 +183,25 @@ type TranslationKey =
   | "rematchRequested"
   | "rematchIncoming"
   | "waitingRematchAcceptance"
-  | "rematchStarting";
+  | "rematchStarting"
+  | "subscription"
+  | "manageSubscription"
+  | "currentPlan"
+  | "freePlan"
+  | "proPlan"
+  | "upgradeToPro"
+  | "switchToFree"
+  | "subscriptionSubtitle"
+  | "subscriptionFreeFeatures"
+  | "subscriptionProFeatures"
+  | "childrenAdFreeNote"
+  | "profileLimitReachedTitle"
+  | "profileLimitReachedMessage"
+  | "freeAiLimitReached"
+  | "freeCompetitionLimitReached"
+  | "freePlanStatus"
+  | "proPlanStatus"
+  | "localSubscriptionNote";
 
 type TranslationMap = Record<TranslationKey, string>;
 
@@ -388,6 +406,24 @@ const english: TranslationMap = {
   rematchIncoming: "Your opponent wants another challenge on the next level.",
   waitingRematchAcceptance: "Waiting for your opponent to accept the rematch.",
   rematchStarting: "Rematch accepted. The next round is starting.",
+  subscription: "Subscription",
+  manageSubscription: "Manage Subscription",
+  currentPlan: "Current plan",
+  freePlan: "Free",
+  proPlan: "Pro",
+  upgradeToPro: "Upgrade to Pro",
+  switchToFree: "Switch to Free",
+  subscriptionSubtitle: "Choose how much AI practice, competition, and study support you want in your learning app.",
+  subscriptionFreeFeatures: "Free includes one profile, local practice, limited daily AI sessions, and limited daily competitions.",
+  subscriptionProFeatures: "Pro includes multiple profiles, unlimited AI practice, unlimited competitions, rematches, and advanced study support.",
+  childrenAdFreeNote: "Quiks Children stays ad-free for a safer child learning experience.",
+  profileLimitReachedTitle: "Profile limit reached",
+  profileLimitReachedMessage: "Free access allows only one learner profile. Upgrade to Pro to add more profiles.",
+  freeAiLimitReached: "You have used today's free AI practice limit. More sessions will use the local question bank unless you upgrade to Pro.",
+  freeCompetitionLimitReached: "You have reached today's free competition limit. Upgrade to Pro for unlimited competitions and rematches.",
+  freePlanStatus: "You are on the Free plan.",
+  proPlanStatus: "You are on the Pro plan.",
+  localSubscriptionNote: "For now, plan changes are stored on this device while full store billing is prepared.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = {

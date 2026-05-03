@@ -8,6 +8,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
 import { appVariant } from "../lib/app-variant";
 import { getLanguageLabel, t } from "../lib/i18n";
+import { canCreateAnotherProfile, shouldShowUpgradePrompts } from "../lib/subscription";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getLocalizedSubjects, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -34,12 +35,14 @@ export default function HomeScreen() {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [currentProfileId, setCurrentProfileIdState] = useState<string | null>(null);
   const [resultsByProfile, setResultsByProfile] = useState<Record<string, SessionResult[]>>({});
+  const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
 
   const loadData = useCallback(async () => {
     const state = await readAppState();
     setProfiles(state.profiles);
     setCurrentProfileIdState(state.currentProfileId);
     setResultsByProfile(state.results);
+    setSubscriptionTier(state.subscriptionTier);
   }, []);
 
   useFocusEffect(
@@ -124,6 +127,8 @@ export default function HomeScreen() {
     router.push({ pathname: "/subject/[slug]", params: { slug: subjectId } });
   };
 
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
+
   return (
     <AppBackground>
       <View style={styles.heroCard}>
@@ -139,7 +144,11 @@ export default function HomeScreen() {
         <View style={styles.ctaRow}>
           <PrimaryButton
             label={t(language, "homeCreateProfile")}
-            onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
+            onPress={() =>
+              canCreateMoreProfiles
+                ? router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
+                : router.push({ pathname: "/subscription" } as never)
+            }
             style={styles.flexButton}
           />
           <PrimaryButton
@@ -265,6 +274,20 @@ export default function HomeScreen() {
                 ? router.push("/competition" as never)
                 : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
             }
+          />
+        </View>
+      ) : null}
+
+      {shouldShowUpgradePrompts(subscriptionTier) ? (
+        <View style={styles.subscriptionCard}>
+          <Text style={styles.homeCompetitionTitle}>{t(language, "currentPlan")}</Text>
+          <Text style={styles.homeCompetitionText}>
+            {subscriptionTier === "pro" ? t(language, "proPlanStatus") : t(language, "freePlanStatus")}
+          </Text>
+          <PrimaryButton
+            label={t(language, "upgradeToPro")}
+            variant="secondary"
+            onPress={() => router.push({ pathname: "/subscription" } as never)}
           />
         </View>
       ) : null}
@@ -518,6 +541,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   homeCompetitionCard: {
+    marginTop: 18,
+    borderRadius: 24,
+    backgroundColor: palette.white,
+    padding: 18,
+    ...shadows.card,
+  },
+  subscriptionCard: {
     marginTop: 18,
     borderRadius: 24,
     backgroundColor: palette.white,

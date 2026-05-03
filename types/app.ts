@@ -6,6 +6,8 @@ export type QuestionFocusMode = "general" | "topic";
 
 export type AppLanguage = "en" | "fr" | "es" | "pt" | "ar" | "sw" | "zh" | "de";
 
+export type SubscriptionTier = "free" | "pro";
+
 export interface SubjectTopic {
   id: string;
   label: string;
@@ -68,6 +70,7 @@ export interface SessionResult {
   competitionOpponentScore?: number;
   competitionPlayerTimeSeconds?: number;
   competitionOpponentTimeSeconds?: number;
+  questionSource?: QuestionResponse["source"];
 }
 
 export interface BreatherContent {
@@ -87,6 +90,7 @@ export interface StoredAppState {
   profiles: UserProfile[];
   currentProfileId: string | null;
   results: Record<string, SessionResult[]>;
+  subscriptionTier: SubscriptionTier;
 }
 
 export interface QuestionRequest {
