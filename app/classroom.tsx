@@ -371,6 +371,15 @@ export default function ClassroomScreen() {
     });
   };
 
+  const openStudentResult = (activity: ClassroomActivitySummary) => {
+    router.push({
+      pathname: "/classroom-result" as never,
+      params: {
+        activityId: activity.activityId,
+      },
+    } as never);
+  };
+
   if (loading) {
     return (
       <AppBackground>
@@ -818,17 +827,21 @@ export default function ClassroomScreen() {
                   <PrimaryButton
                     label={
                       activity.submitted
-                        ? "Submitted"
+                        ? "View result"
                         : activity.status === "closed"
-                          ? "Closed"
+                          ? "View result"
                           : activity.status === "scheduled"
                             ? "Wait for start"
                             : activity.type === "test"
                               ? "Start test"
                               : "Start assignment"
                     }
-                    onPress={() => openActivity(activity)}
-                    disabled={activity.submitted || activity.status === "closed" || activity.status === "scheduled"}
+                    onPress={() =>
+                      activity.submitted || activity.status === "closed"
+                        ? openStudentResult(activity)
+                        : openActivity(activity)
+                    }
+                    disabled={activity.status === "scheduled"}
                   />
                 )}
               </View>

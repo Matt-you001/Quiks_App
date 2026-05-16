@@ -198,6 +198,10 @@ function buildAbsentSummaries(store, activity) {
     }));
 }
 
+function buildAbsentSummaryForProfile(store, activity, profileId) {
+  return buildAbsentSummaries(store, activity).find((entry) => entry.profileId === profileId) ?? null;
+}
+
 function buildActivitySummary(store, activity, profileId) {
   const submissions = getActivitySubmissions(store, activity.id);
   const ownSubmission = submissions.find((submission) => submission.profileId === profileId);
@@ -502,11 +506,15 @@ export async function getActivityDetails(profile, activityId, appVariant) {
 
     const questions = isTeacher ? activity.questions : getOrderedQuestionsForStudent(activity, profile.id);
     const submissions = getActivitySubmissions(store, activity.id).map(buildSubmissionSummary);
+    const absentSummaries = buildAbsentSummaries(store, activity);
+    const ownAbsentSummary = buildAbsentSummaryForProfile(store, activity, profile.id);
     const visibleSubmissions = isTeacher
-      ? [...submissions, ...buildAbsentSummaries(store, activity)]
+      ? [...submissions, ...absentSummaries]
       : activity.resultVisibility === "public"
-        ? [...submissions, ...buildAbsentSummaries(store, activity)]
-        : submissions.filter((submission) => submission.profileId === profile.id);
+        ? [...submissions, ...absentSummaries]
+        : ownAbsentSummary
+          ? [...submissions.filter((submission) => submission.profileId === profile.id), ownAbsentSummary]
+          : submissions.filter((submission) => submission.profileId === profile.id);
 
     return {
       activity: buildActivitySummary(store, activity, profile.id),

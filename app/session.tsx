@@ -755,6 +755,17 @@ export default function SessionScreen() {
     result.aiStudyPlan = hasProAccess(subscriptionTier) ? studyPlan : studyPlan.slice(0, 2);
 
     await appendResult(profile.id, result);
+
+    if (isClassroomActivity && params.classroomActivityId) {
+      router.replace({
+        pathname: "/classroom-result" as never,
+        params: {
+          activityId: params.classroomActivityId,
+        },
+      } as never);
+      return;
+    }
+
     router.replace({
       pathname: "/results",
       params: {
