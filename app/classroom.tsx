@@ -1,5 +1,5 @@
 import { useFocusEffect, router } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
@@ -11,18 +11,23 @@ import { palette, shadows } from "../lib/theme";
 import {
   createClassroomAssignment,
   createClassroomClass,
+  duplicateClassroomActivity,
   generateClassroomQuestionCandidates,
+  getClassroomDetails,
   inviteStudentToClassroom,
   listClassroomActivities,
   listClassroomClasses,
+  removeClassroomMember,
   requestJoinClassroom,
   respondToClassroomMembership,
   syncClassroomProfile,
+  updateClassroomClass,
 } from "../services/ai";
 import { getLocalizedSubjects } from "../lib/subjects";
 import type {
   ClassroomActivitySummary,
   ClassroomActivityType,
+  ClassroomClassDetailsResponse,
   ClassroomMemberSummary,
   ClassroomQuestionOrderMode,
   ClassroomResultVisibility,
@@ -41,10 +46,12 @@ export default function ClassroomScreen() {
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [classes, setClasses] = useState<ClassroomSummary[]>([]);
   const [activities, setActivities] = useState<ClassroomActivitySummary[]>([]);
+  const [selectedClassDetails, setSelectedClassDetails] = useState<ClassroomClassDetailsResponse | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+  const [editClassName, setEditClassName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [inviteStudentId, setInviteStudentId] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
@@ -65,6 +72,7 @@ export default function ClassroomScreen() {
   const [acceptedQuestions, setAcceptedQuestions] = useState<Question[]>([]);
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [publishingAssignment, setPublishingAssignment] = useState(false);
+  const [classActionLoading, setClassActionLoading] = useState(false);
 
   const language = profile?.language ?? "en";
   const localizedSubjects = useMemo(() => getLocalizedSubjects(language), [language]);
@@ -77,8 +85,8 @@ export default function ClassroomScreen() {
     [classes, selectedClassId]
   );
   const pendingTeacherApprovals = useMemo(
-    () => selectedClass?.pendingTeacherApprovals ?? [],
-    [selectedClass]
+    () => selectedClassDetails?.classroom.pendingTeacherApprovals ?? selectedClass?.pendingTeacherApprovals ?? [],
+    [selectedClassDetails, selectedClass]
   );
   const pendingStudentInvites = useMemo(() => {
     if (!profile) {
@@ -91,6 +99,39 @@ export default function ClassroomScreen() {
         .map((membership) => ({ classroom: entry, membership }))
     );
   }, [classes, profile]);
+  const activeMembers = useMemo(
+    () => (selectedClassDetails?.members ?? []).filter((member) => member.status === "active"),
+    [selectedClassDetails]
+  );
+
+  useEffect(() => {
+    if (!profile || !selectedClassId) {
+      setSelectedClassDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const details = await getClassroomDetails({
+          profile,
+          classId: selectedClassId,
+        });
+        if (!cancelled) {
+          setSelectedClassDetails(details);
+          setEditClassName(details.classroom.className);
+        }
+      } catch {
+        if (!cancelled) {
+          setSelectedClassDetails(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, selectedClassId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,9 +185,22 @@ export default function ClassroomScreen() {
     ]);
     setClasses(nextClasses.classes);
     setActivities(nextActivities.activities);
-    setSelectedClassId((current) =>
-      nextClasses.classes.some((entry) => entry.classId === current) ? current : nextClasses.classes[0]?.classId ?? null
-    );
+    const nextSelectedClassId = nextClasses.classes.some((entry) => entry.classId === selectedClassId)
+      ? selectedClassId
+      : nextClasses.classes[0]?.classId ?? null;
+    setSelectedClassId(nextSelectedClassId);
+
+    if (nextSelectedClassId) {
+      const details = await getClassroomDetails({
+        profile,
+        classId: nextSelectedClassId,
+      });
+      setSelectedClassDetails(details);
+      setEditClassName(details.classroom.className);
+    } else {
+      setSelectedClassDetails(null);
+      setEditClassName("");
+    }
   };
 
   const createClass = async () => {
@@ -212,6 +266,46 @@ export default function ClassroomScreen() {
       Alert.alert("Classroom", error instanceof Error ? error.message : "Unable to invite the student.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const renameClass = async () => {
+    if (!profile || !selectedClass || !editClassName.trim()) {
+      return;
+    }
+
+    setClassActionLoading(true);
+    try {
+      await updateClassroomClass({
+        teacherProfile: profile,
+        classId: selectedClass.classId,
+        className: editClassName.trim(),
+      });
+      await refreshClassroomData();
+    } catch (error) {
+      Alert.alert("Classroom", error instanceof Error ? error.message : "Unable to update the class name.");
+    } finally {
+      setClassActionLoading(false);
+    }
+  };
+
+  const removeMember = async (membership: ClassroomMemberSummary) => {
+    if (!profile || !selectedClass) {
+      return;
+    }
+
+    setClassActionLoading(true);
+    try {
+      await removeClassroomMember({
+        teacherProfile: profile,
+        classId: selectedClass.classId,
+        membershipId: membership.membershipId,
+      });
+      await refreshClassroomData();
+    } catch (error) {
+      Alert.alert("Classroom", error instanceof Error ? error.message : "Unable to remove the member.");
+    } finally {
+      setClassActionLoading(false);
     }
   };
 
@@ -345,6 +439,25 @@ export default function ClassroomScreen() {
     }
   };
 
+  const duplicateActivity = async (activity: ClassroomActivitySummary) => {
+    if (!profile) {
+      return;
+    }
+
+    setClassActionLoading(true);
+    try {
+      await duplicateClassroomActivity({
+        teacherProfile: profile,
+        activityId: activity.activityId,
+      });
+      await refreshClassroomData();
+    } catch (error) {
+      Alert.alert("Classroom", error instanceof Error ? error.message : "Unable to duplicate the activity.");
+    } finally {
+      setClassActionLoading(false);
+    }
+  };
+
   const openActivity = (activity: ClassroomActivitySummary) => {
     router.push({
       pathname: "/session",
@@ -418,11 +531,6 @@ export default function ClassroomScreen() {
     <AppBackground>
       <View style={styles.heroCard}>
         <Text style={styles.heroTitle}>Classroom</Text>
-        <Text style={styles.heroText}>
-          {profile.role === "teacher"
-            ? "Create classes, approve students, and publish assignments."
-            : "Join classes, approve invites, and complete assignments before deadline."}
-        </Text>
         <View style={styles.identityRow}>
           <View style={styles.identityChip}>
             <Text style={styles.identityLabel}>Role</Text>
@@ -453,7 +561,7 @@ export default function ClassroomScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Your classes</Text>
               {classes.length === 0 ? (
-                <Text style={styles.helperText}>No classes yet. Create your first class to begin.</Text>
+                <Text style={styles.helperText}>No classes yet.</Text>
               ) : (
                 classes.map((entry) => (
                   <Pressable
@@ -472,9 +580,48 @@ export default function ClassroomScreen() {
             {selectedClass ? (
               <>
                 <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Class</Text>
+                  <TextInput
+                    value={editClassName}
+                    onChangeText={setEditClassName}
+                    placeholder="Class name"
+                    placeholderTextColor="#8092A7"
+                    style={styles.input}
+                  />
+                  <PrimaryButton label="Save name" onPress={renameClass} loading={classActionLoading} />
+                  <Text style={styles.classMeta}>Code: {selectedClass.classCode}</Text>
+                </View>
+
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Roster</Text>
+                  {activeMembers.length === 0 ? (
+                    <Text style={styles.helperText}>No members.</Text>
+                  ) : (
+                    activeMembers.map((membership) => (
+                      <View key={membership.membershipId} style={styles.memberRow}>
+                        <View style={styles.memberMeta}>
+                          <Text style={styles.requestTitle}>{membership.name}</Text>
+                          <Text style={styles.classMeta}>
+                            {membership.role === "teacher" ? "Teacher" : membership.quiksId}
+                          </Text>
+                        </View>
+                        {membership.role === "student" ? (
+                          <PrimaryButton
+                            label="Remove"
+                            variant="secondary"
+                            onPress={() => removeMember(membership)}
+                            style={styles.memberAction}
+                          />
+                        ) : null}
+                      </View>
+                    ))
+                  )}
+                </View>
+
+                <View style={styles.card}>
                   <Text style={styles.cardTitle}>Pending student requests</Text>
                   {pendingTeacherApprovals.length === 0 ? (
-                    <Text style={styles.helperText}>No student requests waiting for approval.</Text>
+                    <Text style={styles.helperText}>No requests.</Text>
                   ) : (
                     pendingTeacherApprovals.map((membership) => (
                       <View key={membership.membershipId} style={styles.requestCard}>
@@ -511,7 +658,7 @@ export default function ClassroomScreen() {
                 </View>
 
                 <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Create classroom activity</Text>
+                  <Text style={styles.cardTitle}>Create activity</Text>
                   <Text style={styles.sectionLabel}>Activity type</Text>
                   <View style={styles.inlineActions}>
                     <PrimaryButton
@@ -701,7 +848,7 @@ export default function ClassroomScreen() {
                     Accepted questions ({acceptedQuestions.length}/{desiredQuestionCount})
                   </Text>
                   {acceptedQuestions.length === 0 ? (
-                    <Text style={styles.helperText}>Accept candidate questions to build the assignment.</Text>
+                    <Text style={styles.helperText}>No questions yet.</Text>
                   ) : (
                     acceptedQuestions.map((question) => (
                       <View key={question.id} style={styles.questionCard}>
@@ -717,7 +864,7 @@ export default function ClassroomScreen() {
 
                   <Text style={styles.sectionLabel}>Candidate questions</Text>
                   {candidateQuestions.length === 0 ? (
-                    <Text style={styles.helperText}>Load candidates, then accept or ignore them.</Text>
+                    <Text style={styles.helperText}>No candidates loaded.</Text>
                   ) : (
                     candidateQuestions.map((question) => (
                       <View key={question.id} style={styles.questionCard}>
@@ -768,9 +915,9 @@ export default function ClassroomScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Teacher invites</Text>
+              <Text style={styles.cardTitle}>Invites</Text>
               {pendingStudentInvites.length === 0 ? (
-                <Text style={styles.helperText}>No invites waiting for your approval.</Text>
+                <Text style={styles.helperText}>No invites.</Text>
               ) : (
                 pendingStudentInvites.map(({ classroom, membership }) => (
                   <View key={membership.membershipId} style={styles.requestCard}>
@@ -818,11 +965,20 @@ export default function ClassroomScreen() {
                 </Text>
                 <Text style={styles.classMeta}>Questions: {activity.questionCount}</Text>
                 {profile.role === "teacher" ? (
-                  <PrimaryButton
-                    label="View results"
-                    variant="secondary"
-                    onPress={() => openActivityDashboard(activity)}
-                  />
+                  <View style={styles.inlineActions}>
+                    <PrimaryButton
+                      label="Results"
+                      variant="secondary"
+                      onPress={() => openActivityDashboard(activity)}
+                      style={styles.inlineButton}
+                    />
+                    <PrimaryButton
+                      label="Duplicate"
+                      onPress={() => duplicateActivity(activity)}
+                      loading={classActionLoading}
+                      style={styles.inlineButton}
+                    />
+                  </View>
                 ) : (
                   <PrimaryButton
                     label={
@@ -866,11 +1022,6 @@ const styles = StyleSheet.create({
     color: palette.white,
     fontSize: 32,
     fontWeight: "900",
-  },
-  heroText: {
-    color: "#E8F4FB",
-    marginTop: 10,
-    lineHeight: 22,
   },
   identityRow: {
     flexDirection: "row",
@@ -963,6 +1114,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#F6FAFD",
     padding: 14,
     gap: 8,
+  },
+  memberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D7E0EA",
+    padding: 14,
+  },
+  memberMeta: {
+    flex: 1,
+    gap: 4,
+  },
+  memberAction: {
+    minWidth: 110,
   },
   requestTitle: {
     color: palette.ink,

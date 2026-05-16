@@ -4,13 +4,17 @@ import { URL } from "node:url";
 import {
   createClassroomActivity,
   createClassroom,
+  duplicateActivity,
   getActivityDetails,
+  getClassroomDetails,
   inviteStudentToClass,
   listActivitiesForProfile,
   listClassroomsForProfile,
+  removeClassroomMember,
   requestJoinClass,
   respondToMembershipRequest,
   submitActivity,
+  updateClassroomName,
   upsertClassroomProfile,
 } from "./classroom-store.mjs";
 
@@ -1300,6 +1304,31 @@ async function handleClassroomList(body, response) {
   sendJson(response, 200, { classes });
 }
 
+async function handleClassroomDetails(body, response) {
+  if (!body.profile?.id || !body.classId) {
+    sendJson(response, 400, { error: "Profile and class are required." });
+    return;
+  }
+
+  const payload = await getClassroomDetails(body.profile, body.classId, body.appVariant ?? "children");
+  sendJson(response, 200, payload);
+}
+
+async function handleClassroomUpdate(body, response) {
+  if (!body.teacherProfile?.id || !body.classId || !body.className?.trim()) {
+    sendJson(response, 400, { error: "Teacher profile, class, and class name are required." });
+    return;
+  }
+
+  const payload = await updateClassroomName(
+    body.teacherProfile,
+    body.classId,
+    body.className,
+    body.appVariant ?? "children"
+  );
+  sendJson(response, 200, payload);
+}
+
 async function handleClassroomJoin(body, response) {
   if (!body.studentProfile?.id || !body.classCode?.trim()) {
     sendJson(response, 400, { error: "Student profile and class code are required." });
@@ -1341,6 +1370,21 @@ async function handleClassroomMembershipRespond(body, response) {
   sendJson(response, 200, payload);
 }
 
+async function handleClassroomMemberRemove(body, response) {
+  if (!body.teacherProfile?.id || !body.classId || !body.membershipId) {
+    sendJson(response, 400, { error: "Teacher profile, class, and member are required." });
+    return;
+  }
+
+  const payload = await removeClassroomMember(
+    body.teacherProfile,
+    body.classId,
+    body.membershipId,
+    body.appVariant ?? "children"
+  );
+  sendJson(response, 200, payload);
+}
+
 async function handleAssignmentCandidates(body, response) {
   if (!body.teacherProfile?.id || !body.classId || !body.subject?.id) {
     sendJson(response, 400, { error: "Assignment candidate request is incomplete." });
@@ -1363,6 +1407,16 @@ async function handleAssignmentCreate(body, response) {
   }
 
   const activity = await createClassroomActivity(body, body.appVariant ?? "children");
+  sendJson(response, 200, { activity });
+}
+
+async function handleAssignmentDuplicate(body, response) {
+  if (!body.teacherProfile?.id || !body.activityId) {
+    sendJson(response, 400, { error: "Teacher profile and activity are required." });
+    return;
+  }
+
+  const activity = await duplicateActivity(body.teacherProfile, body.activityId, body.appVariant ?? "children");
   sendJson(response, 200, { activity });
 }
 
@@ -1537,6 +1591,16 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/classroom/classes/details") {
+      await handleClassroomDetails(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/classes/update") {
+      await handleClassroomUpdate(body, response);
+      return;
+    }
+
     if (url.pathname === "/classroom/classes/join") {
       await handleClassroomJoin(body, response);
       return;
@@ -1552,6 +1616,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/classroom/classes/member/remove") {
+      await handleClassroomMemberRemove(body, response);
+      return;
+    }
+
     if (url.pathname === "/classroom/assignments/candidates") {
       await handleAssignmentCandidates(body, response);
       return;
@@ -1559,6 +1628,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/assignments/create") {
       await handleAssignmentCreate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/duplicate") {
+      await handleAssignmentDuplicate(body, response);
       return;
     }
 

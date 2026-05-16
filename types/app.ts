@@ -205,6 +205,28 @@ export interface ClassroomClassCreateResponse {
   classroom: ClassroomSummary;
 }
 
+export interface ClassroomClassDetailsRequest {
+  profile: UserProfile;
+  classId: string;
+}
+
+export interface ClassroomClassDetailsResponse {
+  classroom: ClassroomSummary;
+  members: ClassroomMemberSummary[];
+}
+
+export interface ClassroomClassUpdateRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+  className: string;
+}
+
+export interface ClassroomClassMemberRemoveRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+  membershipId: string;
+}
+
 export interface ClassroomJoinClassRequest {
   studentProfile: UserProfile;
   classCode: string;
@@ -297,6 +319,11 @@ export interface ClassroomActivityCreateRequest {
 
 export interface ClassroomActivityCreateResponse {
   activity: ClassroomActivitySummary;
+}
+
+export interface ClassroomActivityDuplicateRequest {
+  teacherProfile: UserProfile;
+  activityId: string;
 }
 
 export interface ClassroomActivityListRequest {

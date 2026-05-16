@@ -9,14 +9,19 @@ import type {
   ClassroomActivityCreateResponse,
   ClassroomActivityDetailsRequest,
   ClassroomActivityDetailsResponse,
+  ClassroomActivityDuplicateRequest,
   ClassroomActivityListRequest,
   ClassroomActivityListResponse,
   ClassroomActivitySubmitRequest,
   ClassroomActivitySubmitResponse,
   ClassroomClassCreateRequest,
   ClassroomClassCreateResponse,
+  ClassroomClassDetailsRequest,
+  ClassroomClassDetailsResponse,
   ClassroomClassListRequest,
   ClassroomClassListResponse,
+  ClassroomClassMemberRemoveRequest,
+  ClassroomClassUpdateRequest,
   ClassroomInviteStudentRequest,
   ClassroomJoinClassRequest,
   ClassroomMembershipDecisionRequest,
@@ -545,6 +550,24 @@ export async function listClassroomClasses(
   return postJson("/classroom/classes/list", withVariantMeta(request));
 }
 
+export async function getClassroomDetails(
+  request: ClassroomClassDetailsRequest
+): Promise<ClassroomClassDetailsResponse> {
+  return postJson("/classroom/classes/details", withVariantMeta(request));
+}
+
+export async function updateClassroomClass(
+  request: ClassroomClassUpdateRequest
+): Promise<ClassroomMembershipMutationResponse> {
+  return postJson("/classroom/classes/update", withVariantMeta(request));
+}
+
+export async function removeClassroomMember(
+  request: ClassroomClassMemberRemoveRequest
+): Promise<ClassroomMembershipMutationResponse> {
+  return postJson("/classroom/classes/member/remove", withVariantMeta(request));
+}
+
 export async function requestJoinClassroom(
   request: ClassroomJoinClassRequest
 ): Promise<ClassroomMembershipMutationResponse> {
@@ -573,6 +596,12 @@ export async function createClassroomAssignment(
   request: ClassroomActivityCreateRequest
 ): Promise<ClassroomActivityCreateResponse> {
   return postJson("/classroom/assignments/create", withVariantMeta(request));
+}
+
+export async function duplicateClassroomActivity(
+  request: ClassroomActivityDuplicateRequest
+): Promise<ClassroomActivityCreateResponse> {
+  return postJson("/classroom/assignments/duplicate", withVariantMeta(request));
 }
 
 export async function listClassroomActivities(

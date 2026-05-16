@@ -98,6 +98,22 @@ function getMembershipsForClass(store, classId) {
   return Object.values(store.memberships).filter((membership) => membership.classId === classId);
 }
 
+function getSortedMembershipsForClass(store, classId) {
+  return getMembershipsForClass(store, classId).sort((left, right) => {
+    const statusWeight = {
+      active: 0,
+      pending_teacher_approval: 1,
+      pending_student_approval: 2,
+    };
+    const leftWeight = statusWeight[left.status] ?? 99;
+    const rightWeight = statusWeight[right.status] ?? 99;
+    if (leftWeight !== rightWeight) {
+      return leftWeight - rightWeight;
+    }
+    return left.name.localeCompare(right.name);
+  });
+}
+
 function getActiveMembership(store, classId, profileId) {
   return Object.values(store.memberships).find(
     (membership) => membership.classId === classId && membership.profileId === profileId && membership.status === "active"
@@ -122,6 +138,13 @@ function buildClassroomSummary(store, classroom) {
     memberCount: memberships.filter((membership) => membership.status === "active").length,
     pendingTeacherApprovals: memberships.filter((membership) => membership.status === "pending_teacher_approval"),
     pendingStudentApprovals: memberships.filter((membership) => membership.status === "pending_student_approval"),
+  };
+}
+
+function buildClassroomDetails(store, classroom) {
+  return {
+    classroom: buildClassroomSummary(store, classroom),
+    members: getSortedMembershipsForClass(store, classroom.id),
   };
 }
 
@@ -302,6 +325,24 @@ export async function listClassroomsForProfile(profile, appVariant) {
   });
 }
 
+export async function getClassroomDetails(profile, classId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
+    const classroom = store.classrooms[classId];
+    if (!classroom) {
+      throw new Error("Class not found.");
+    }
+
+    const membership = getMembershipsForClass(store, classId).find((entry) => entry.profileId === profile.id);
+    const isTeacher = classroom.teacherProfileId === profile.id;
+    if (!membership && !isTeacher) {
+      throw new Error("This profile is not part of the class.");
+    }
+
+    return buildClassroomDetails(store, classroom);
+  });
+}
+
 export async function requestJoinClass(studentProfile, classCode, appVariant) {
   return mutateStore(async (store) => {
     if (normalizeRole(studentProfile.role) !== "student") {
@@ -379,6 +420,45 @@ export async function inviteStudentToClass(teacherProfile, classId, studentQuiks
     return {
       classroom: buildClassroomSummary(store, classroom),
       message: `Invite sent to ${student.name}.`,
+    };
+  });
+}
+
+export async function updateClassroomName(teacherProfile, classId, className, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const classroom = store.classrooms[classId];
+    ensureTeacherOwnsClass(classroom, teacherProfile.id);
+
+    classroom.className = className.trim();
+
+    return {
+      classroom: buildClassroomSummary(store, classroom),
+      message: "Class name updated.",
+    };
+  });
+}
+
+export async function removeClassroomMember(teacherProfile, classId, membershipId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const classroom = store.classrooms[classId];
+    ensureTeacherOwnsClass(classroom, teacherProfile.id);
+    const membership = store.memberships[membershipId];
+
+    if (!membership || membership.classId !== classId) {
+      throw new Error("Member record not found.");
+    }
+
+    if (membership.profileId === teacherProfile.id || membership.role === "teacher") {
+      throw new Error("The class teacher cannot be removed from the class.");
+    }
+
+    delete store.memberships[membershipId];
+
+    return {
+      classroom: buildClassroomSummary(store, classroom),
+      message: `${membership.name} was removed from the class.`,
     };
   });
 }
@@ -465,6 +545,38 @@ export async function createClassroomActivity(payload, appVariant) {
     };
 
     return buildActivitySummary(store, store.activities[activityId], payload.teacherProfile.id);
+  });
+}
+
+export async function duplicateActivity(teacherProfile, activityId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const sourceActivity = store.activities[activityId];
+    if (!sourceActivity) {
+      throw new Error("Activity not found.");
+    }
+
+    const classroom = store.classrooms[sourceActivity.classId];
+    ensureTeacherOwnsClass(classroom, teacherProfile.id);
+
+    const nextActivityId = randomUUID();
+    const now = Date.now();
+    const startAt = sourceActivity.type === "test" ? now + 5 * 60 * 1000 : now;
+    const endAt =
+      sourceActivity.type === "test"
+        ? startAt + sourceActivity.durationMinutes * 60 * 1000
+        : startAt + 24 * 60 * 60 * 1000;
+
+    store.activities[nextActivityId] = {
+      ...cloneValue(sourceActivity),
+      id: nextActivityId,
+      title: `${sourceActivity.title} Copy`,
+      startAt,
+      endAt,
+      createdAt: now,
+    };
+
+    return buildActivitySummary(store, store.activities[nextActivityId], teacherProfile.id);
   });
 }
 
