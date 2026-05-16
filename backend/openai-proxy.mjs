@@ -1,6 +1,18 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
+import {
+  createClassroomActivity,
+  createClassroom,
+  getActivityDetails,
+  inviteStudentToClass,
+  listActivitiesForProfile,
+  listClassroomsForProfile,
+  requestJoinClass,
+  respondToMembershipRequest,
+  submitActivity,
+  upsertClassroomProfile,
+} from "./classroom-store.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
@@ -1258,6 +1270,142 @@ async function handleCompetitionRematchAccept(body, response) {
   sendJson(response, 200, buildRematchResponse(rematch, body.playerId));
 }
 
+async function handleClassroomProfileUpsert(body, response) {
+  if (!body.profile?.id || !body.profile?.quiksId) {
+    sendJson(response, 400, { error: "Profile identity is missing." });
+    return;
+  }
+
+  const profile = await upsertClassroomProfile(body.profile, body.appVariant ?? "children");
+  sendJson(response, 200, { profile });
+}
+
+async function handleClassroomCreate(body, response) {
+  if (!body.teacherProfile?.id || !body.className?.trim()) {
+    sendJson(response, 400, { error: "Teacher profile and class name are required." });
+    return;
+  }
+
+  const classroom = await createClassroom(body.teacherProfile, body.className, body.appVariant ?? "children");
+  sendJson(response, 200, { classroom });
+}
+
+async function handleClassroomList(body, response) {
+  if (!body.profile?.id) {
+    sendJson(response, 400, { error: "Profile is required." });
+    return;
+  }
+
+  const classes = await listClassroomsForProfile(body.profile, body.appVariant ?? "children");
+  sendJson(response, 200, { classes });
+}
+
+async function handleClassroomJoin(body, response) {
+  if (!body.studentProfile?.id || !body.classCode?.trim()) {
+    sendJson(response, 400, { error: "Student profile and class code are required." });
+    return;
+  }
+
+  const payload = await requestJoinClass(body.studentProfile, body.classCode, body.appVariant ?? "children");
+  sendJson(response, 200, payload);
+}
+
+async function handleClassroomInvite(body, response) {
+  if (!body.teacherProfile?.id || !body.classId || !body.studentQuiksId?.trim()) {
+    sendJson(response, 400, { error: "Teacher profile, class, and student ID are required." });
+    return;
+  }
+
+  const payload = await inviteStudentToClass(
+    body.teacherProfile,
+    body.classId,
+    body.studentQuiksId,
+    body.appVariant ?? "children"
+  );
+  sendJson(response, 200, payload);
+}
+
+async function handleClassroomMembershipRespond(body, response) {
+  if (!body.actorProfile?.id || !body.classId || !body.membershipId || !body.decision) {
+    sendJson(response, 400, { error: "Membership response is incomplete." });
+    return;
+  }
+
+  const payload = await respondToMembershipRequest(
+    body.actorProfile,
+    body.classId,
+    body.membershipId,
+    body.decision,
+    body.appVariant ?? "children"
+  );
+  sendJson(response, 200, payload);
+}
+
+async function handleAssignmentCandidates(body, response) {
+  if (!body.teacherProfile?.id || !body.classId || !body.subject?.id) {
+    sendJson(response, 400, { error: "Assignment candidate request is incomplete." });
+    return;
+  }
+
+  const batchCount = Math.max(1, Math.min(Number(body.batchCount ?? 3), Number(body.questionCount ?? 3), 6));
+  const questions = await generateQuestionSet({
+    ...body,
+    questionCount: batchCount,
+  });
+
+  sendJson(response, 200, { questions });
+}
+
+async function handleAssignmentCreate(body, response) {
+  if (!body.teacherProfile?.id || !body.classId || !body.subject?.id || !Array.isArray(body.questions)) {
+    sendJson(response, 400, { error: "Assignment creation request is incomplete." });
+    return;
+  }
+
+  const activity = await createClassroomActivity(body, body.appVariant ?? "children");
+  sendJson(response, 200, { activity });
+}
+
+async function handleAssignmentList(body, response) {
+  if (!body.profile?.id) {
+    sendJson(response, 400, { error: "Profile is required." });
+    return;
+  }
+
+  const activities = await listActivitiesForProfile(body.profile, body.appVariant ?? "children");
+  sendJson(response, 200, { activities });
+}
+
+async function handleAssignmentDetails(body, response) {
+  if (!body.profile?.id || !body.activityId) {
+    sendJson(response, 400, { error: "Profile and assignment are required." });
+    return;
+  }
+
+  const payload = await getActivityDetails(body.profile, body.activityId, body.appVariant ?? "children");
+  sendJson(response, 200, payload);
+}
+
+async function handleAssignmentSubmit(body, response) {
+  if (!body.profile?.id || !body.activityId) {
+    sendJson(response, 400, { error: "Profile and assignment are required." });
+    return;
+  }
+
+  const payload = await submitActivity(
+    body.profile,
+    body.activityId,
+    {
+      score: body.score ?? 0,
+      correctAnswers: body.correctAnswers ?? 0,
+      totalQuestions: body.totalQuestions ?? 0,
+      timeTakenSeconds: body.timeTakenSeconds ?? 0,
+    },
+    body.appVariant ?? "children"
+  );
+  sendJson(response, 200, payload);
+}
+
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
@@ -1371,6 +1519,61 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/competition/rematch/accept") {
       await handleCompetitionRematchAccept(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/profile/upsert") {
+      await handleClassroomProfileUpsert(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/classes/create") {
+      await handleClassroomCreate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/classes/list") {
+      await handleClassroomList(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/classes/join") {
+      await handleClassroomJoin(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/classes/invite") {
+      await handleClassroomInvite(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/classes/membership/respond") {
+      await handleClassroomMembershipRespond(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/candidates") {
+      await handleAssignmentCandidates(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/create") {
+      await handleAssignmentCreate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/list") {
+      await handleAssignmentList(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/details") {
+      await handleAssignmentDetails(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/submit") {
+      await handleAssignmentSubmit(body, response);
       return;
     }
 

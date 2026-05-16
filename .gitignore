@@ -49,4 +49,7 @@ firestore-debug.log
 expo-env.d.ts
 .expo
 dist
+.gradle
+.idx
+.trae
 # @end expo-cli

@@ -8,6 +8,21 @@ export type AppLanguage = "en" | "fr" | "es" | "pt" | "ar" | "sw" | "zh" | "de";
 
 export type SubscriptionTier = "free" | "pro";
 
+export type UserRole = "student" | "teacher";
+
+export type ClassroomActivityType = "assignment" | "test";
+
+export type ClassroomResultVisibility = "public" | "private";
+
+export type ClassroomQuestionOrderMode = "same" | "shuffled";
+
+export interface AppAccount {
+  uid: string;
+  name: string;
+  email: string;
+  provider: "email" | "google";
+}
+
 export interface SubjectTopic {
   id: string;
   label: string;
@@ -26,6 +41,16 @@ export interface Subject {
   topics: SubjectTopic[];
 }
 
+export interface TopicValidationResult {
+  status: "empty" | "valid" | "wrong-subject" | "unknown";
+  input: string;
+  matchedTopicId?: string;
+  matchedTopicLabel?: string;
+  matchedSubjectId?: string;
+  matchedSubjectName?: string;
+  correctedFrom?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -33,6 +58,8 @@ export interface UserProfile {
   targetExam: string;
   dailyGoalMinutes: number;
   language: AppLanguage;
+  role: UserRole;
+  quiksId: string;
 }
 
 export interface Question {
@@ -87,6 +114,8 @@ export interface BreatherContent {
 }
 
 export interface StoredAppState {
+  account: AppAccount | null;
+  isAuthenticated: boolean;
   profiles: UserProfile[];
   currentProfileId: string | null;
   results: Record<string, SessionResult[]>;
@@ -129,6 +158,192 @@ export interface CoachPlanRequest {
   focusMode?: QuestionFocusMode;
   topicLabel?: string;
   profile?: UserProfile | null;
+}
+
+export interface ClassroomProfileSyncRequest {
+  profile: UserProfile;
+}
+
+export interface ClassroomMemberSummary {
+  membershipId: string;
+  profileId: string;
+  quiksId: string;
+  name: string;
+  role: UserRole;
+  status: "active" | "pending_teacher_approval" | "pending_student_approval";
+  requestedBy: "teacher" | "student";
+  joinedAt?: number;
+  createdAt: number;
+}
+
+export interface ClassroomSummary {
+  classId: string;
+  classCode: string;
+  className: string;
+  teacherProfileId: string;
+  teacherName: string;
+  createdAt: number;
+  memberCount: number;
+  pendingTeacherApprovals: ClassroomMemberSummary[];
+  pendingStudentApprovals: ClassroomMemberSummary[];
+}
+
+export interface ClassroomClassCreateRequest {
+  teacherProfile: UserProfile;
+  className: string;
+}
+
+export interface ClassroomClassListRequest {
+  profile: UserProfile;
+}
+
+export interface ClassroomClassListResponse {
+  classes: ClassroomSummary[];
+}
+
+export interface ClassroomClassCreateResponse {
+  classroom: ClassroomSummary;
+}
+
+export interface ClassroomJoinClassRequest {
+  studentProfile: UserProfile;
+  classCode: string;
+}
+
+export interface ClassroomInviteStudentRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+  studentQuiksId: string;
+}
+
+export interface ClassroomMembershipDecisionRequest {
+  actorProfile: UserProfile;
+  classId: string;
+  membershipId: string;
+  decision: "approve" | "reject";
+}
+
+export interface ClassroomMembershipMutationResponse {
+  classroom: ClassroomSummary;
+  message: string;
+}
+
+export interface ClassroomQuestionCandidateRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+  subject: Subject;
+  grade: string;
+  level: number;
+  difficulty: Difficulty;
+  focusMode?: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  questionCount: number;
+  batchCount?: number;
+}
+
+export interface ClassroomQuestionCandidateResponse {
+  questions: Question[];
+}
+
+export interface ClassroomActivitySummary {
+  activityId: string;
+  classId: string;
+  className: string;
+  type: ClassroomActivityType;
+  title: string;
+  subjectId: string;
+  subjectName: string;
+  grade: string;
+  level: number;
+  difficulty: Difficulty;
+  focusMode: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  questionCount: number;
+  durationMinutes: number;
+  startAt: number;
+  endAt: number;
+  resultVisibility: ClassroomResultVisibility;
+  questionOrderMode: ClassroomQuestionOrderMode;
+  status: "scheduled" | "open" | "closed";
+  teacherProfileId: string;
+  teacherName: string;
+  submissionCount: number;
+  createdAt: number;
+  submitted?: boolean;
+  score?: number;
+}
+
+export interface ClassroomActivityCreateRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+  type: ClassroomActivityType;
+  title: string;
+  subject: Subject;
+  grade: string;
+  level: number;
+  difficulty: Difficulty;
+  focusMode?: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  durationMinutes: number;
+  availabilityHours: number;
+  startInMinutes?: number;
+  resultVisibility: ClassroomResultVisibility;
+  questionOrderMode: ClassroomQuestionOrderMode;
+  questions: Question[];
+}
+
+export interface ClassroomActivityCreateResponse {
+  activity: ClassroomActivitySummary;
+}
+
+export interface ClassroomActivityListRequest {
+  profile: UserProfile;
+}
+
+export interface ClassroomActivityListResponse {
+  activities: ClassroomActivitySummary[];
+}
+
+export interface ClassroomActivityDetailsRequest {
+  profile: UserProfile;
+  activityId: string;
+}
+
+export interface ClassroomSubmissionSummary {
+  profileId: string;
+  studentName: string;
+  quiksId: string;
+  submittedAt?: number;
+  score: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  timeTakenSeconds: number;
+  status: "submitted" | "absent";
+}
+
+export interface ClassroomActivityDetailsResponse {
+  activity: ClassroomActivitySummary;
+  questions: Question[];
+  className: string;
+  teacherName: string;
+  submissions?: ClassroomSubmissionSummary[];
+}
+
+export interface ClassroomActivitySubmitRequest {
+  profile: UserProfile;
+  activityId: string;
+  score: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  timeTakenSeconds: number;
+}
+
+export interface ClassroomActivitySubmitResponse {
+  activity: ClassroomActivitySummary;
+  submission: ClassroomSubmissionSummary;
 }
 
 export interface BreatherRequest {

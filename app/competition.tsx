@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
@@ -391,6 +392,8 @@ export default function CompetitionScreen() {
             />
           </View>
         ) : null}
+
+        {subscriptionTier === "free" ? <DemoAdBanner language={language} /> : null}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "openChallenges")}</Text>

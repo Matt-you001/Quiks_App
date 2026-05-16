@@ -107,21 +107,16 @@ export default function SubjectDetailScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{appVariant.studyAssistantTitle}</Text>
-        <Text style={styles.coachText}>
-          {t(language, "aiCoachDescription", { appName: appVariant.appName, subject: subject.name.toLowerCase() })}
-        </Text>
-        <PrimaryButton
-          label={t(language, "openSetup", { mode })}
-          onPress={() =>
-            router.push({
-              pathname: "/session",
-              params: { subjectId: subject.id, mode, grade: selectedGrade },
-            })
-          }
-        />
-      </View>
+      <PrimaryButton
+        label={t(language, "openSetup", { mode }).replace(/setup/i, "").replace(/\s{2,}/g, " ").trim()}
+        onPress={() =>
+          router.push({
+            pathname: "/session",
+            params: { subjectId: subject.id, mode, grade: selectedGrade },
+          })
+        }
+        style={styles.openQuizButton}
+      />
     </AppBackground>
   );
 }
@@ -217,10 +212,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     lineHeight: 20,
   },
-  coachText: {
-    color: palette.slate,
-    lineHeight: 22,
-    marginBottom: 14,
+  openQuizButton: {
+    marginTop: 18,
   },
   fallbackCard: {
     marginTop: 40,

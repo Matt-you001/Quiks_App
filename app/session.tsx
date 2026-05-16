@@ -1,29 +1,35 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState } from "../lib/storage";
-import { canUseAiToday, isProTier } from "../lib/subscription";
+import { canUseAiToday, hasProAccess } from "../lib/subscription";
 import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
-import { getSubjectById, getTopicById, grades, QUESTIONS_PER_LEVEL } from "../lib/subjects";
+import { getSubjectById, getTopicById, grades, QUESTIONS_PER_LEVEL, validateTopicInput } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import {
+  acceptCompetitionRematch,
   generateCoachPlan,
   generateFeedback,
   generateQuestions,
+  getClassroomActivityDetails,
+  getCompetitionRematchStatus,
   getCompetitionStatus,
+  requestCompetitionRematch,
   sendCompetitionChat,
+  submitClassroomActivity,
   submitCompetitionResult,
   updateCompetitionProgress,
 } from "../services/ai";
 import type {
   CompetitionChatMessage,
   CompetitionLiveProgress,
+  CompetitionRematchResponse,
   Difficulty,
   Question,
   QuestionFocusMode,
@@ -48,6 +54,7 @@ export default function SessionScreen() {
     autoStart?: string;
     competitionId?: string;
     competitionOpponentName?: string;
+    classroomActivityId?: string;
   }>();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -63,6 +70,8 @@ export default function SessionScreen() {
   );
   const [focusMode, setFocusMode] = useState<QuestionFocusMode>(params.focusMode === "topic" ? "topic" : "general");
   const [topicId, setTopicId] = useState<string | null>(typeof params.topicId === "string" ? params.topicId : null);
+  const [isCustomTopic, setIsCustomTopic] = useState(false);
+  const [customTopicInput, setCustomTopicInput] = useState("");
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(Math.max(1, presetLevel));
   const [levelTouched, setLevelTouched] = useState(false);
@@ -84,8 +93,12 @@ export default function SessionScreen() {
   const [competitionStartAt, setCompetitionStartAt] = useState<number | null>(null);
   const [competitionEndAt, setCompetitionEndAt] = useState<number | null>(null);
   const [pendingCompetitionResult, setPendingCompetitionResult] = useState<SessionResult | null>(null);
+  const [competitionRematchState, setCompetitionRematchState] = useState<CompetitionRematchResponse | null>(null);
+  const [isRequestingCompetitionRematch, setIsRequestingCompetitionRematch] = useState(false);
+  const [isAcceptingCompetitionRematch, setIsAcceptingCompetitionRematch] = useState(false);
   const hasAutoStartedRef = useRef(false);
   const isCompetition = typeof params.competitionId === "string";
+  const isClassroomActivity = typeof params.classroomActivityId === "string";
   const competitionOpponentName =
     typeof params.competitionOpponentName === "string" ? params.competitionOpponentName : undefined;
   const competitionQuickMessages = useMemo(
@@ -157,6 +170,17 @@ export default function SessionScreen() {
   }, [grade, results, subject]);
 
   const selectedTopic = useMemo(() => getTopicById(subject, topicId ?? undefined), [subject, topicId]);
+  const customTopicValidation = useMemo(
+    () => (isCustomTopic ? validateTopicInput(subject, customTopicInput, language) : null),
+    [customTopicInput, isCustomTopic, language, subject]
+  );
+  const resolvedTopic = useMemo(() => {
+    if (isCustomTopic && customTopicValidation?.status === "valid") {
+      return getTopicById(subject, customTopicValidation.matchedTopicId);
+    }
+
+    return selectedTopic;
+  }, [customTopicValidation, isCustomTopic, selectedTopic, subject]);
 
   useEffect(() => {
     if (!subject) {
@@ -164,6 +188,10 @@ export default function SessionScreen() {
     }
 
     if (focusMode === "topic") {
+      if (isCustomTopic) {
+        return;
+      }
+
       const hasCurrentTopic = topicId && subject.topics.some((topic) => topic.id === topicId);
       if (!hasCurrentTopic) {
         setTopicId(subject.topics[0]?.id ?? null);
@@ -172,8 +200,10 @@ export default function SessionScreen() {
     }
 
     setIsTopicDropdownOpen(false);
+    setIsCustomTopic(false);
+    setCustomTopicInput("");
     setTopicId(null);
-  }, [focusMode, subject, topicId]);
+  }, [focusMode, isCustomTopic, subject, topicId]);
 
   useEffect(() => {
     const availableLevels = levelProgress.map((entry) => entry.level);
@@ -250,10 +280,16 @@ export default function SessionScreen() {
 
     const interval = setInterval(async () => {
       try {
-        const response = await getCompetitionStatus({
-          playerId: profile.id,
-          competitionId: params.competitionId,
-        });
+        const [response, rematchResponse] = await Promise.all([
+          getCompetitionStatus({
+            playerId: profile.id,
+            competitionId: params.competitionId,
+          }),
+          getCompetitionRematchStatus({
+            sourceCompetitionId: params.competitionId!,
+            playerId: profile.id,
+          }),
+        ]);
         if (response.competition?.chats) {
           setCompetitionChats(response.competition.chats);
         }
@@ -266,6 +302,7 @@ export default function SessionScreen() {
         if (response.competition?.endAt) {
           setCompetitionEndAt(response.competition.endAt);
         }
+        setCompetitionRematchState(rematchResponse);
 
         if (pendingCompetitionResult && response.status === "completed") {
           const finalResult: SessionResult = {
@@ -298,6 +335,50 @@ export default function SessionScreen() {
     return () => clearInterval(interval);
   }, [difficulty, isCompetition, params.competitionId, pendingCompetitionResult, phase, profile]);
 
+  const requestLiveRematch = async () => {
+    if (!canUseCompetitionRematch || !params.competitionId || !profile || !subject) {
+      return;
+    }
+
+    setIsRequestingCompetitionRematch(true);
+    try {
+      const response = await requestCompetitionRematch({
+        sourceCompetitionId: params.competitionId,
+        playerId: profile.id,
+        subject,
+        grade,
+        level: selectedLevel + 1,
+        difficulty,
+        focusMode,
+        topicId: selectedTopic?.id,
+        topicLabel: selectedTopic?.label,
+        durationSeconds: calculateQuizTime(selectedLevel + 1),
+        profile,
+      });
+      setCompetitionRematchState(response);
+    } finally {
+      setIsRequestingCompetitionRematch(false);
+    }
+  };
+
+  const acceptLiveRematch = async () => {
+    if (!canUseCompetitionRematch || !params.competitionId || !profile) {
+      return;
+    }
+
+    setIsAcceptingCompetitionRematch(true);
+    try {
+      const response = await acceptCompetitionRematch({
+        sourceCompetitionId: params.competitionId,
+        playerId: profile.id,
+        profile,
+      });
+      setCompetitionRematchState(response);
+    } finally {
+      setIsAcceptingCompetitionRematch(false);
+    }
+  };
+
   const currentQuestion = useMemo(() => questions[currentIndex], [questions, currentIndex]);
   const opponentProgress = useMemo(
     () => competitionLiveProgress.find((entry) => entry.playerId !== profile?.id),
@@ -307,14 +388,85 @@ export default function SessionScreen() {
     () => competitionLiveProgress.find((entry) => entry.playerId === profile?.id),
     [competitionLiveProgress, profile?.id]
   );
+  const canUseCompetitionRematch = Boolean(isCompetition && profile && hasProAccess(subscriptionTier));
 
   const loadQuestions = async () => {
     if (!subject || !profile) {
       return;
     }
 
+    if (focusMode === "topic") {
+      if (isCustomTopic) {
+        if (!customTopicValidation || customTopicValidation.status === "empty") {
+          Alert.alert(t(language, "chooseTopic"), t(language, "customTopicRequired"));
+          return;
+        }
+
+        if (customTopicValidation.status === "wrong-subject") {
+          Alert.alert(
+            t(language, "chooseTopic"),
+            t(language, "customTopicWrongSubject", {
+              topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
+              subject: subject.name,
+              matchedSubject: customTopicValidation.matchedSubjectName ?? subject.name,
+            })
+          );
+          return;
+        }
+
+        if (customTopicValidation.status === "unknown") {
+          Alert.alert(
+            t(language, "chooseTopic"),
+            t(language, "customTopicUnknown", {
+              topic: customTopicValidation.input,
+              subject: subject.name,
+            })
+          );
+          return;
+        }
+      } else if (!selectedTopic) {
+        Alert.alert(t(language, "chooseTopic"), t(language, "customTopicRequired"));
+        return;
+      }
+    }
+
     setPhase("loading");
     try {
+      if (isClassroomActivity) {
+        const assignment = await getClassroomActivityDetails({
+          profile,
+          activityId: params.classroomActivityId!,
+        });
+        if (assignment.activity.submitted) {
+          Alert.alert("Classroom", `You have already submitted this ${assignment.activity.type}.`);
+          router.replace("/classroom");
+          return;
+        }
+
+        if (assignment.activity.status === "closed") {
+          Alert.alert("Classroom", `This ${assignment.activity.type} is already closed.`);
+          router.replace("/classroom");
+          return;
+        }
+
+        const nextQuestions = normalizeQuestions(assignment.questions);
+        setQuestionSource("remote");
+        setCompetitionChats([]);
+        setCompetitionLiveProgress([]);
+        setCompetitionStartAt(assignment.activity.startAt ?? null);
+        setCompetitionEndAt(assignment.activity.endAt ?? null);
+        setQuestions(nextQuestions);
+        setAnswers(Array(nextQuestions.length).fill(null));
+        setCurrentIndex(0);
+        setSelectedAnswer(null);
+        setElapsed(0);
+        const absoluteRemainingSeconds = Math.max(1, Math.floor((assignment.activity.endAt - Date.now()) / 1000));
+        const perAttemptSeconds = Math.max(60, assignment.activity.durationMinutes * 60);
+        setTimeLeft(Math.min(absoluteRemainingSeconds, perAttemptSeconds));
+        setPhase(assignment.activity.startAt > Date.now() ? "countdown" : "active");
+        return;
+      }
+
       if (isCompetition) {
         const competitionStatus = await getCompetitionStatus({
           playerId: profile.id,
@@ -356,12 +508,12 @@ export default function SessionScreen() {
         level: selectedLevel,
         questionCount: QUESTIONS_PER_LEVEL,
         focusMode,
-        topicId: selectedTopic?.id,
-        topicLabel: selectedTopic?.label,
+        topicId: resolvedTopic?.id,
+        topicLabel: resolvedTopic?.label,
         profile,
         recentQuestionIds,
       };
-      const allowAi = isProTier(subscriptionTier) || canUseAiToday(subscriptionTier, results);
+      const allowAi = hasProAccess(subscriptionTier) || canUseAiToday(subscriptionTier, results);
       const response = allowAi
         ? await generateQuestions(request)
         : {
@@ -489,7 +641,7 @@ export default function SessionScreen() {
     const score = scoreQuestions(questions, finalAnswers);
     const timeTakenSeconds = mode === "quiz" ? calculateQuizTime(selectedLevel) - timeLeft : elapsed;
     const bonusCoins = mode === "quiz" && score.score === 100 ? Math.floor(Math.max(timeLeft, 0) * 0.05) : 0;
-    const practiceLabel = selectedTopic?.label ?? subject.name;
+    const practiceLabel = resolvedTopic?.label ?? subject.name;
     let feedback = `You completed your ${practiceLabel} session. Keep building your confidence one level at a time.`;
     let studyPlan = [
       `Review the key ideas from ${practiceLabel.toLowerCase()} before your next session.`,
@@ -497,14 +649,14 @@ export default function SessionScreen() {
       `Move steadily and focus on accuracy first, then speed.`,
     ];
 
-    if (isProTier(subscriptionTier)) {
+    if (hasProAccess(subscriptionTier)) {
       try {
         feedback = await generateFeedback({
           score: score.score,
           subject,
           grade,
           focusMode,
-          topicLabel: selectedTopic?.label,
+          topicLabel: resolvedTopic?.label,
           profile,
         });
       } catch {
@@ -518,7 +670,7 @@ export default function SessionScreen() {
           grade,
           level: selectedLevel,
           focusMode,
-          topicLabel: selectedTopic?.label,
+          topicLabel: resolvedTopic?.label,
           profile,
         });
       } catch {
@@ -536,8 +688,8 @@ export default function SessionScreen() {
       grade,
       mode,
       focusMode,
-      topicId: selectedTopic?.id,
-      topicLabel: selectedTopic?.label,
+      topicId: resolvedTopic?.id,
+      topicLabel: resolvedTopic?.label,
       score: score.score,
       timeTakenSeconds,
       correctAnswers: score.correctAnswers,
@@ -585,7 +737,22 @@ export default function SessionScreen() {
       }
     }
 
-    result.aiStudyPlan = isProTier(subscriptionTier) ? studyPlan : studyPlan.slice(0, 2);
+    if (isClassroomActivity && params.classroomActivityId) {
+      try {
+        await submitClassroomActivity({
+          profile,
+          activityId: params.classroomActivityId,
+          score: score.score,
+          correctAnswers: score.correctAnswers,
+          totalQuestions: score.totalQuestions,
+          timeTakenSeconds,
+        });
+      } catch {
+        // Keep the normal local results flow if backend submission is temporarily unavailable.
+      }
+    }
+
+    result.aiStudyPlan = hasProAccess(subscriptionTier) ? studyPlan : studyPlan.slice(0, 2);
 
     await appendResult(profile.id, result);
     router.replace({
@@ -674,7 +841,9 @@ export default function SessionScreen() {
                 style={[styles.dropdownTrigger, isTopicDropdownOpen ? styles.dropdownTriggerActive : null]}
               >
                 <View style={styles.dropdownTextWrap}>
-                  <Text style={styles.dropdownLabel}>{selectedTopic?.label ?? t(language, "selectTopic")}</Text>
+                  <Text style={styles.dropdownLabel}>
+                    {isCustomTopic ? customTopicInput || t(language, "otherTopic") : selectedTopic?.label ?? t(language, "selectTopic")}
+                  </Text>
                   <Text style={styles.dropdownHint}>{t(language, "topicPickerHint")}</Text>
                 </View>
                 <MaterialCommunityIcons
@@ -690,6 +859,8 @@ export default function SessionScreen() {
                       <Pressable
                         key={topic.id}
                         onPress={() => {
+                          setIsCustomTopic(false);
+                          setCustomTopicInput("");
                           setTopicId(topic.id);
                           setIsTopicDropdownOpen(false);
                         }}
@@ -703,10 +874,62 @@ export default function SessionScreen() {
                         </Text>
                       </Pressable>
                     ))}
+                    <Pressable
+                      onPress={() => {
+                        setIsCustomTopic(true);
+                        setTopicId(null);
+                        setIsTopicDropdownOpen(false);
+                      }}
+                      style={[styles.dropdownItem, isCustomTopic ? styles.dropdownItemActive : null]}
+                    >
+                      <Text style={[styles.dropdownItemTitle, isCustomTopic ? styles.dropdownItemTitleActive : null]}>
+                        {t(language, "otherTopic")}
+                      </Text>
+                      <Text style={[styles.dropdownItemText, isCustomTopic ? styles.dropdownItemTextActive : null]}>
+                        {t(language, "customTopicHint")}
+                      </Text>
+                    </Pressable>
                   </ScrollView>
                 </View>
               ) : null}
-              {selectedTopic ? <Text style={styles.hintText}>{selectedTopic.description}</Text> : null}
+              {isCustomTopic ? (
+                <>
+                  <TextInput
+                    value={customTopicInput}
+                    onChangeText={setCustomTopicInput}
+                    style={styles.customTopicInput}
+                    placeholder={t(language, "enterCustomTopic")}
+                    placeholderTextColor="#7C8EA3"
+                    autoCapitalize="words"
+                  />
+                  <Text style={styles.hintText}>
+                    {customTopicValidation?.status === "valid"
+                      ? customTopicValidation.correctedFrom
+                        ? t(language, "customTopicSuggestion", {
+                            topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
+                            input: customTopicValidation.input,
+                          })
+                        : t(language, "customTopicRecognized", {
+                            topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
+                            subject: subject.name,
+                          })
+                      : customTopicValidation?.status === "wrong-subject"
+                        ? t(language, "customTopicWrongSubject", {
+                            topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
+                            subject: subject.name,
+                            matchedSubject: customTopicValidation.matchedSubjectName ?? subject.name,
+                          })
+                        : customTopicValidation?.status === "unknown"
+                          ? t(language, "customTopicUnknown", {
+                              topic: customTopicValidation.input,
+                              subject: subject.name,
+                            })
+                          : t(language, "customTopicHint")}
+                  </Text>
+                </>
+              ) : selectedTopic ? (
+                <Text style={styles.hintText}>{selectedTopic.description}</Text>
+              ) : null}
             </>
           ) : null}
 
@@ -799,7 +1022,9 @@ export default function SessionScreen() {
               {grade} | {t(language, "levelLabel")} {selectedLevel} | {getDifficultyLabel(language, difficulty)}
             </Text>
             <Text style={styles.focusLine}>
-              {focusMode === "topic" && selectedTopic ? `Topic focus: ${selectedTopic.label}` : "General mixed practice"}
+              {focusMode === "topic" && resolvedTopic
+                ? t(language, "topicFocusLabel", { topic: resolvedTopic.label })
+                : t(language, "generalMixedPractice")}
             </Text>
             {isCompetition && competitionOpponentName ? (
               <Text style={styles.competitionLine}>
@@ -822,15 +1047,46 @@ export default function SessionScreen() {
         </View>
 
         {isCompetition ? (
-          <View style={styles.liveScoreCard}>
-            <Text style={styles.chatTitle}>{t(language, "liveScores")}</Text>
-            <Text style={styles.liveScoreLine}>
-              You: {ownCompetitionProgress?.score ?? 0}% ({ownCompetitionProgress?.answeredCount ?? 0}/{questions.length})
-            </Text>
-            <Text style={styles.liveScoreLine}>
-              {competitionOpponentName ?? t(language, "opponent")}: {opponentProgress?.score ?? 0}% ({opponentProgress?.answeredCount ?? 0}/{questions.length})
-            </Text>
-          </View>
+          <>
+            <View style={styles.liveScoreCard}>
+              <Text style={styles.chatTitle}>{t(language, "liveScores")}</Text>
+              <Text style={styles.liveScoreLine}>
+                You: {ownCompetitionProgress?.score ?? 0}% ({ownCompetitionProgress?.answeredCount ?? 0}/{questions.length})
+              </Text>
+              <Text style={styles.liveScoreLine}>
+                {competitionOpponentName ?? t(language, "opponent")}: {opponentProgress?.score ?? 0}% ({opponentProgress?.answeredCount ?? 0}/{questions.length})
+              </Text>
+            </View>
+
+            <View style={styles.rematchActionWrap}>
+              {canUseCompetitionRematch ? (
+                competitionRematchState?.status === "incoming" ? (
+                  <PrimaryButton
+                    label={t(language, "acceptRematch")}
+                    onPress={acceptLiveRematch}
+                    loading={isAcceptingCompetitionRematch}
+                  />
+                ) : competitionRematchState?.status === "requested" ? (
+                  <PrimaryButton label={t(language, "rematchRequested")} variant="secondary" onPress={() => {}} disabled />
+                ) : competitionRematchState?.status === "accepted" ? (
+                  <PrimaryButton label={t(language, "rematchStarting")} variant="secondary" onPress={() => {}} disabled />
+                ) : (
+                  <PrimaryButton
+                    label={t(language, "requestRematch")}
+                    variant="secondary"
+                    onPress={requestLiveRematch}
+                    loading={isRequestingCompetitionRematch}
+                  />
+                )
+              ) : (
+                <PrimaryButton
+                  label={t(language, "upgradeToPro")}
+                  variant="secondary"
+                  onPress={() => router.push({ pathname: "/subscription" } as never)}
+                />
+              )}
+            </View>
+          </>
         ) : null}
 
         <Text style={styles.progressText}>
@@ -1071,6 +1327,16 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     color: palette.navy,
   },
+  customTopicInput: {
+    minHeight: 50,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: "#F9FBFD",
+    paddingHorizontal: 14,
+    color: palette.ink,
+    marginTop: 12,
+  },
   focusLine: {
     color: palette.navy,
     marginTop: 6,
@@ -1208,6 +1474,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#EEF7FB",
     padding: 14,
+  },
+  rematchActionWrap: {
+    marginTop: 12,
   },
   liveScoreLine: {
     color: palette.navy,

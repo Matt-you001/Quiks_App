@@ -2,11 +2,13 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { canShowAds, showInterstitialAd } from "../lib/ads";
 import { getSubjectPassStreak, shouldOfferBreather } from "../lib/breathers";
 import { t } from "../lib/i18n";
 import { calculateQuizTime } from "../lib/quiz";
-import { isProTier } from "../lib/subscription";
+import { hasProAccess } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getSubjectById, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -74,6 +76,14 @@ export default function ResultsScreen() {
     };
   }, [result]);
 
+  useEffect(() => {
+    if (!result || !canShowAds(subscriptionTier)) {
+      return;
+    }
+
+    void showInterstitialAd();
+  }, [result, subscriptionTier]);
+
   const passed = result ? result.score >= SCORE_THRESHOLD : false;
   const rematchSubject = result ? getSubjectById(result.subjectId, language) : null;
   const nextDifficulty =
@@ -91,7 +101,7 @@ export default function ResultsScreen() {
   const canUseRematch = Boolean(
     result?.competitionId &&
       profile &&
-      isProTier(subscriptionTier) &&
+      hasProAccess(subscriptionTier) &&
       rematchSubject &&
       result?.competitionOutcome &&
       result.competitionOutcome !== "pending"
@@ -338,7 +348,7 @@ export default function ResultsScreen() {
                 <PrimaryButton label={t(language, "requestRematch")} variant="secondary" onPress={requestRematch} loading={isRequestingRematch} />
               )}
             </View>
-          ) : isCompetition && !isProTier(subscriptionTier) ? (
+          ) : isCompetition && !hasProAccess(subscriptionTier) ? (
             <View style={styles.rematchActions}>
               <Text style={styles.rematchHint}>{t(language, "manageSubscription")}</Text>
               <PrimaryButton
@@ -375,6 +385,8 @@ export default function ResultsScreen() {
           </Text>
         ))}
       </View>
+
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} /> : null}
 
       <View style={styles.actionColumn}>
         {passed && showBreather ? <PrimaryButton label={t(language, "takeLearningBreather")} onPress={openBreather} /> : null}

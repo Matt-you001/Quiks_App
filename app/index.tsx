@@ -4,6 +4,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
 import { appVariant } from "../lib/app-variant";
@@ -32,6 +33,7 @@ function getGradeRank(grade: string) {
 }
 
 export default function HomeScreen() {
+  const [authChecked, setAuthChecked] = useState(false);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [currentProfileId, setCurrentProfileIdState] = useState<string | null>(null);
   const [resultsByProfile, setResultsByProfile] = useState<Record<string, SessionResult[]>>({});
@@ -39,10 +41,16 @@ export default function HomeScreen() {
 
   const loadData = useCallback(async () => {
     const state = await readAppState();
+    if (!state.isAuthenticated) {
+      setAuthChecked(true);
+      router.replace({ pathname: "/login" } as never);
+      return;
+    }
     setProfiles(state.profiles);
     setCurrentProfileIdState(state.currentProfileId);
     setResultsByProfile(state.results);
     setSubscriptionTier(state.subscriptionTier);
+    setAuthChecked(true);
   }, []);
 
   useFocusEffect(
@@ -128,6 +136,16 @@ export default function HomeScreen() {
   };
 
   const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
+
+  if (!authChecked) {
+    return (
+      <AppBackground>
+        <View style={styles.loadingCard}>
+          <Text style={styles.loadingText}>{appVariant.appName}</Text>
+        </View>
+      </AppBackground>
+    );
+  }
 
   return (
     <AppBackground>
@@ -264,9 +282,16 @@ export default function HomeScreen() {
       </View>
 
       {appVariant.id !== "children" ? (
-        <View style={styles.homeCompetitionCard}>
-          <Text style={styles.homeCompetitionTitle}>{t(language, "competitionArena")}</Text>
-          <Text style={styles.homeCompetitionText}>{t(language, "competitionArenaHint")}</Text>
+        <View style={styles.homeActionColumn}>
+          <PrimaryButton
+            label="Classroom"
+            variant="secondary"
+            onPress={() =>
+              activeProfile
+                ? router.push("/classroom" as never)
+                : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
+            }
+          />
           <PrimaryButton
             label={t(language, "enterCompetition")}
             onPress={() =>
@@ -274,6 +299,7 @@ export default function HomeScreen() {
                 ? router.push("/competition" as never)
                 : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
             }
+            style={styles.homeCompetitionButton}
           />
         </View>
       ) : null}
@@ -292,6 +318,8 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
+      {subscriptionTier === "free" && appVariant.id !== "children" ? <DemoAdBanner language={language} /> : null}
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{appVariant.curriculumPlural}</Text>
         <Text style={styles.sectionHint}>
@@ -308,7 +336,6 @@ export default function HomeScreen() {
               <MaterialCommunityIcons name={subject.icon as never} size={28} color={palette.white} />
               <Text style={styles.subjectName}>{subject.name}</Text>
               <Text style={styles.subjectTagline}>{subject.tagline}</Text>
-              <Text style={styles.subjectDescription}>{subject.description}</Text>
             </LinearGradient>
           </Pressable>
         ))}
@@ -318,6 +345,16 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingCard: {
+    marginTop: 120,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    color: palette.white,
+    fontSize: 22,
+    fontWeight: "800",
+  },
   heroCard: {
     marginTop: 12,
     borderRadius: 30,
@@ -540,12 +577,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  homeCompetitionCard: {
+  homeCompetitionButton: {
+    marginTop: 0,
+  },
+  homeActionColumn: {
     marginTop: 18,
-    borderRadius: 24,
-    backgroundColor: palette.white,
-    padding: 18,
-    ...shadows.card,
+    gap: 12,
   },
   subscriptionCard: {
     marginTop: 18,
@@ -605,10 +642,5 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 14,
     fontWeight: "700",
-  },
-  subjectDescription: {
-    color: "rgba(255,255,255,0.88)",
-    marginTop: 10,
-    lineHeight: 20,
   },
 });

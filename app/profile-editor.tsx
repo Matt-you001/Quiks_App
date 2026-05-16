@@ -8,7 +8,7 @@ import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, t } from "../lib/i18n";
 import { canCreateAnotherProfile } from "../lib/subscription";
 import { readAppState, upsertProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
-import type { AppLanguage, UserProfile } from "../types/app";
+import type { AppLanguage, UserProfile, UserRole } from "../types/app";
 
 const defaultForm = {
   name: "",
@@ -16,10 +16,18 @@ const defaultForm = {
   targetExam: appVariant.defaultTargetExam,
   dailyGoalMinutes: String(appVariant.defaultDailyGoalMinutes),
   language: DEFAULT_LANGUAGE as AppLanguage,
+  role: "student" as UserRole,
 };
 
 function createId() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function createQuiksId(name: string, role: UserRole) {
+  const prefix = role === "teacher" ? "QT" : "QS";
+  const nameToken = name.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 3).padEnd(3, "X");
+  const randomToken = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${prefix}-${nameToken}${randomToken}`;
 }
 
 export default function ProfileEditorScreen() {
@@ -42,6 +50,7 @@ export default function ProfileEditorScreen() {
           targetExam: activeProfile.targetExam,
           dailyGoalMinutes: String(activeProfile.dailyGoalMinutes),
           language: activeProfile.language ?? DEFAULT_LANGUAGE,
+          role: activeProfile.role ?? "student",
         });
         return;
       }
@@ -88,11 +97,13 @@ export default function ProfileEditorScreen() {
       targetExam: form.targetExam.trim() || "General school prep",
       dailyGoalMinutes: goal,
       language: form.language,
+      role: form.role,
+      quiksId: editingProfile?.quiksId ?? createQuiksId(form.name.trim(), form.role),
     };
 
     await upsertProfile(profile);
     setSaving(false);
-    router.replace("/profile");
+    router.replace(isEditMode ? "/profile" : "/");
   };
 
   return (
@@ -142,6 +153,30 @@ export default function ProfileEditorScreen() {
           keyboardType="number-pad"
           placeholderTextColor="#7C8EA3"
         />
+
+        {appVariant.id !== "children" ? (
+          <>
+            <Text style={styles.label}>{t(form.language, "classroomRole")}</Text>
+            <View style={styles.languageWrap}>
+              {([
+                { code: "student", label: t(form.language, "studentRole") },
+                { code: "teacher", label: t(form.language, "teacherRole") },
+              ] as const).map((entry) => (
+                <Pressable
+                  key={entry.code}
+                  onPress={() => setForm((current) => ({ ...current, role: entry.code }))}
+                  style={[styles.languageChip, form.role === entry.code ? styles.languageChipActive : null]}
+                >
+                  <Text
+                    style={[styles.languageChipText, form.role === entry.code ? styles.languageChipTextActive : null]}
+                  >
+                    {entry.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <Text style={styles.label}>{t(form.language, "language")}</Text>
         <View style={styles.languageWrap}>

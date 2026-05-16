@@ -5,6 +5,25 @@ import { getLocalQuestions } from "../lib/question-bank";
 import type {
   BreatherContent,
   BreatherRequest,
+  ClassroomActivityCreateRequest,
+  ClassroomActivityCreateResponse,
+  ClassroomActivityDetailsRequest,
+  ClassroomActivityDetailsResponse,
+  ClassroomActivityListRequest,
+  ClassroomActivityListResponse,
+  ClassroomActivitySubmitRequest,
+  ClassroomActivitySubmitResponse,
+  ClassroomClassCreateRequest,
+  ClassroomClassCreateResponse,
+  ClassroomClassListRequest,
+  ClassroomClassListResponse,
+  ClassroomInviteStudentRequest,
+  ClassroomJoinClassRequest,
+  ClassroomMembershipDecisionRequest,
+  ClassroomMembershipMutationResponse,
+  ClassroomProfileSyncRequest,
+  ClassroomQuestionCandidateRequest,
+  ClassroomQuestionCandidateResponse,
   CompetitionJoinRequest,
   CompetitionJoinResponse,
   CompetitionChallengeAcceptRequest,
@@ -36,7 +55,23 @@ import type {
   QuestionResponse,
 } from "../types/app";
 
-const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>;
+const extra = ({
+  ...(Constants.expoConfig?.extra ?? {}),
+  ...(((Constants as unknown as { manifest?: { extra?: Record<string, string | undefined> } }).manifest?.extra ?? {})),
+  ...(
+    (
+      Constants as unknown as {
+        manifest2?: {
+          extra?: {
+            expoClient?: {
+              extra?: Record<string, string | undefined>;
+            };
+          };
+        };
+      }
+    ).manifest2?.extra?.expoClient?.extra ?? {}
+  ),
+} as Record<string, string | undefined>);
 const apiUrl = process.env.EXPO_PUBLIC_AI_API_URL ?? extra.EXPO_PUBLIC_AI_API_URL;
 const apiKey = process.env.EXPO_PUBLIC_AI_API_KEY ?? extra.EXPO_PUBLIC_AI_API_KEY;
 const aiMode = process.env.EXPO_PUBLIC_AI_MODE ?? extra.EXPO_PUBLIC_AI_MODE ?? "demo";
@@ -213,6 +248,22 @@ function buildDemoQuestions(request: QuestionRequest): Question[] {
   });
 }
 
+function buildFallbackQuestionResponse(request: QuestionRequest): QuestionResponse {
+  const localQuestions = getLocalQuestions(request);
+
+  if (localQuestions.length >= request.questionCount) {
+    return {
+      questions: localQuestions,
+      source: "local",
+    };
+  }
+
+  return {
+    questions: buildDemoQuestions(request),
+    source: "demo",
+  };
+}
+
 function validateQuestions(questions: Question[], expectedCount: number) {
   if (!Array.isArray(questions) || questions.length === 0) {
     throw new Error("AI did not return any questions.");
@@ -329,38 +380,28 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
 }
 
 export async function generateQuestions(request: QuestionRequest): Promise<QuestionResponse> {
-  const localQuestions = getLocalQuestions(request);
-
   if (aiMode !== "demo") {
     try {
       if (apiUrl) {
-        return postJson("/questions", withVariantMeta(request));
+        const response = await postJson<Record<string, unknown>, QuestionResponse>(
+          "/questions",
+          withVariantMeta(request) as unknown as Record<string, unknown>
+        );
+        return {
+          questions: validateQuestions(response.questions, request.questionCount),
+          source: response.source === "local" || response.source === "demo" ? response.source : "remote",
+        };
       }
 
       if (geminiApiKey) {
         return generateWithGemini(request);
       }
     } catch {
-      if (localQuestions.length >= request.questionCount) {
-        return {
-          questions: localQuestions,
-          source: "local",
-        };
-      }
+      return buildFallbackQuestionResponse(request);
     }
   }
 
-  if (localQuestions.length >= request.questionCount) {
-    return {
-      questions: localQuestions,
-      source: "local",
-    };
-  }
-
-  return {
-    questions: buildDemoQuestions(request),
-    source: "demo",
-  };
+  return buildFallbackQuestionResponse(request);
 }
 
 export async function generateFeedback(request: FeedbackRequest): Promise<string> {
@@ -486,4 +527,68 @@ export async function submitCompetitionResult(request: CompetitionSubmitRequest)
 
 export async function sendCompetitionChat(request: CompetitionChatSendRequest): Promise<CompetitionChatSendResponse> {
   return postJson("/competition/chat", withVariantMeta(request));
+}
+
+export async function syncClassroomProfile(request: ClassroomProfileSyncRequest) {
+  return postJson("/classroom/profile/upsert", withVariantMeta(request));
+}
+
+export async function createClassroomClass(
+  request: ClassroomClassCreateRequest
+): Promise<ClassroomClassCreateResponse> {
+  return postJson("/classroom/classes/create", withVariantMeta(request));
+}
+
+export async function listClassroomClasses(
+  request: ClassroomClassListRequest
+): Promise<ClassroomClassListResponse> {
+  return postJson("/classroom/classes/list", withVariantMeta(request));
+}
+
+export async function requestJoinClassroom(
+  request: ClassroomJoinClassRequest
+): Promise<ClassroomMembershipMutationResponse> {
+  return postJson("/classroom/classes/join", withVariantMeta(request));
+}
+
+export async function inviteStudentToClassroom(
+  request: ClassroomInviteStudentRequest
+): Promise<ClassroomMembershipMutationResponse> {
+  return postJson("/classroom/classes/invite", withVariantMeta(request));
+}
+
+export async function respondToClassroomMembership(
+  request: ClassroomMembershipDecisionRequest
+): Promise<ClassroomMembershipMutationResponse> {
+  return postJson("/classroom/classes/membership/respond", withVariantMeta(request));
+}
+
+export async function generateClassroomQuestionCandidates(
+  request: ClassroomQuestionCandidateRequest
+): Promise<ClassroomQuestionCandidateResponse> {
+  return postJson("/classroom/assignments/candidates", withVariantMeta(request));
+}
+
+export async function createClassroomAssignment(
+  request: ClassroomActivityCreateRequest
+): Promise<ClassroomActivityCreateResponse> {
+  return postJson("/classroom/assignments/create", withVariantMeta(request));
+}
+
+export async function listClassroomActivities(
+  request: ClassroomActivityListRequest
+): Promise<ClassroomActivityListResponse> {
+  return postJson("/classroom/assignments/list", withVariantMeta(request));
+}
+
+export async function getClassroomActivityDetails(
+  request: ClassroomActivityDetailsRequest
+): Promise<ClassroomActivityDetailsResponse> {
+  return postJson("/classroom/assignments/details", withVariantMeta(request));
+}
+
+export async function submitClassroomActivity(
+  request: ClassroomActivitySubmitRequest
+): Promise<ClassroomActivitySubmitResponse> {
+  return postJson("/classroom/assignments/submit", withVariantMeta(request));
 }

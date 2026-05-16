@@ -1,6 +1,38 @@
 import type { AppLanguage } from "../types/app";
 
 type TranslationKey =
+  | "signIn"
+  | "signUp"
+  | "welcomeBack"
+  | "createAccount"
+  | "authSubtitle"
+  | "fullName"
+  | "email"
+  | "password"
+  | "confirmPassword"
+  | "enterEmail"
+  | "enterPassword"
+  | "enterFullName"
+  | "reEnterPassword"
+  | "noAccountYet"
+  | "alreadyHaveAccount"
+  | "logOut"
+  | "invalidCredentialsTitle"
+  | "invalidCredentialsMessage"
+  | "accountExistsTitle"
+  | "accountExistsMessage"
+  | "passwordMismatchTitle"
+  | "passwordMismatchMessage"
+  | "passwordTooShortTitle"
+  | "passwordTooShortMessage"
+  | "authRequiredTitle"
+  | "authRequiredMessage"
+  | "continueWithGoogle"
+  | "forgotPassword"
+  | "passwordResetSentTitle"
+  | "passwordResetSentMessage"
+  | "authNotConfiguredTitle"
+  | "authNotConfiguredMessage"
   | "createProfile"
   | "editProfile"
   | "updateLearnerDetails"
@@ -77,6 +109,17 @@ type TranslationKey =
   | "chooseTopic"
   | "selectTopic"
   | "topicPickerHint"
+  | "otherTopic"
+  | "enterCustomTopic"
+  | "customTopicHint"
+  | "customTopicRecognized"
+  | "customTopicSuggestion"
+  | "customTopicWrongSubject"
+  | "customTopicUnknown"
+  | "customTopicRequired"
+  | "classroomRole"
+  | "studentRole"
+  | "teacherRole"
   | "unlockedLevels"
   | "highestUnlockedSelected"
   | "difficulty"
@@ -194,6 +237,26 @@ type TranslationKey =
   | "subscriptionSubtitle"
   | "subscriptionFreeFeatures"
   | "subscriptionProFeatures"
+  | "monthlyPlan"
+  | "yearlyPlan"
+  | "restorePurchases"
+  | "refreshStatus"
+  | "loadingStoreStatus"
+  | "subscriptionStoreHint"
+  | "subscriptionTestingPaused"
+  | "subscriptionProductsUnavailable"
+  | "subscriptionSyncFailedTitle"
+  | "subscriptionSyncFailedMessage"
+  | "purchaseSuccessTitle"
+  | "purchaseSuccessMessage"
+  | "purchasePendingTitle"
+  | "purchasePendingMessage"
+  | "purchaseFailedTitle"
+  | "restoreSuccessTitle"
+  | "restoreSuccessMessage"
+  | "restoreFreeTitle"
+  | "restoreFreeMessage"
+  | "subscriptionNotSupported"
   | "childrenAdFreeNote"
   | "profileLimitReachedTitle"
   | "profileLimitReachedMessage"
@@ -201,7 +264,9 @@ type TranslationKey =
   | "freeCompetitionLimitReached"
   | "freePlanStatus"
   | "proPlanStatus"
-  | "localSubscriptionNote";
+  | "localSubscriptionNote"
+  | "sponsoredLearningSpot"
+  | "demoAdBannerHint";
 
 type TranslationMap = Record<TranslationKey, string>;
 
@@ -223,6 +288,38 @@ export const LANGUAGE_OPTIONS: Array<{
 ];
 
 const english: TranslationMap = {
+  signIn: "Sign in",
+  signUp: "Sign up",
+  welcomeBack: "Welcome back",
+  createAccount: "Create your account",
+  authSubtitle: "Sign in to continue learning progress on this device.",
+  fullName: "Full name",
+  email: "Email",
+  password: "Password",
+  confirmPassword: "Confirm password",
+  enterEmail: "Enter your email",
+  enterPassword: "Enter your password",
+  enterFullName: "Enter your full name",
+  reEnterPassword: "Re-enter your password",
+  noAccountYet: "No account yet? Sign up",
+  alreadyHaveAccount: "Already have an account? Sign in",
+  logOut: "Log out",
+  invalidCredentialsTitle: "Invalid login",
+  invalidCredentialsMessage: "The email or password is incorrect.",
+  accountExistsTitle: "Account already exists",
+  accountExistsMessage: "An account is already saved on this device. Sign in instead.",
+  passwordMismatchTitle: "Passwords do not match",
+  passwordMismatchMessage: "Please make sure both password fields match.",
+  passwordTooShortTitle: "Password too short",
+  passwordTooShortMessage: "Use at least 6 characters for the password.",
+  authRequiredTitle: "Sign in required",
+  authRequiredMessage: "Please sign in or create an account to continue.",
+  continueWithGoogle: "Continue with Google",
+  forgotPassword: "Forgot password?",
+  passwordResetSentTitle: "Reset email sent",
+  passwordResetSentMessage: "Check your email for the password reset link.",
+  authNotConfiguredTitle: "Auth not configured",
+  authNotConfiguredMessage: "Add your Firebase and Google auth environment variables to use online sign-in.",
   createProfile: "Create profile",
   editProfile: "Edit profile",
   updateLearnerDetails: "Update this learner's details and save the changes.",
@@ -299,6 +396,17 @@ const english: TranslationMap = {
   chooseTopic: "Choose Topic",
   selectTopic: "Select topic",
   topicPickerHint: "Tap to choose from the full topic list.",
+  otherTopic: "Other topic",
+  enterCustomTopic: "Enter a topic",
+  customTopicHint: "Type a topic if it is not listed. We'll check the spelling and whether it belongs in this subject.",
+  customTopicRecognized: "{topic} is available in {subject}.",
+  customTopicSuggestion: "Do you mean {topic} instead of {input}? We'll use {topic} for this session.",
+  customTopicWrongSubject: "{topic} is not a topic in {subject}. It belongs under {matchedSubject}.",
+  customTopicUnknown: "We couldn't match {topic} to a topic in {subject}. Try another wording.",
+  customTopicRequired: "Enter a topic before starting this session.",
+  classroomRole: "Classroom role",
+  studentRole: "Student",
+  teacherRole: "Teacher",
   unlockedLevels: "Unlocked Levels",
   highestUnlockedSelected: "The highest unlocked level for {grade} is selected for you.",
   difficulty: "Difficulty",
@@ -416,6 +524,26 @@ const english: TranslationMap = {
   subscriptionSubtitle: "Choose how much AI practice, competition, and study support you want in your learning app.",
   subscriptionFreeFeatures: "Free includes one profile, local practice, limited daily AI sessions, and limited daily competitions.",
   subscriptionProFeatures: "Pro includes multiple profiles, unlimited AI practice, unlimited competitions, rematches, and advanced study support.",
+  monthlyPlan: "Monthly Pro",
+  yearlyPlan: "Yearly Pro",
+  restorePurchases: "Restore Purchases",
+  refreshStatus: "Refresh Status",
+  loadingStoreStatus: "Loading store subscription details...",
+  subscriptionStoreHint: "Google Play subscriptions are loaded from this app's store products. Use the buttons below to subscribe or restore an existing Pro plan.",
+  subscriptionTestingPaused: "Subscription purchases are hidden during testing, but the billing SDK is already installed for Play Console setup.",
+  subscriptionProductsUnavailable: "No subscription plans are available from Google Play yet. Confirm your product IDs and Play Console setup, then rebuild.",
+  subscriptionSyncFailedTitle: "Subscription unavailable",
+  subscriptionSyncFailedMessage: "We could not load your store subscription details right now.",
+  purchaseSuccessTitle: "Subscription active",
+  purchaseSuccessMessage: "Your Pro subscription is active on this device now.",
+  purchasePendingTitle: "Purchase pending",
+  purchasePendingMessage: "Google Play has received the request, but the subscription is not active yet.",
+  purchaseFailedTitle: "Purchase failed",
+  restoreSuccessTitle: "Subscription restored",
+  restoreSuccessMessage: "Your Pro subscription has been restored successfully.",
+  restoreFreeTitle: "No active subscription",
+  restoreFreeMessage: "We could not find an active Pro subscription for this account.",
+  subscriptionNotSupported: "Store purchases are not available in Expo Go. Use a preview or production build to test subscriptions.",
   childrenAdFreeNote: "Quiks Children stays ad-free for a safer child learning experience.",
   profileLimitReachedTitle: "Profile limit reached",
   profileLimitReachedMessage: "Free access allows only one learner profile. Upgrade to Pro to add more profiles.",
@@ -424,6 +552,8 @@ const english: TranslationMap = {
   freePlanStatus: "You are on the Free plan.",
   proPlanStatus: "You are on the Pro plan.",
   localSubscriptionNote: "For now, plan changes are stored on this device while full store billing is prepared.",
+  sponsoredLearningSpot: "Sponsored learning spot",
+  demoAdBannerHint: "This is the fallback test banner. Install a fresh native preview or production build to see live ad rendering.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = {

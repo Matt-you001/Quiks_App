@@ -1,6 +1,6 @@
 import { appVariant } from "./app-variant";
 import { t } from "./i18n";
-import type { AppLanguage, Difficulty, Subject, SubjectTopic } from "../types/app";
+import type { AppLanguage, Difficulty, Subject, SubjectTopic, TopicValidationResult } from "../types/app";
 
 const allGrades = [
   "Grade 1",
@@ -1496,4 +1496,182 @@ export function getTopicById(subject: Subject | undefined, topicId?: string | st
   }
 
   return subject.topics.find((topic) => topic.id === topicId);
+}
+
+function normalizeTopicLookupValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function levenshteinDistance(left: string, right: string) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (!left.length) {
+    return right.length;
+  }
+
+  if (!right.length) {
+    return left.length;
+  }
+
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  const current = new Array(right.length + 1).fill(0);
+
+  for (let row = 1; row <= left.length; row += 1) {
+    current[0] = row;
+    for (let column = 1; column <= right.length; column += 1) {
+      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
+      current[column] = Math.min(
+        current[column - 1] + 1,
+        previous[column] + 1,
+        previous[column - 1] + cost
+      );
+    }
+
+    for (let index = 0; index < previous.length; index += 1) {
+      previous[index] = current[index];
+    }
+  }
+
+  return previous[right.length];
+}
+
+function getTopicAliases(topic: SubjectTopic) {
+  return [topic.label, ...topic.keywords]
+    .map(normalizeTopicLookupValue)
+    .filter(Boolean);
+}
+
+function getTopicMatchScore(input: string, topic: SubjectTopic) {
+  const aliases = getTopicAliases(topic);
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let exact = false;
+  let contains = false;
+
+  for (const alias of aliases) {
+    if (alias === input) {
+      exact = true;
+      bestDistance = 0;
+      break;
+    }
+
+    if (alias.includes(input) || input.includes(alias)) {
+      contains = true;
+    }
+
+    bestDistance = Math.min(bestDistance, levenshteinDistance(input, alias));
+  }
+
+  return {
+    exact,
+    contains,
+    distance: bestDistance,
+  };
+}
+
+function isAcceptableFuzzyMatch(input: string, match: { contains: boolean; distance: number }) {
+  if (match.contains) {
+    return true;
+  }
+
+  if (!Number.isFinite(match.distance)) {
+    return false;
+  }
+
+  const maxDistance = input.length <= 5 ? 2 : input.length <= 10 ? 3 : 4;
+  return match.distance <= maxDistance;
+}
+
+export function validateTopicInput(
+  subject: Subject | undefined,
+  input: string,
+  language: AppLanguage = "en"
+): TopicValidationResult {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return {
+      status: "empty",
+      input: trimmed,
+    };
+  }
+
+  if (!subject) {
+    return {
+      status: "unknown",
+      input: trimmed,
+    };
+  }
+
+  const normalizedInput = normalizeTopicLookupValue(trimmed);
+  const localizedSubjects = getLocalizedSubjects(language);
+  const currentSubject = localizedSubjects.find((entry) => entry.id === subject.id) ?? subject;
+
+  let bestCurrentMatch:
+    | {
+        topic: SubjectTopic;
+        score: ReturnType<typeof getTopicMatchScore>;
+      }
+    | undefined;
+
+  for (const topic of currentSubject.topics) {
+    const score = getTopicMatchScore(normalizedInput, topic);
+    if (!bestCurrentMatch || score.distance < bestCurrentMatch.score.distance || (score.exact && !bestCurrentMatch.score.exact)) {
+      bestCurrentMatch = { topic, score };
+    }
+
+    if (score.exact) {
+      return {
+        status: "valid",
+        input: trimmed,
+        matchedTopicId: topic.id,
+        matchedTopicLabel: topic.label,
+      };
+    }
+  }
+
+  if (bestCurrentMatch && isAcceptableFuzzyMatch(normalizedInput, bestCurrentMatch.score)) {
+    return {
+      status: "valid",
+      input: trimmed,
+      matchedTopicId: bestCurrentMatch.topic.id,
+      matchedTopicLabel: bestCurrentMatch.topic.label,
+      correctedFrom: bestCurrentMatch.topic.label !== trimmed ? trimmed : undefined,
+    };
+  }
+
+  for (const otherSubject of localizedSubjects) {
+    if (otherSubject.id === currentSubject.id) {
+      continue;
+    }
+
+    for (const topic of otherSubject.topics) {
+      const score = getTopicMatchScore(normalizedInput, topic);
+      if (score.exact || isAcceptableFuzzyMatch(normalizedInput, score)) {
+        return {
+          status: "wrong-subject",
+          input: trimmed,
+          matchedTopicId: topic.id,
+          matchedTopicLabel: topic.label,
+          matchedSubjectId: otherSubject.id,
+          matchedSubjectName: otherSubject.name,
+        };
+      }
+    }
+  }
+
+  return {
+    status: "unknown",
+    input: trimmed,
+    matchedTopicId: bestCurrentMatch?.topic.id,
+    matchedTopicLabel:
+      bestCurrentMatch && isAcceptableFuzzyMatch(normalizedInput, bestCurrentMatch.score)
+        ? bestCurrentMatch.topic.label
+        : undefined,
+  };
 }

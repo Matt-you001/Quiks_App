@@ -81,7 +81,6 @@ function GoogleSignupButton({
 export default function SignupScreen() {
   const language = "en";
   const scrollRef = useRef<ScrollView>(null);
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -132,7 +131,7 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      const account = await signUpWithEmailAccount(name, email, password);
+      const account = await signUpWithEmailAccount("", email, password);
       await setAuthenticatedAccount(account, true);
       router.replace("/");
     } catch (error) {
@@ -164,16 +163,6 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.label}>Name/Username</Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter name or username"
-              placeholderTextColor="#7E93A8"
-              style={styles.input}
-              returnKeyType="next"
-            />
-
             <Text style={styles.label}>{t(language, "email")}</Text>
             <TextInput
               value={email}

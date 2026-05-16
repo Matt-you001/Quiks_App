@@ -3,9 +3,10 @@ import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { signOutAccount } from "../lib/firebase";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { canCreateAnotherProfile } from "../lib/subscription";
-import { readAppState } from "../lib/storage";
+import { logoutAccount, readAppState } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import type { SessionResult, UserProfile } from "../types/app";
@@ -46,12 +47,22 @@ export default function ProfileScreen() {
 
   const load = useCallback(async () => {
     const state = await readAppState();
+    if (!state.isAuthenticated) {
+      router.replace({ pathname: "/login" } as never);
+      return;
+    }
     const profile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
     setActiveProfile(profile);
     setResults(profile ? state.results[profile.id] ?? [] : []);
     setSubscriptionTier(state.subscriptionTier);
     setProfileCount(state.profiles.length);
   }, []);
+
+  const handleLogout = async () => {
+    await signOutAccount().catch(() => undefined);
+    await logoutAccount();
+    router.replace({ pathname: "/login" } as never);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -182,6 +193,8 @@ export default function ProfileScreen() {
         <Text style={styles.metricText}>{t(language, "targetExam")}: {activeProfile.targetExam}</Text>
         <Text style={styles.metricText}>{t(language, "dailyTarget")}: {activeProfile.dailyGoalMinutes} minutes</Text>
         <Text style={styles.metricText}>{t(language, "currentLanguage")}: {getLanguageLabel(activeProfile.language)}</Text>
+        <Text style={styles.metricText}>Role: {activeProfile.role === "teacher" ? "Teacher" : "Student"}</Text>
+        <Text style={styles.metricText}>Quiks ID: {activeProfile.quiksId}</Text>
       </View>
 
       <View style={styles.actionColumn}>
@@ -200,6 +213,7 @@ export default function ProfileScreen() {
           variant="secondary"
           onPress={() => router.push({ pathname: "/subscription" } as never)}
         />
+        <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} />
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
       </View>
     </AppBackground>

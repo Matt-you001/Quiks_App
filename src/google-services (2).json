@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "51562512706",
+    "project_id": "synapse-trainer-y0kk3",
+    "storage_bucket": "synapse-trainer-y0kk3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:51562512706:android:fdf4ea188b869ab28a08db",
+        "android_client_info": {
+          "package_name": "com.quiks.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVst4hfC3p0XJMmGuJMyMjlPzI8NNFRwI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:51562512706:android:7e545672df5543348a08db",
+        "android_client_info": {
+          "package_name": "com.quiks.teens"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVst4hfC3p0XJMmGuJMyMjlPzI8NNFRwI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

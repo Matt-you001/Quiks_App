@@ -21,10 +21,31 @@ import type { AppAccount, StoredAppState } from "../types/app";
 const rnAuth = require("@firebase/auth") as {
   getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
 };
+const fallbackFirebaseConfig = {
+  apiKey: "AIzaSyDSICe2NTtANURfwcQPYWlywx3OPiJ7kEA",
+  authDomain: "synapse-trainer-y0kk3.firebaseapp.com",
+  projectId: "synapse-trainer-y0kk3",
+  storageBucket: "synapse-trainer-y0kk3.firebasestorage.app",
+  messagingSenderId: "51562512706",
+  appId: "1:51562512706:web:6854bbc7b9d26a378a08db",
+} as const;
 
 const extra = {
   ...(Constants.expoConfig?.extra ?? {}),
   ...(((Constants as unknown as { manifest?: { extra?: Record<string, string | undefined> } }).manifest?.extra ?? {})),
+  ...(
+    (
+      Constants as unknown as {
+        manifest2?: {
+          extra?: {
+            expoClient?: {
+              extra?: Record<string, string | undefined>;
+            };
+          };
+        };
+      }
+    ).manifest2?.extra?.expoClient?.extra ?? {}
+  ),
 } as Record<string, string | undefined>;
 function normalizeEnvValue(value?: string) {
   if (!value) {
@@ -35,14 +56,26 @@ function normalizeEnvValue(value?: string) {
 }
 
 const firebaseConfig = {
-  apiKey: normalizeEnvValue(process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? extra.EXPO_PUBLIC_FIREBASE_API_KEY),
-  authDomain: normalizeEnvValue(process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? extra.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN),
-  projectId: normalizeEnvValue(process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? extra.EXPO_PUBLIC_FIREBASE_PROJECT_ID),
-  storageBucket: normalizeEnvValue(process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? extra.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET),
-  messagingSenderId: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? extra.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+  apiKey: normalizeEnvValue(
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? extra.EXPO_PUBLIC_FIREBASE_API_KEY ?? fallbackFirebaseConfig.apiKey
   ),
-  appId: normalizeEnvValue(process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? extra.EXPO_PUBLIC_FIREBASE_APP_ID),
+  authDomain: normalizeEnvValue(
+    process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? extra.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? fallbackFirebaseConfig.authDomain
+  ),
+  projectId: normalizeEnvValue(
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? extra.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? fallbackFirebaseConfig.projectId
+  ),
+  storageBucket: normalizeEnvValue(
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ??
+      extra.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ??
+      fallbackFirebaseConfig.storageBucket
+  ),
+  messagingSenderId: normalizeEnvValue(
+    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??
+      extra.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??
+      fallbackFirebaseConfig.messagingSenderId
+  ),
+  appId: normalizeEnvValue(process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? extra.EXPO_PUBLIC_FIREBASE_APP_ID ?? fallbackFirebaseConfig.appId),
 };
 
 const isConfigured = Boolean(

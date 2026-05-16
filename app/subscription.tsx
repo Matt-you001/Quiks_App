@@ -1,47 +1,135 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { t } from "../lib/i18n";
-import { readAppState, setSubscriptionTier } from "../lib/storage";
+import { areSubscriptionRestrictionsEnabled } from "../lib/subscription";
+import {
+  endPurchaseConnection,
+  loadSubscriptionStoreState,
+  purchaseProSubscription,
+  purchaseRuntimeAvailable,
+  restoreProSubscription,
+  type SubscriptionPlan,
+} from "../lib/purchases";
+import { readAppState } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import type { AppLanguage, SubscriptionTier } from "../types/app";
+
+const SHOW_SUBSCRIPTION_PURCHASES = false;
 
 export default function SubscriptionScreen() {
   const [subscriptionTier, setSubscriptionTierState] = useState<SubscriptionTier>("free");
   const [language, setLanguage] = useState<AppLanguage>("en");
-  const [saving, setSaving] = useState(false);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [loadingStore, setLoadingStore] = useState(true);
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [storeMessage, setStoreMessage] = useState<string | null>(null);
+  const [storeReady, setStoreReady] = useState(false);
 
   const load = useCallback(async () => {
     const state = await readAppState();
+    const nextLanguage = state.profiles.find((profile) => profile.id === state.currentProfileId)?.language ?? "en";
+    setLanguage(nextLanguage);
     setSubscriptionTierState(state.subscriptionTier);
-    setLanguage(state.profiles.find((profile) => profile.id === state.currentProfileId)?.language ?? "en");
+
+    if (!purchaseRuntimeAvailable()) {
+      setStoreReady(false);
+      setStoreMessage(t(nextLanguage, "subscriptionNotSupported"));
+      setLoadingStore(false);
+      return;
+    }
+
+    setLoadingStore(true);
+    try {
+      const storeState = await loadSubscriptionStoreState();
+      setPlans(storeState.plans);
+      setStoreReady(storeState.available);
+      setSubscriptionTierState(storeState.active ? "pro" : "free");
+
+      if (storeState.reason === "products_unavailable") {
+        setStoreMessage(t(nextLanguage, "subscriptionProductsUnavailable"));
+      } else if (!storeState.available) {
+        setStoreMessage(t(nextLanguage, "subscriptionSyncFailedMessage"));
+      } else {
+        setStoreMessage(null);
+      }
+    } catch (error) {
+      setStoreReady(false);
+      setStoreMessage(t(nextLanguage, "subscriptionSyncFailedMessage"));
+    } finally {
+      setLoadingStore(false);
+    }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       load();
+      return () => {
+        void endPurchaseConnection();
+      };
     }, [load])
   );
 
-  const updatePlan = async (nextTier: SubscriptionTier) => {
-    setSaving(true);
-    await setSubscriptionTier(nextTier);
-    setSubscriptionTierState(nextTier);
-    setSaving(false);
+  const subscribeToPlan = async (productId: string) => {
+    setActiveProductId(productId);
+    try {
+      const result = await purchaseProSubscription(productId);
+      if (result.active) {
+        setSubscriptionTierState("pro");
+        Alert.alert(t(language, "purchaseSuccessTitle"), t(language, "purchaseSuccessMessage"));
+        return;
+      }
+
+      Alert.alert(t(language, "purchasePendingTitle"), t(language, "purchasePendingMessage"));
+    } catch (error) {
+      Alert.alert(
+        t(language, "purchaseFailedTitle"),
+        error instanceof Error ? error.message : t(language, "subscriptionSyncFailedMessage")
+      );
+    } finally {
+      setActiveProductId(null);
+    }
+  };
+
+  const restorePurchases = async () => {
+    setRestoring(true);
+    try {
+      const result = await restoreProSubscription();
+      setSubscriptionTierState(result.active ? "pro" : "free");
+      Alert.alert(
+        result.active ? t(language, "restoreSuccessTitle") : t(language, "restoreFreeTitle"),
+        result.active ? t(language, "restoreSuccessMessage") : t(language, "restoreFreeMessage")
+      );
+    } catch (error) {
+      Alert.alert(
+        t(language, "subscriptionSyncFailedTitle"),
+        error instanceof Error ? error.message : t(language, "subscriptionSyncFailedMessage")
+      );
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const getPlanLabel = (plan: SubscriptionPlan) => {
+    if (plan.period === "monthly") {
+      return t(language, "monthlyPlan");
+    }
+
+    if (plan.period === "yearly") {
+      return t(language, "yearlyPlan");
+    }
+
+    return plan.title;
   };
 
   return (
     <AppBackground>
       <View style={styles.heroCard}>
         <Text style={styles.title}>{t(language, "manageSubscription")}</Text>
-        <Text style={styles.subtitle}>{t(language, "subscriptionSubtitle")}</Text>
-        <Text style={styles.planStatus}>
-          {t(language, "currentPlan")}: {subscriptionTier === "pro" ? t(language, "proPlan") : t(language, "freePlan")}
-        </Text>
-        {appVariant.id === "children" ? <Text style={styles.note}>{t(language, "childrenAdFreeNote")}</Text> : null}
       </View>
 
       <View style={styles.card}>
@@ -56,16 +144,18 @@ export default function SubscriptionScreen() {
         <Text style={styles.statusText}>{t(language, "proPlanStatus")}</Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardText}>{t(language, "localSubscriptionNote")}</Text>
-      </View>
-
       <View style={styles.actionColumn}>
-        {subscriptionTier === "free" ? (
-          <PrimaryButton label={t(language, "upgradeToPro")} onPress={() => updatePlan("pro")} loading={saving} />
-        ) : (
-          <PrimaryButton label={t(language, "switchToFree")} variant="secondary" onPress={() => updatePlan("free")} loading={saving} />
-        )}
+        {SHOW_SUBSCRIPTION_PURCHASES && areSubscriptionRestrictionsEnabled() ? (
+          <>
+            <PrimaryButton
+              label={t(language, "restorePurchases")}
+              variant="secondary"
+              onPress={restorePurchases}
+              loading={restoring}
+            />
+            <PrimaryButton label={t(language, "refreshStatus")} variant="secondary" onPress={load} disabled={loadingStore} />
+          </>
+        ) : null}
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
       </View>
     </AppBackground>
@@ -124,5 +214,30 @@ const styles = StyleSheet.create({
   actionColumn: {
     marginTop: 18,
     gap: 12,
+  },
+  planList: {
+    gap: 12,
+    marginTop: 10,
+  },
+  planCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#DEE7EF",
+    padding: 14,
+    gap: 8,
+  },
+  planTitle: {
+    color: palette.ink,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  planPrice: {
+    color: palette.navy,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  planText: {
+    color: palette.slate,
+    lineHeight: 20,
   },
 });

@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { appVariant } from "./app-variant";
 import type { SessionResult, SubscriptionTier } from "../types/app";
 
@@ -15,6 +16,39 @@ const FREE_COMPETITION_LIMITS = {
   uni: 2,
 } as const;
 
+const extra = {
+  ...(Constants.expoConfig?.extra ?? {}),
+  ...(((Constants as unknown as { manifest?: { extra?: Record<string, string | undefined> } }).manifest?.extra ?? {})),
+  ...(
+    (
+      Constants as unknown as {
+        manifest2?: {
+          extra?: {
+            expoClient?: {
+              extra?: Record<string, string | undefined>;
+            };
+          };
+        };
+      }
+    ).manifest2?.extra?.expoClient?.extra ?? {}
+  ),
+} as Record<string, string | undefined>;
+
+function normalizeEnvValue(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  return value.replace(/^"(.*)"$/, "$1");
+}
+
+const subscriptionRestrictionsEnabled =
+  normalizeEnvValue(
+    process.env.EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS ??
+      extra.EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS ??
+      "false"
+  ) === "true";
+
 function isSameLocalDay(dateIso: string) {
   const now = new Date();
   const value = new Date(dateIso);
@@ -26,12 +60,20 @@ function isSameLocalDay(dateIso: string) {
   );
 }
 
+export function areSubscriptionRestrictionsEnabled() {
+  return subscriptionRestrictionsEnabled;
+}
+
+export function hasProAccess(subscriptionTier: SubscriptionTier) {
+  return !subscriptionRestrictionsEnabled || subscriptionTier === "pro";
+}
+
 export function isProTier(subscriptionTier: SubscriptionTier) {
   return subscriptionTier === "pro";
 }
 
 export function getProfileLimit(subscriptionTier: SubscriptionTier) {
-  return isProTier(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_PROFILE_LIMIT;
+  return hasProAccess(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_PROFILE_LIMIT;
 }
 
 export function canCreateAnotherProfile(subscriptionTier: SubscriptionTier, profileCount: number) {
@@ -39,11 +81,11 @@ export function canCreateAnotherProfile(subscriptionTier: SubscriptionTier, prof
 }
 
 export function getDailyAiSessionLimit(subscriptionTier: SubscriptionTier) {
-  return isProTier(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_AI_SESSION_LIMITS[appVariant.id];
+  return hasProAccess(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_AI_SESSION_LIMITS[appVariant.id];
 }
 
 export function getDailyCompetitionLimit(subscriptionTier: SubscriptionTier) {
-  return isProTier(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_COMPETITION_LIMITS[appVariant.id];
+  return hasProAccess(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_COMPETITION_LIMITS[appVariant.id];
 }
 
 export function getDailyAiSessionsUsed(results: SessionResult[]) {
@@ -63,5 +105,5 @@ export function canJoinCompetitionToday(subscriptionTier: SubscriptionTier, resu
 }
 
 export function shouldShowUpgradePrompts(subscriptionTier: SubscriptionTier) {
-  return appVariant.id !== "children" && !isProTier(subscriptionTier);
+  return subscriptionRestrictionsEnabled && appVariant.id !== "children" && !isProTier(subscriptionTier);
 }

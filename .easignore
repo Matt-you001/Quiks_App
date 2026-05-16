@@ -1,0 +1,6 @@
+.gradle
+.idx
+.trae
+node_modules
+dist
+.expo
