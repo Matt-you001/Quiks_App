@@ -57,6 +57,8 @@ export interface UserProfile {
   age: number;
   targetExam: string;
   dailyGoalMinutes: number;
+  schoolName?: string;
+  teachingFocus?: string;
   language: AppLanguage;
   role: UserRole;
   quiksId: string;
@@ -282,6 +284,8 @@ export interface ClassroomActivitySummary {
   focusMode: QuestionFocusMode;
   topicId?: string;
   topicLabel?: string;
+  usesCustomSubject?: boolean;
+  usesCustomTopic?: boolean;
   questionCount: number;
   durationMinutes: number;
   startAt: number;
@@ -303,6 +307,8 @@ export interface ClassroomActivityCreateRequest {
   type: ClassroomActivityType;
   title: string;
   subject: Subject;
+  usesCustomSubject?: boolean;
+  usesCustomTopic?: boolean;
   grade: string;
   level: number;
   difficulty: Difficulty;
@@ -312,6 +318,8 @@ export interface ClassroomActivityCreateRequest {
   durationMinutes: number;
   availabilityHours: number;
   startInMinutes?: number;
+  startAt?: number;
+  endAt?: number;
   resultVisibility: ClassroomResultVisibility;
   questionOrderMode: ClassroomQuestionOrderMode;
   questions: Question[];

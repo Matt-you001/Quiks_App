@@ -35,6 +35,7 @@ import type {
   QuestionFocusMode,
   QuestionResponse,
   SessionResult,
+  Subject,
   SubscriptionTier,
   TestMode,
   UserProfile,
@@ -88,6 +89,8 @@ export default function SessionScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [questionSource, setQuestionSource] = useState<QuestionResponse["source"] | null>(null);
+  const [activitySubjectName, setActivitySubjectName] = useState<string | null>(subject?.name ?? null);
+  const [activityTopicLabel, setActivityTopicLabel] = useState<string | null>(null);
   const [competitionChats, setCompetitionChats] = useState<CompetitionChatMessage[]>([]);
   const [competitionLiveProgress, setCompetitionLiveProgress] = useState<CompetitionLiveProgress[]>([]);
   const [competitionStartAt, setCompetitionStartAt] = useState<number | null>(null);
@@ -158,6 +161,12 @@ export default function SessionScreen() {
   }, [params.grade, params.difficulty, params.focusMode, params.topicId]);
 
   useEffect(() => {
+    if (subject?.name) {
+      setActivitySubjectName(subject.name);
+    }
+  }, [subject?.name]);
+
+  useEffect(() => {
     setLevelTouched(false);
   }, [grade]);
 
@@ -181,6 +190,40 @@ export default function SessionScreen() {
 
     return selectedTopic;
   }, [customTopicValidation, isCustomTopic, selectedTopic, subject]);
+  const resolvedSubjectName = activitySubjectName ?? subject?.name ?? "Session";
+  const resolvedFocusLabel =
+    focusMode === "topic"
+      ? activityTopicLabel ?? resolvedTopic?.label ?? null
+      : null;
+  const effectiveSubject = useMemo<Subject | null>(() => {
+    if (subject) {
+      return subject;
+    }
+
+    if (!activitySubjectName) {
+      return null;
+    }
+
+    return {
+      id: params.subjectId ?? `custom-${activitySubjectName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      name: activitySubjectName,
+      tagline: "Classroom subject",
+      icon: "book-open-variant",
+      accent: ["#0E5C63", "#7EE2D9"],
+      description: "Classroom activity subject",
+      aiPromptHint: `Treat ${activitySubjectName} as the classroom subject for this activity.`,
+      topics: resolvedFocusLabel
+        ? [
+            {
+              id: params.topicId ?? `topic-${resolvedFocusLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+              label: resolvedFocusLabel,
+              description: "Classroom topic",
+              keywords: [resolvedFocusLabel.toLowerCase()],
+            },
+          ]
+        : [],
+    };
+  }, [activitySubjectName, params.subjectId, params.topicId, resolvedFocusLabel, subject]);
 
   useEffect(() => {
     if (!subject) {
@@ -391,7 +434,7 @@ export default function SessionScreen() {
   const canUseCompetitionRematch = Boolean(isCompetition && profile && hasProAccess(subscriptionTier));
 
   const loadQuestions = async () => {
-    if (!subject || !profile) {
+    if (!profile || (!subject && !isClassroomActivity)) {
       return;
     }
 
@@ -407,8 +450,8 @@ export default function SessionScreen() {
             t(language, "chooseTopic"),
             t(language, "customTopicWrongSubject", {
               topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
-              subject: subject.name,
-              matchedSubject: customTopicValidation.matchedSubjectName ?? subject.name,
+              subject: resolvedSubjectName,
+              matchedSubject: customTopicValidation.matchedSubjectName ?? resolvedSubjectName,
             })
           );
           return;
@@ -419,7 +462,7 @@ export default function SessionScreen() {
             t(language, "chooseTopic"),
             t(language, "customTopicUnknown", {
               topic: customTopicValidation.input,
-              subject: subject.name,
+              subject: resolvedSubjectName,
             })
           );
           return;
@@ -450,6 +493,8 @@ export default function SessionScreen() {
         }
 
         const nextQuestions = normalizeQuestions(assignment.questions);
+        setActivitySubjectName(assignment.activity.subjectName);
+        setActivityTopicLabel(assignment.activity.topicLabel ?? null);
         setQuestionSource("remote");
         setCompetitionChats([]);
         setCompetitionLiveProgress([]);
@@ -499,9 +544,13 @@ export default function SessionScreen() {
         return;
       }
 
-      const recentQuestionIds = profile ? await getRecentQuestionIds(profile.id, subject.id) : [];
+      if (!effectiveSubject) {
+        throw new Error("Subject is unavailable for this session.");
+      }
+
+      const recentQuestionIds = profile ? await getRecentQuestionIds(profile.id, effectiveSubject.id) : [];
       const request = {
-        subject,
+        subject: effectiveSubject,
         grade,
         difficulty,
         mode,
@@ -530,7 +579,7 @@ export default function SessionScreen() {
       if (profile) {
         await appendQuestionHistory(
           profile.id,
-          subject.id,
+          effectiveSubject.id,
           nextQuestions.map((question) => question.id)
         );
       }
@@ -634,14 +683,27 @@ export default function SessionScreen() {
   };
 
   const finishSession = async (finalAnswers = answers) => {
-    if (!subject || !profile || questions.length === 0) {
+    if (!profile || questions.length === 0) {
       return;
     }
+
+    const effectiveSubject =
+      subject ??
+      ({
+        id: params.subjectId ?? "custom-classroom-subject",
+        name: activitySubjectName ?? "Custom subject",
+        tagline: "",
+        icon: "book-open-variant",
+        accent: ["#0E5C63", "#7EE2D9"],
+        description: "",
+        aiPromptHint: "Teacher-authored classroom subject.",
+        topics: [],
+      } as const);
 
     const score = scoreQuestions(questions, finalAnswers);
     const timeTakenSeconds = mode === "quiz" ? calculateQuizTime(selectedLevel) - timeLeft : elapsed;
     const bonusCoins = mode === "quiz" && score.score === 100 ? Math.floor(Math.max(timeLeft, 0) * 0.05) : 0;
-    const practiceLabel = resolvedTopic?.label ?? subject.name;
+    const practiceLabel = resolvedFocusLabel ?? effectiveSubject.name;
     let feedback = `You completed your ${practiceLabel} session. Keep building your confidence one level at a time.`;
     let studyPlan = [
       `Review the key ideas from ${practiceLabel.toLowerCase()} before your next session.`,
@@ -651,14 +713,14 @@ export default function SessionScreen() {
 
     if (hasProAccess(subscriptionTier)) {
       try {
-        feedback = await generateFeedback({
-          score: score.score,
-          subject,
-          grade,
-          focusMode,
-          topicLabel: resolvedTopic?.label,
-          profile,
-        });
+          feedback = await generateFeedback({
+            score: score.score,
+            subject: effectiveSubject,
+            grade,
+            focusMode,
+            topicLabel: resolvedFocusLabel ?? undefined,
+            profile,
+          });
       } catch {
         // Keep the local fallback message.
       }
@@ -666,11 +728,11 @@ export default function SessionScreen() {
       try {
         studyPlan = await generateCoachPlan({
           resultScore: score.score,
-          subject,
+          subject: effectiveSubject,
           grade,
           level: selectedLevel,
           focusMode,
-          topicLabel: resolvedTopic?.label,
+          topicLabel: resolvedFocusLabel ?? undefined,
           profile,
         });
       } catch {
@@ -679,17 +741,17 @@ export default function SessionScreen() {
     }
 
     const result: SessionResult = {
-      id: `${Date.now()}`,
-      date: new Date().toISOString(),
-      subjectId: subject.id,
-      subjectName: subject.name,
+        id: `${Date.now()}`,
+        date: new Date().toISOString(),
+        subjectId: effectiveSubject.id,
+        subjectName: effectiveSubject.name,
       level: selectedLevel,
       difficulty,
       grade,
       mode,
-      focusMode,
-      topicId: resolvedTopic?.id,
-      topicLabel: resolvedTopic?.label,
+        focusMode,
+        topicId: resolvedTopic?.id,
+        topicLabel: resolvedFocusLabel ?? resolvedTopic?.label,
       score: score.score,
       timeTakenSeconds,
       correctAnswers: score.correctAnswers,
@@ -789,8 +851,8 @@ export default function SessionScreen() {
   if (phase === "setup") {
     return (
       <AppBackground>
-        <View style={styles.panel}>
-          <Text style={styles.title}>{t(language, "sessionTitle", { subject: subject.name })}</Text>
+          <View style={styles.panel}>
+          <Text style={styles.title}>{t(language, "sessionTitle", { subject: resolvedSubjectName })}</Text>
           <Text style={styles.subtitle}>
             {hasPresetGrade
               ? t(language, "selectedGradeStartHint", {
@@ -992,7 +1054,7 @@ export default function SessionScreen() {
       <AppBackground scroll={false}>
         <View style={styles.centerPanel}>
           <Text style={styles.title}>{t(language, "preparingSession")}</Text>
-          <Text style={styles.subtitle}>{t(language, "loadingQuestionsFor", { subject: subject.name })}</Text>
+          <Text style={styles.subtitle}>{t(language, "loadingQuestionsFor", { subject: resolvedSubjectName })}</Text>
         </View>
       </AppBackground>
     );
@@ -1003,7 +1065,8 @@ export default function SessionScreen() {
     return (
       <AppBackground scroll={false}>
         <View style={styles.centerPanel}>
-          <Text style={styles.title}>{subject.name}</Text>
+          <Text style={styles.title}>{resolvedSubjectName}</Text>
+          
           <Text style={styles.subtitle}>{t(language, "challengeAccepted")}</Text>
           <Text style={styles.countdownText}>{countdown}</Text>
           <Text style={styles.subtitle}>{t(language, "countdownToStart", { count: countdown })}</Text>
@@ -1028,13 +1091,13 @@ export default function SessionScreen() {
       <View style={styles.panel}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.titleSmall}>{subject.name}</Text>
+            <Text style={styles.titleSmall}>{resolvedSubjectName}</Text>
             <Text style={styles.subtitle}>
               {grade} | {t(language, "levelLabel")} {selectedLevel} | {getDifficultyLabel(language, difficulty)}
             </Text>
             <Text style={styles.focusLine}>
-              {focusMode === "topic" && resolvedTopic
-                ? t(language, "topicFocusLabel", { topic: resolvedTopic.label })
+              {focusMode === "topic" && resolvedFocusLabel
+                ? t(language, "topicFocusLabel", { topic: resolvedFocusLabel })
                 : t(language, "generalMixedPractice")}
             </Text>
             {isCompetition && competitionOpponentName ? (

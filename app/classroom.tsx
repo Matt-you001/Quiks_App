@@ -36,10 +36,24 @@ import type {
   Question,
   QuestionFocusMode,
   SubscriptionTier,
+  Subject,
   UserProfile,
 } from "../types/app";
 
 const difficultyOptions: Difficulty[] = ["Beginner", "Intermediate", "Advanced", "Expert"];
+
+function toSubjectId(value: string) {
+  return `custom-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "subject"}`;
+}
+
+function parseDateTimeInput(dateText: string, timeText: string) {
+  if (!dateText.trim() || !timeText.trim()) {
+    return null;
+  }
+
+  const candidate = new Date(`${dateText.trim()}T${timeText.trim()}:00`);
+  return Number.isNaN(candidate.getTime()) ? null : candidate.getTime();
+}
 
 export default function ClassroomScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -62,14 +76,26 @@ export default function ClassroomScreen() {
   const [focusMode, setFocusMode] = useState<QuestionFocusMode>("general");
   const [subjectId, setSubjectId] = useState(appVariant.allowedSubjectIds[0] ?? "");
   const [topicId, setTopicId] = useState<string | null>(null);
+  const [useCustomSubject, setUseCustomSubject] = useState(false);
+  const [customSubjectName, setCustomSubjectName] = useState("");
+  const [customTopicLabel, setCustomTopicLabel] = useState("");
   const [questionCount, setQuestionCount] = useState("5");
   const [durationMinutes, setDurationMinutes] = useState("30");
-  const [availabilityHours, setAvailabilityHours] = useState("24");
-  const [startInMinutes, setStartInMinutes] = useState("5");
+  const [deadlineDate, setDeadlineDate] = useState("");
+  const [deadlineTime, setDeadlineTime] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
   const [resultVisibility, setResultVisibility] = useState<ClassroomResultVisibility>("private");
   const [questionOrderMode, setQuestionOrderMode] = useState<ClassroomQuestionOrderMode>("same");
   const [candidateQuestions, setCandidateQuestions] = useState<Question[]>([]);
   const [acceptedQuestions, setAcceptedQuestions] = useState<Question[]>([]);
+  const [isReviewingQuestions, setIsReviewingQuestions] = useState(false);
+  const [reviewPage, setReviewPage] = useState(0);
+  const [showCustomQuestionForm, setShowCustomQuestionForm] = useState(false);
+  const [customQuestionPrompt, setCustomQuestionPrompt] = useState("");
+  const [customQuestionOptions, setCustomQuestionOptions] = useState(["", "", "", ""]);
+  const [customQuestionAnswerIndex, setCustomQuestionAnswerIndex] = useState(0);
+  const [customQuestionExplanation, setCustomQuestionExplanation] = useState("");
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [publishingAssignment, setPublishingAssignment] = useState(false);
   const [classActionLoading, setClassActionLoading] = useState(false);
@@ -80,6 +106,36 @@ export default function ClassroomScreen() {
     () => localizedSubjects.find((subject) => subject.id === subjectId) ?? localizedSubjects[0] ?? null,
     [localizedSubjects, subjectId]
   );
+  const resolvedActivitySubject = useMemo((): Subject | null => {
+    if (useCustomSubject) {
+      const name = customSubjectName.trim();
+      if (!name) {
+        return null;
+      }
+
+      return {
+        id: toSubjectId(name),
+        name,
+        tagline: "Custom subject",
+        icon: "book-open-variant",
+        accent: ["#0E5C63", "#7EE2D9"],
+        description: "Teacher-defined subject",
+        aiPromptHint: `Treat ${name} as a teacher-defined subject or course. Keep the questions aligned to the teacher's chosen grade, level, difficulty, and topic focus.`,
+        topics: customTopicLabel.trim()
+          ? [
+              {
+                id: `custom-topic-${toSubjectId(customTopicLabel)}`,
+                label: customTopicLabel.trim(),
+                description: "Teacher-defined topic",
+                keywords: [customTopicLabel.trim().toLowerCase()],
+              },
+            ]
+          : [],
+      };
+    }
+
+    return selectedSubject;
+  }, [customSubjectName, customTopicLabel, selectedSubject, useCustomSubject]);
   const selectedClass = useMemo(
     () => classes.find((entry) => entry.classId === selectedClassId) ?? classes[0] ?? null,
     [classes, selectedClassId]
@@ -99,6 +155,10 @@ export default function ClassroomScreen() {
         .map((membership) => ({ classroom: entry, membership }))
     );
   }, [classes, profile]);
+  const desiredQuestionCount = Math.max(1, Number(questionCount) || 5);
+  const currentCandidateQuestion = candidateQuestions[0] ?? null;
+  const reviewQuestions = acceptedQuestions.slice(reviewPage * 5, reviewPage * 5 + 5);
+  const reviewPageCount = Math.max(1, Math.ceil(acceptedQuestions.length / 5));
   const activeMembers = useMemo(
     () => (selectedClassDetails?.members ?? []).filter((member) => member.status === "active"),
     [selectedClassDetails]
@@ -335,30 +395,47 @@ export default function ClassroomScreen() {
   };
 
   const generateCandidates = async () => {
-    if (!profile || !selectedClass || !selectedSubject) {
+    if (!profile || !selectedClass || !resolvedActivitySubject) {
       return;
     }
 
-    const desiredCount = Math.max(1, Number(questionCount) || 5);
+    if (focusMode === "topic" && useCustomSubject && !customTopicLabel.trim()) {
+      Alert.alert("Question selection", "Enter the custom topic first.");
+      return;
+    }
+
     setCandidateLoading(true);
     try {
       const response = await generateClassroomQuestionCandidates({
         teacherProfile: profile,
         classId: selectedClass.classId,
-        subject: selectedSubject,
+        subject: resolvedActivitySubject,
         grade,
         level: Math.max(1, Number(level) || 1),
         difficulty,
         focusMode,
-        topicId: focusMode === "topic" ? topicId ?? undefined : undefined,
+        topicId:
+          focusMode === "topic"
+            ? useCustomSubject
+              ? resolvedActivitySubject.topics[0]?.id
+              : topicId ?? undefined
+            : undefined,
         topicLabel:
           focusMode === "topic"
-            ? selectedSubject.topics.find((topic) => topic.id === topicId)?.label
+            ? useCustomSubject
+              ? customTopicLabel.trim() || undefined
+              : selectedSubject?.topics.find((topic) => topic.id === topicId)?.label
             : undefined,
-        questionCount: desiredCount,
-        batchCount: Math.min(3, Math.max(1, desiredCount - acceptedQuestions.length)),
+        questionCount: desiredQuestionCount,
+        batchCount: Math.min(6, Math.max(3, desiredQuestionCount - acceptedQuestions.length)),
       });
-      setCandidateQuestions(response.questions);
+      setCandidateQuestions((current) => [
+        ...current,
+        ...response.questions.map((question, index) => ({
+          ...question,
+          id: `${question.id}-${Date.now()}-${current.length + index}`,
+        })),
+      ]);
     } catch (error) {
       Alert.alert("Question selection", error instanceof Error ? error.message : "Unable to load candidate questions.");
     } finally {
@@ -367,34 +444,95 @@ export default function ClassroomScreen() {
   };
 
   const acceptCandidate = (question: Question) => {
-    const desiredCount = Math.max(1, Number(questionCount) || 5);
     setAcceptedQuestions((current) => {
-      if (current.some((entry) => entry.id === question.id) || current.length >= desiredCount) {
+      if (current.some((entry) => entry.id === question.id) || current.length >= desiredQuestionCount) {
         return current;
       }
 
       return [...current, question];
     });
     setCandidateQuestions((current) => current.filter((entry) => entry.id !== question.id));
+    setIsReviewingQuestions(false);
+  };
+
+  const skipCandidate = () => {
+    setCandidateQuestions((current) => current.slice(1));
   };
 
   const removeAcceptedQuestion = (questionId: string) => {
     setAcceptedQuestions((current) => current.filter((entry) => entry.id !== questionId));
+    setIsReviewingQuestions(false);
+    setReviewPage(0);
   };
 
-  const publishAssignment = async () => {
-    if (!profile || !selectedClass || !selectedSubject) {
+  const addCustomQuestion = () => {
+    if (!customQuestionPrompt.trim()) {
+      Alert.alert("Custom question", "Enter the question prompt.");
       return;
     }
 
-    const desiredCount = Math.max(1, Number(questionCount) || 5);
-    if (acceptedQuestions.length < desiredCount) {
-      Alert.alert("Assignment", `Accept ${desiredCount} questions before publishing.`);
+    if (customQuestionOptions.some((option) => !option.trim())) {
+      Alert.alert("Custom question", "Fill all four answer options.");
+      return;
+    }
+
+    const answer = customQuestionOptions[customQuestionAnswerIndex]?.trim();
+    if (!answer) {
+      Alert.alert("Custom question", "Choose the correct answer.");
+      return;
+    }
+
+    if (acceptedQuestions.length >= desiredQuestionCount) {
+      Alert.alert("Custom question", "Question count is already complete.");
+      return;
+    }
+
+    const customQuestion: Question = {
+      id: `custom-${Date.now()}-${acceptedQuestions.length + 1}`,
+      prompt: customQuestionPrompt.trim(),
+      options: customQuestionOptions.map((option) => option.trim()),
+      answer,
+      explanation: customQuestionExplanation.trim() || "Teacher-authored question.",
+    };
+
+    setAcceptedQuestions((current) => [...current, customQuestion]);
+    setCustomQuestionPrompt("");
+    setCustomQuestionOptions(["", "", "", ""]);
+    setCustomQuestionAnswerIndex(0);
+    setCustomQuestionExplanation("");
+    setShowCustomQuestionForm(false);
+  };
+
+  const publishAssignment = async () => {
+    if (!profile || !selectedClass || !resolvedActivitySubject) {
+      return;
+    }
+
+    if (acceptedQuestions.length < desiredQuestionCount) {
+      Alert.alert("Assignment", `Accept ${desiredQuestionCount} questions before publishing.`);
       return;
     }
 
     if (!assignmentTitle.trim()) {
       Alert.alert("Assignment", "Enter an assignment title first.");
+      return;
+    }
+
+    if (focusMode === "topic" && useCustomSubject && !customTopicLabel.trim()) {
+      Alert.alert("Assignment", "Enter the custom topic first.");
+      return;
+    }
+
+    const parsedStartAt = activityType === "test" ? parseDateTimeInput(startDate, startTime) : null;
+    const parsedDeadline = activityType === "assignment" ? parseDateTimeInput(deadlineDate, deadlineTime) : null;
+
+    if (activityType === "test" && !parsedStartAt) {
+      Alert.alert("Test", "Enter a valid start date and time.");
+      return;
+    }
+
+    if (activityType === "assignment" && !parsedDeadline) {
+      Alert.alert("Assignment", "Enter a valid deadline date and time.");
       return;
     }
 
@@ -405,26 +543,50 @@ export default function ClassroomScreen() {
         classId: selectedClass.classId,
         type: activityType,
         title: assignmentTitle.trim(),
-        subject: selectedSubject,
+        subject: resolvedActivitySubject,
+        usesCustomSubject: useCustomSubject,
+        usesCustomTopic: Boolean(focusMode === "topic" && (useCustomSubject || customTopicLabel.trim())),
         grade,
         level: Math.max(1, Number(level) || 1),
         difficulty,
         focusMode,
-        topicId: focusMode === "topic" ? topicId ?? undefined : undefined,
+        topicId:
+          focusMode === "topic"
+            ? useCustomSubject
+              ? resolvedActivitySubject.topics[0]?.id
+              : topicId ?? undefined
+            : undefined,
         topicLabel:
           focusMode === "topic"
-            ? selectedSubject.topics.find((topic) => topic.id === topicId)?.label
+            ? useCustomSubject
+              ? customTopicLabel.trim() || undefined
+              : selectedSubject?.topics.find((topic) => topic.id === topicId)?.label
             : undefined,
         durationMinutes: Math.max(5, Number(durationMinutes) || 30),
-        availabilityHours: Math.max(1, Number(availabilityHours) || 24),
-        startInMinutes: Math.max(0, Number(startInMinutes) || 0),
+        availabilityHours: 24,
+        startAt: parsedStartAt ?? undefined,
+        endAt:
+          parsedDeadline ??
+          (parsedStartAt
+            ? parsedStartAt + Math.max(5, Number(durationMinutes) || 30) * 60 * 1000
+            : undefined),
         resultVisibility,
         questionOrderMode,
-        questions: acceptedQuestions.slice(0, desiredCount),
+        questions: acceptedQuestions.slice(0, desiredQuestionCount),
       });
       setAssignmentTitle("");
       setAcceptedQuestions([]);
       setCandidateQuestions([]);
+      setIsReviewingQuestions(false);
+      setReviewPage(0);
+      setDeadlineDate("");
+      setDeadlineTime("");
+      setStartDate("");
+      setStartTime("");
+      setCustomSubjectName("");
+      setCustomTopicLabel("");
+      setUseCustomSubject(false);
+      setShowCustomQuestionForm(false);
       await refreshClassroomData();
       Alert.alert(
         activityType === "test" ? "Test published" : "Assignment published",
@@ -524,9 +686,6 @@ export default function ClassroomScreen() {
       </AppBackground>
     );
   }
-
-  const desiredQuestionCount = Math.max(1, Number(questionCount) || 5);
-
   return (
     <AppBackground>
       <View style={styles.heroCard}>
@@ -661,105 +820,75 @@ export default function ClassroomScreen() {
                   <Text style={styles.cardTitle}>Create activity</Text>
                   <Text style={styles.sectionLabel}>Activity type</Text>
                   <View style={styles.inlineActions}>
-                    <PrimaryButton
-                      label="Assignment"
-                      onPress={() => setActivityType("assignment")}
-                      variant={activityType === "assignment" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
-                    <PrimaryButton
-                      label="Test"
-                      onPress={() => setActivityType("test")}
-                      variant={activityType === "test" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
+                    <PrimaryButton label="Assignment" onPress={() => setActivityType("assignment")} variant={activityType === "assignment" ? "primary" : "secondary"} style={styles.inlineButton} />
+                    <PrimaryButton label="Test" onPress={() => setActivityType("test")} variant={activityType === "test" ? "primary" : "secondary"} style={styles.inlineButton} />
                   </View>
-                  <TextInput
-                    value={assignmentTitle}
-                    onChangeText={setAssignmentTitle}
-                    placeholder={activityType === "test" ? "Test title" : "Assignment title"}
-                    placeholderTextColor="#8092A7"
-                    style={styles.input}
-                  />
+
+                  <TextInput value={assignmentTitle} onChangeText={setAssignmentTitle} placeholder={activityType === "test" ? "Test title" : "Assignment title"} placeholderTextColor="#8092A7" style={styles.input} />
+
+                  <Text style={styles.sectionLabel}>Form</Text>
+                  <View style={styles.inlineActions}>
+                    <PrimaryButton label="Preset" onPress={() => setUseCustomSubject(false)} variant={useCustomSubject ? "secondary" : "primary"} style={styles.inlineButton} />
+                    <PrimaryButton label="Custom" onPress={() => setUseCustomSubject(true)} variant={useCustomSubject ? "primary" : "secondary"} style={styles.inlineButton} />
+                  </View>
+
                   <Text style={styles.sectionLabel}>Subject</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                    {localizedSubjects.map((entry) => (
-                      <Pressable
-                        key={entry.id}
-                        onPress={() => {
-                          setSubjectId(entry.id);
-                          setTopicId(entry.topics[0]?.id ?? null);
-                        }}
-                        style={[styles.choiceChip, entry.id === selectedSubject?.id ? styles.choiceChipActive : null]}
-                      >
-                        <Text style={[styles.choiceChipText, entry.id === selectedSubject?.id ? styles.choiceChipTextActive : null]}>
-                          {entry.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  {useCustomSubject ? (
+                    <TextInput value={customSubjectName} onChangeText={setCustomSubjectName} placeholder="Custom subject or course" placeholderTextColor="#8092A7" style={styles.input} />
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                      {localizedSubjects.map((entry) => (
+                        <Pressable
+                          key={entry.id}
+                          onPress={() => {
+                            setSubjectId(entry.id);
+                            setTopicId(entry.topics[0]?.id ?? null);
+                          }}
+                          style={[styles.choiceChip, entry.id === selectedSubject?.id ? styles.choiceChipActive : null]}
+                        >
+                          <Text style={[styles.choiceChipText, entry.id === selectedSubject?.id ? styles.choiceChipTextActive : null]}>{entry.name}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  )}
 
                   <Text style={styles.sectionLabel}>Grade</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
                     {appVariant.allowedGrades.map((entry) => (
-                      <Pressable
-                        key={entry}
-                        onPress={() => setGrade(entry)}
-                        style={[styles.choiceChip, entry === grade ? styles.choiceChipActive : null]}
-                      >
-                        <Text style={[styles.choiceChipText, entry === grade ? styles.choiceChipTextActive : null]}>
-                          {entry}
-                        </Text>
+                      <Pressable key={entry} onPress={() => setGrade(entry)} style={[styles.choiceChip, entry === grade ? styles.choiceChipActive : null]}>
+                        <Text style={[styles.choiceChipText, entry === grade ? styles.choiceChipTextActive : null]}>{entry}</Text>
                       </Pressable>
                     ))}
                   </ScrollView>
 
                   <Text style={styles.sectionLabel}>Question focus</Text>
                   <View style={styles.inlineActions}>
-                    <PrimaryButton
-                      label="General"
-                      onPress={() => setFocusMode("general")}
-                      variant={focusMode === "general" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
-                    <PrimaryButton
-                      label="Topic Focus"
-                      onPress={() => setFocusMode("topic")}
-                      variant={focusMode === "topic" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
+                    <PrimaryButton label="General" onPress={() => setFocusMode("general")} variant={focusMode === "general" ? "primary" : "secondary"} style={styles.inlineButton} />
+                    <PrimaryButton label="Topic Focus" onPress={() => setFocusMode("topic")} variant={focusMode === "topic" ? "primary" : "secondary"} style={styles.inlineButton} />
                   </View>
 
-                  {focusMode === "topic" && selectedSubject ? (
+                  {focusMode === "topic" ? (
                     <>
                       <Text style={styles.sectionLabel}>Topic</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                        {selectedSubject.topics.map((entry) => (
-                          <Pressable
-                            key={entry.id}
-                            onPress={() => setTopicId(entry.id)}
-                            style={[styles.choiceChip, entry.id === topicId ? styles.choiceChipActive : null]}
-                          >
-                            <Text style={[styles.choiceChipText, entry.id === topicId ? styles.choiceChipTextActive : null]}>
-                              {entry.label}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </ScrollView>
+                      {useCustomSubject ? (
+                        <TextInput value={customTopicLabel} onChangeText={setCustomTopicLabel} placeholder="Custom topic" placeholderTextColor="#8092A7" style={styles.input} />
+                      ) : selectedSubject ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                          {selectedSubject.topics.map((entry) => (
+                            <Pressable key={entry.id} onPress={() => setTopicId(entry.id)} style={[styles.choiceChip, entry.id === topicId ? styles.choiceChipActive : null]}>
+                              <Text style={[styles.choiceChipText, entry.id === topicId ? styles.choiceChipTextActive : null]}>{entry.label}</Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      ) : null}
                     </>
                   ) : null}
 
                   <Text style={styles.sectionLabel}>Difficulty</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
                     {difficultyOptions.map((entry) => (
-                      <Pressable
-                        key={entry}
-                        onPress={() => setDifficulty(entry)}
-                        style={[styles.choiceChip, entry === difficulty ? styles.choiceChipActive : null]}
-                      >
-                        <Text style={[styles.choiceChipText, entry === difficulty ? styles.choiceChipTextActive : null]}>
-                          {getDifficultyLabel(language, entry)}
-                        </Text>
+                      <Pressable key={entry} onPress={() => setDifficulty(entry)} style={[styles.choiceChip, entry === difficulty ? styles.choiceChipActive : null]}>
+                        <Text style={[styles.choiceChipText, entry === difficulty ? styles.choiceChipTextActive : null]}>{getDifficultyLabel(language, entry)}</Text>
                       </Pressable>
                     ))}
                   </ScrollView>
@@ -771,130 +900,107 @@ export default function ClassroomScreen() {
                     </View>
                     <View style={styles.dualInputItem}>
                       <Text style={styles.sectionLabel}>Question count</Text>
-                      <TextInput
-                        value={questionCount}
-                        onChangeText={setQuestionCount}
-                        keyboardType="number-pad"
-                        style={styles.input}
-                      />
+                      <TextInput value={questionCount} onChangeText={setQuestionCount} keyboardType="number-pad" style={styles.input} />
                     </View>
                   </View>
 
                   <View style={styles.dualInputRow}>
                     <View style={styles.dualInputItem}>
                       <Text style={styles.sectionLabel}>Duration (minutes)</Text>
-                      <TextInput
-                        value={durationMinutes}
-                        onChangeText={setDurationMinutes}
-                        keyboardType="number-pad"
-                        style={styles.input}
-                      />
+                      <TextInput value={durationMinutes} onChangeText={setDurationMinutes} keyboardType="number-pad" style={styles.input} />
                     </View>
                     <View style={styles.dualInputItem}>
-                      <Text style={styles.sectionLabel}>
-                        {activityType === "test" ? "Starts in (minutes)" : "Deadline (hours)"}
-                      </Text>
-                      <TextInput
-                        value={activityType === "test" ? startInMinutes : availabilityHours}
-                        onChangeText={activityType === "test" ? setStartInMinutes : setAvailabilityHours}
-                        keyboardType="number-pad"
-                        style={styles.input}
-                      />
+                      <Text style={styles.sectionLabel}>{activityType === "test" ? "Start date" : "Deadline date"}</Text>
+                      <TextInput value={activityType === "test" ? startDate : deadlineDate} onChangeText={activityType === "test" ? setStartDate : setDeadlineDate} placeholder="YYYY-MM-DD" placeholderTextColor="#7C8EA3" style={styles.input} />
+                    </View>
+                  </View>
+
+                  <View style={styles.dualInputRow}>
+                    <View style={styles.dualInputItem}>
+                      <Text style={styles.sectionLabel}>{activityType === "test" ? "Start time" : "Deadline time"}</Text>
+                      <TextInput value={activityType === "test" ? startTime : deadlineTime} onChangeText={activityType === "test" ? setStartTime : setDeadlineTime} placeholder="HH:MM" placeholderTextColor="#7C8EA3" style={styles.input} />
+                    </View>
+                    <View style={styles.dualInputItem}>
+                      <Text style={styles.sectionLabel}>Custom question</Text>
+                      <PrimaryButton label={showCustomQuestionForm ? "Hide custom question" : "Custom question"} variant="secondary" onPress={() => setShowCustomQuestionForm((current) => !current)} />
                     </View>
                   </View>
 
                   <Text style={styles.sectionLabel}>Results</Text>
                   <View style={styles.inlineActions}>
-                    <PrimaryButton
-                      label="Private"
-                      onPress={() => setResultVisibility("private")}
-                      variant={resultVisibility === "private" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
-                    <PrimaryButton
-                      label="Public"
-                      onPress={() => setResultVisibility("public")}
-                      variant={resultVisibility === "public" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
+                    <PrimaryButton label="Private" onPress={() => setResultVisibility("private")} variant={resultVisibility === "private" ? "primary" : "secondary"} style={styles.inlineButton} />
+                    <PrimaryButton label="Public" onPress={() => setResultVisibility("public")} variant={resultVisibility === "public" ? "primary" : "secondary"} style={styles.inlineButton} />
                   </View>
 
                   <Text style={styles.sectionLabel}>Question order</Text>
                   <View style={styles.inlineActions}>
-                    <PrimaryButton
-                      label="Same for all"
-                      onPress={() => setQuestionOrderMode("same")}
-                      variant={questionOrderMode === "same" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
-                    <PrimaryButton
-                      label="Shuffle per student"
-                      onPress={() => setQuestionOrderMode("shuffled")}
-                      variant={questionOrderMode === "shuffled" ? "primary" : "secondary"}
-                      style={styles.inlineButton}
-                    />
+                    <PrimaryButton label="Same for all" onPress={() => setQuestionOrderMode("same")} variant={questionOrderMode === "same" ? "primary" : "secondary"} style={styles.inlineButton} />
+                    <PrimaryButton label="Shuffle per student" onPress={() => setQuestionOrderMode("shuffled")} variant={questionOrderMode === "shuffled" ? "primary" : "secondary"} style={styles.inlineButton} />
                   </View>
 
-                  <PrimaryButton
-                    label={
-                      acceptedQuestions.length >= desiredQuestionCount ? "Question set complete" : "Load question candidates"
-                    }
-                    onPress={generateCandidates}
-                    loading={candidateLoading}
-                    disabled={acceptedQuestions.length >= desiredQuestionCount}
-                  />
-
-                  <Text style={styles.sectionLabel}>
-                    Accepted questions ({acceptedQuestions.length}/{desiredQuestionCount})
-                  </Text>
-                  {acceptedQuestions.length === 0 ? (
-                    <Text style={styles.helperText}>No questions yet.</Text>
-                  ) : (
-                    acceptedQuestions.map((question) => (
-                      <View key={question.id} style={styles.questionCard}>
-                        <Text style={styles.questionPrompt}>{question.prompt}</Text>
-                        <PrimaryButton
-                          label="Remove"
-                          variant="secondary"
-                          onPress={() => removeAcceptedQuestion(question.id)}
-                        />
-                      </View>
-                    ))
-                  )}
-
-                  <Text style={styles.sectionLabel}>Candidate questions</Text>
-                  {candidateQuestions.length === 0 ? (
-                    <Text style={styles.helperText}>No candidates loaded.</Text>
-                  ) : (
-                    candidateQuestions.map((question) => (
-                      <View key={question.id} style={styles.questionCard}>
-                        <Text style={styles.questionPrompt}>{question.prompt}</Text>
-                        <Text style={styles.helperText}>{question.options.join(" | ")}</Text>
-                        <View style={styles.inlineActions}>
-                          <PrimaryButton
-                            label="Accept"
-                            onPress={() => acceptCandidate(question)}
-                            style={styles.inlineButton}
-                          />
-                          <PrimaryButton
-                            label="Ignore"
-                            variant="secondary"
-                            onPress={() =>
-                              setCandidateQuestions((current) => current.filter((entry) => entry.id !== question.id))
-                            }
-                            style={styles.inlineButton}
+                  {showCustomQuestionForm ? (
+                    <View style={styles.questionCard}>
+                      <Text style={styles.sectionLabel}>Prompt</Text>
+                      <TextInput value={customQuestionPrompt} onChangeText={setCustomQuestionPrompt} placeholder="Enter your question" placeholderTextColor="#8092A7" style={[styles.input, styles.textAreaInput]} multiline />
+                      {customQuestionOptions.map((option, index) => (
+                        <View key={`custom-option-${index}`} style={styles.customOptionRow}>
+                          <Pressable onPress={() => setCustomQuestionAnswerIndex(index)} style={[styles.answerPick, customQuestionAnswerIndex === index ? styles.answerPickActive : null]}>
+                            <Text style={[styles.answerPickText, customQuestionAnswerIndex === index ? styles.answerPickTextActive : null]}>{index + 1}</Text>
+                          </Pressable>
+                          <TextInput
+                            value={option}
+                            onChangeText={(value) => setCustomQuestionOptions((current) => current.map((entry, optionIndex) => (optionIndex === index ? value : entry)))}
+                            placeholder={`Option ${index + 1}`}
+                            placeholderTextColor="#7C8EA3"
+                            style={[styles.input, styles.customOptionInput]}
                           />
                         </View>
+                      ))}
+                      <TextInput value={customQuestionExplanation} onChangeText={setCustomQuestionExplanation} placeholder="Explanation (optional)" placeholderTextColor="#7C8EA3" style={[styles.input, styles.textAreaInput]} multiline />
+                      <PrimaryButton label="Add custom question" onPress={addCustomQuestion} />
+                    </View>
+                  ) : null}
+
+                  <Text style={styles.sectionLabel}>Question count ({acceptedQuestions.length}/{desiredQuestionCount})</Text>
+                  {acceptedQuestions.length < desiredQuestionCount ? (
+                    currentCandidateQuestion ? (
+                      <View style={styles.questionCard}>
+                        <Text style={styles.questionPrompt}>{currentCandidateQuestion.prompt}</Text>
+                        {currentCandidateQuestion.options.map((option, index) => (
+                          <Text key={`${currentCandidateQuestion.id}-option-${index}`} style={styles.optionPreview}>
+                            {index + 1}. {option}
+                          </Text>
+                        ))}
+                        <View style={styles.inlineActions}>
+                          <PrimaryButton label="Accept" onPress={() => acceptCandidate(currentCandidateQuestion)} style={styles.inlineButton} />
+                          <PrimaryButton label="Skip" variant="secondary" onPress={skipCandidate} style={styles.inlineButton} />
+                        </View>
                       </View>
-                    ))
+                    ) : (
+                      <PrimaryButton label={candidateQuestions.length === 0 ? "Load question candidates" : "Load more questions"} onPress={generateCandidates} loading={candidateLoading} />
+                    )
+                  ) : (
+                    <View style={styles.inlineActions}>
+                      <PrimaryButton label="Review" variant="secondary" onPress={() => { setIsReviewingQuestions(true); setReviewPage(0); }} style={styles.inlineButton} />
+                      <PrimaryButton label={activityType === "test" ? "Publish test" : "Publish assignment"} onPress={publishAssignment} loading={publishingAssignment} style={styles.inlineButton} />
+                    </View>
                   )}
 
-                  <PrimaryButton
-                    label={activityType === "test" ? "Publish test" : "Publish assignment"}
-                    onPress={publishAssignment}
-                    loading={publishingAssignment}
-                    disabled={acceptedQuestions.length < desiredQuestionCount}
-                  />
+                  {isReviewingQuestions ? (
+                    <View style={styles.reviewWrap}>
+                      <Text style={styles.sectionLabel}>Review</Text>
+                      {reviewQuestions.map((question) => (
+                        <View key={question.id} style={styles.questionCard}>
+                          <Text style={styles.questionPrompt}>{question.prompt}</Text>
+                          <PrimaryButton label="Remove" variant="secondary" onPress={() => removeAcceptedQuestion(question.id)} />
+                        </View>
+                      ))}
+                      <View style={styles.inlineActions}>
+                        <PrimaryButton label="Previous" variant="secondary" onPress={() => setReviewPage((current) => Math.max(0, current - 1))} disabled={reviewPage === 0} style={styles.inlineButton} />
+                        <PrimaryButton label="Next" variant="secondary" onPress={() => setReviewPage((current) => Math.min(reviewPageCount - 1, current + 1))} disabled={reviewPage >= reviewPageCount - 1} style={styles.inlineButton} />
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               </>
             ) : null}
@@ -1085,6 +1191,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     color: palette.ink,
   },
+  textAreaInput: {
+    minHeight: 90,
+    paddingVertical: 12,
+    textAlignVertical: "top",
+  },
   helperText: {
     color: palette.slate,
     lineHeight: 20,
@@ -1180,6 +1291,35 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 8,
   },
+  customOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  customOptionInput: {
+    flex: 1,
+  },
+  answerPick: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F9FBFD",
+  },
+  answerPickActive: {
+    backgroundColor: palette.navy,
+    borderColor: palette.navy,
+  },
+  answerPickText: {
+    color: palette.navy,
+    fontWeight: "800",
+  },
+  answerPickTextActive: {
+    color: palette.white,
+  },
   questionCard: {
     borderRadius: 18,
     borderWidth: 1,
@@ -1192,5 +1332,12 @@ const styles = StyleSheet.create({
     color: palette.ink,
     lineHeight: 22,
     fontWeight: "700",
+  },
+  optionPreview: {
+    color: palette.slate,
+    lineHeight: 20,
+  },
+  reviewWrap: {
+    gap: 12,
   },
 });

@@ -243,6 +243,8 @@ function buildActivitySummary(store, activity, profileId) {
     focusMode: activity.focusMode,
     topicId: activity.topicId,
     topicLabel: activity.topicLabel,
+    usesCustomSubject: Boolean(activity.usesCustomSubject),
+    usesCustomTopic: Boolean(activity.usesCustomTopic),
     questionCount: activity.questionCount,
     durationMinutes: activity.durationMinutes,
     startAt: activity.startAt,
@@ -507,16 +509,22 @@ export async function createClassroomActivity(payload, appVariant) {
     const classroom = store.classrooms[payload.classId];
     ensureTeacherOwnsClass(classroom, payload.teacherProfile.id);
 
-    const questionCount = Math.max(1, payload.questions.length);
+    const questionCount = Math.max(1, Number(payload.questionCount ?? payload.questions.length));
     const durationMinutes = Math.max(5, Number(payload.durationMinutes ?? 30));
     const now = Date.now();
     const isTest = payload.type === "test";
-    const startAt = isTest
-      ? now + Math.max(0, Number(payload.startInMinutes ?? 0)) * 60 * 1000
-      : now;
-    const endAt = isTest
-      ? startAt + durationMinutes * 60 * 1000
-      : startAt + Math.max(1, Number(payload.availabilityHours ?? 24)) * 60 * 60 * 1000;
+    const explicitStartAt = Number(payload.startAt ?? 0);
+    const explicitEndAt = Number(payload.endAt ?? 0);
+    const startAt = Number.isFinite(explicitStartAt) && explicitStartAt > now
+      ? explicitStartAt
+      : isTest
+        ? now + Math.max(0, Number(payload.startInMinutes ?? 0)) * 60 * 1000
+        : now;
+    const endAt = Number.isFinite(explicitEndAt) && explicitEndAt > startAt
+      ? explicitEndAt
+      : isTest
+        ? startAt + durationMinutes * 60 * 1000
+        : startAt + Math.max(1, Number(payload.availabilityHours ?? 24)) * 60 * 60 * 1000;
     const activityId = randomUUID();
 
     store.activities[activityId] = {
@@ -526,12 +534,14 @@ export async function createClassroomActivity(payload, appVariant) {
       title: payload.title.trim(),
       subjectId: payload.subject.id,
       subjectName: payload.subject.name,
+      usesCustomSubject: Boolean(payload.usesCustomSubject),
       grade: payload.grade,
       level: payload.level,
       difficulty: payload.difficulty,
       focusMode: payload.focusMode ?? "general",
       topicId: payload.topicId,
       topicLabel: payload.topicLabel,
+      usesCustomTopic: Boolean(payload.usesCustomTopic),
       durationMinutes,
       startAt,
       endAt,

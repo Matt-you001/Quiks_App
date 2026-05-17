@@ -15,6 +15,8 @@ const defaultForm = {
   age: "",
   targetExam: appVariant.defaultTargetExam,
   dailyGoalMinutes: String(appVariant.defaultDailyGoalMinutes),
+  schoolName: "",
+  teachingFocus: "",
   language: DEFAULT_LANGUAGE as AppLanguage,
   role: "student" as UserRole,
 };
@@ -49,6 +51,8 @@ export default function ProfileEditorScreen() {
           age: String(activeProfile.age),
           targetExam: activeProfile.targetExam,
           dailyGoalMinutes: String(activeProfile.dailyGoalMinutes),
+          schoolName: activeProfile.schoolName ?? "",
+          teachingFocus: activeProfile.teachingFocus ?? "",
           language: activeProfile.language ?? DEFAULT_LANGUAGE,
           role: activeProfile.role ?? "student",
         });
@@ -67,16 +71,24 @@ export default function ProfileEditorScreen() {
     }
 
     const age = Number(form.age);
-    const goal = Number(form.dailyGoalMinutes);
-
     if (!Number.isFinite(age) || age < 3) {
       Alert.alert(t(form.language, "invalidAgeTitle"), t(form.language, "invalidAgeMessage"));
       return;
     }
 
-    if (!Number.isFinite(goal) || goal < 5) {
-      Alert.alert(t(form.language, "invalidGoalTitle"), t(form.language, "invalidGoalMessage"));
-      return;
+    const isTeacher = form.role === "teacher";
+    const goal = Number(form.dailyGoalMinutes);
+
+    if (!isTeacher) {
+      if (!Number.isFinite(goal) || goal < 5) {
+        Alert.alert(t(form.language, "invalidGoalTitle"), t(form.language, "invalidGoalMessage"));
+        return;
+      }
+    } else {
+      if (!form.schoolName.trim() || !form.teachingFocus.trim()) {
+        Alert.alert("Teacher profile", "Enter school name and teaching focus.");
+        return;
+      }
     }
 
     if (!editingProfile) {
@@ -94,8 +106,10 @@ export default function ProfileEditorScreen() {
       id: editingProfile?.id ?? createId(),
       name: form.name.trim(),
       age,
-      targetExam: form.targetExam.trim() || "General school prep",
-      dailyGoalMinutes: goal,
+      targetExam: isTeacher ? "Teacher account" : form.targetExam.trim() || "General school prep",
+      dailyGoalMinutes: isTeacher ? 0 : goal,
+      schoolName: isTeacher ? form.schoolName.trim() : "",
+      teachingFocus: isTeacher ? form.teachingFocus.trim() : "",
       language: form.language,
       role: form.role,
       quiksId: editingProfile?.quiksId ?? createQuiksId(form.name.trim(), form.role),
@@ -116,44 +130,6 @@ export default function ProfileEditorScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.label}>{t(form.language, "name")}</Text>
-        <TextInput
-          value={form.name}
-          onChangeText={(value) => setForm((current) => ({ ...current, name: value }))}
-          style={styles.input}
-          placeholder={t(form.language, "enterLearnerName")}
-          placeholderTextColor="#7C8EA3"
-        />
-
-        <Text style={styles.label}>{t(form.language, "age")}</Text>
-        <TextInput
-          value={form.age}
-          onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
-          style={styles.input}
-          placeholder={t(form.language, "age")}
-          keyboardType="number-pad"
-          placeholderTextColor="#7C8EA3"
-        />
-
-        <Text style={styles.label}>{t(form.language, "targetExam")}</Text>
-        <TextInput
-          value={form.targetExam}
-          onChangeText={(value) => setForm((current) => ({ ...current, targetExam: value }))}
-          style={styles.input}
-          placeholder={appVariant.targetExamPlaceholder}
-          placeholderTextColor="#7C8EA3"
-        />
-
-        <Text style={styles.label}>{t(form.language, "dailyGoalMinutes")}</Text>
-        <TextInput
-          value={form.dailyGoalMinutes}
-          onChangeText={(value) => setForm((current) => ({ ...current, dailyGoalMinutes: value }))}
-          style={styles.input}
-          placeholder={String(appVariant.defaultDailyGoalMinutes)}
-          keyboardType="number-pad"
-          placeholderTextColor="#7C8EA3"
-        />
-
         {appVariant.id !== "children" ? (
           <>
             <Text style={styles.label}>{t(form.language, "classroomRole")}</Text>
@@ -177,6 +153,68 @@ export default function ProfileEditorScreen() {
             </View>
           </>
         ) : null}
+
+        <Text style={styles.label}>{t(form.language, "name")}</Text>
+        <TextInput
+          value={form.name}
+          onChangeText={(value) => setForm((current) => ({ ...current, name: value }))}
+          style={styles.input}
+          placeholder={t(form.language, "enterLearnerName")}
+          placeholderTextColor="#7C8EA3"
+        />
+
+        <Text style={styles.label}>{t(form.language, "age")}</Text>
+        <TextInput
+          value={form.age}
+          onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
+          style={styles.input}
+          placeholder={t(form.language, "age")}
+          keyboardType="number-pad"
+          placeholderTextColor="#7C8EA3"
+        />
+
+        {form.role === "teacher" && appVariant.id !== "children" ? (
+          <>
+            <Text style={styles.label}>School name</Text>
+            <TextInput
+              value={form.schoolName}
+              onChangeText={(value) => setForm((current) => ({ ...current, schoolName: value }))}
+              style={styles.input}
+              placeholder="School or institution"
+              placeholderTextColor="#7C8EA3"
+            />
+
+            <Text style={styles.label}>Teaching focus</Text>
+            <TextInput
+              value={form.teachingFocus}
+              onChangeText={(value) => setForm((current) => ({ ...current, teachingFocus: value }))}
+              style={styles.input}
+              placeholder="Subjects, class, or department"
+              placeholderTextColor="#7C8EA3"
+            />
+          </>
+        ) : (
+          <>
+            <Text style={styles.label}>{t(form.language, "targetExam")}</Text>
+            <TextInput
+              value={form.targetExam}
+              onChangeText={(value) => setForm((current) => ({ ...current, targetExam: value }))}
+              style={styles.input}
+              placeholder={appVariant.targetExamPlaceholder}
+              placeholderTextColor="#7C8EA3"
+            />
+
+            <Text style={styles.label}>{t(form.language, "dailyGoalMinutes")}</Text>
+            <TextInput
+              value={form.dailyGoalMinutes}
+              onChangeText={(value) => setForm((current) => ({ ...current, dailyGoalMinutes: value }))}
+              style={styles.input}
+              placeholder={String(appVariant.defaultDailyGoalMinutes)}
+              keyboardType="number-pad"
+              placeholderTextColor="#7C8EA3"
+            />
+          </>
+        )}
 
         <Text style={styles.label}>{t(form.language, "language")}</Text>
         <View style={styles.languageWrap}>

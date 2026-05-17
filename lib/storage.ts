@@ -41,6 +41,10 @@ function enforceProfileLimit(state: StoredAppState): StoredAppState {
 function normalizeProfile(profile: UserProfile): UserProfile {
   return {
     ...profile,
+    targetExam: profile.targetExam ?? "",
+    dailyGoalMinutes: Number.isFinite(profile.dailyGoalMinutes) ? profile.dailyGoalMinutes : 0,
+    schoolName: typeof profile.schoolName === "string" ? profile.schoolName : "",
+    teachingFocus: typeof profile.teachingFocus === "string" ? profile.teachingFocus : "",
     language: normalizeLanguage(profile.language ?? DEFAULT_LANGUAGE),
     role: normalizeUserRole(profile.role),
     quiksId: normalizeQuiksId(profile.quiksId, profile.id),
