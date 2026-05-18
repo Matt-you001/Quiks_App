@@ -195,6 +195,8 @@ export default function SessionScreen() {
     focusMode === "topic"
       ? activityTopicLabel ?? resolvedTopic?.label ?? null
       : null;
+  const sourceBadgeLabel =
+    questionSource === "remote" ? "TS1" : questionSource === "local" ? "TS2" : questionSource === "demo" ? "TS3" : null;
   const effectiveSubject = useMemo<Subject | null>(() => {
     if (subject) {
       return subject;
@@ -1110,7 +1112,7 @@ export default function SessionScreen() {
             {questionSource ? (
               <View style={[styles.sourceBadge, questionSource === "remote" ? styles.sourceBadgeRemote : null]}>
                 <Text style={[styles.sourceBadgeText, questionSource === "remote" ? styles.sourceBadgeTextRemote : null]}>
-                  {questionSource === "remote" ? t(language, "testSourceAi") : questionSource === "local" ? t(language, "testSourceLocal") : t(language, "testSourceDemo")}
+                  {sourceBadgeLabel}
                 </Text>
               </View>
             ) : null}

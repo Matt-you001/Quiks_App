@@ -14,6 +14,7 @@ import {
   requestJoinClass,
   respondToMembershipRequest,
   submitActivity,
+  updateClassroomActivity,
   updateClassroomName,
   upsertClassroomProfile,
 } from "./classroom-store.mjs";
@@ -1420,6 +1421,16 @@ async function handleAssignmentDuplicate(body, response) {
   sendJson(response, 200, { activity });
 }
 
+async function handleAssignmentUpdate(body, response) {
+  if (!body.teacherProfile?.id || !body.activityId || !body.classId || !body.subject?.id || !Array.isArray(body.questions)) {
+    sendJson(response, 400, { error: "Activity update request is incomplete." });
+    return;
+  }
+
+  const activity = await updateClassroomActivity(body, body.appVariant ?? "children");
+  sendJson(response, 200, { activity });
+}
+
 async function handleAssignmentList(body, response) {
   if (!body.profile?.id) {
     sendJson(response, 400, { error: "Profile is required." });
@@ -1633,6 +1644,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/assignments/duplicate") {
       await handleAssignmentDuplicate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/update") {
+      await handleAssignmentUpdate(body, response);
       return;
     }
 

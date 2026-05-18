@@ -12,6 +12,7 @@ import type {
   ClassroomActivityDuplicateRequest,
   ClassroomActivityListRequest,
   ClassroomActivityListResponse,
+  ClassroomActivityUpdateRequest,
   ClassroomActivitySubmitRequest,
   ClassroomActivitySubmitResponse,
   ClassroomClassCreateRequest,
@@ -602,6 +603,12 @@ export async function duplicateClassroomActivity(
   request: ClassroomActivityDuplicateRequest
 ): Promise<ClassroomActivityCreateResponse> {
   return postJson("/classroom/assignments/duplicate", withVariantMeta(request));
+}
+
+export async function updateClassroomActivity(
+  request: ClassroomActivityUpdateRequest
+): Promise<ClassroomActivityCreateResponse> {
+  return postJson("/classroom/assignments/update", withVariantMeta(request));
 }
 
 export async function listClassroomActivities(

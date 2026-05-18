@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
 import { palette } from "../lib/theme";
 
 interface PrimaryButtonProps {
@@ -8,6 +8,8 @@ interface PrimaryButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  labelStyle?: TextStyle;
+  compact?: boolean;
 }
 
 export function PrimaryButton({
@@ -17,6 +19,8 @@ export function PrimaryButton({
   disabled,
   loading,
   style,
+  labelStyle,
+  compact,
 }: PrimaryButtonProps) {
   const variantStyle = styles[variant];
   const textStyle = styles[`${variant}Text` as const];
@@ -27,13 +31,20 @@ export function PrimaryButton({
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.base,
+        compact ? styles.compactBase : null,
         variantStyle,
         pressed && !disabled ? styles.pressed : null,
         disabled ? styles.disabled : null,
         style,
       ]}
     >
-      {loading ? <ActivityIndicator color={variant === "ghost" ? palette.navy : palette.white} /> : <Text style={textStyle}>{label}</Text>}
+      {loading ? (
+        <ActivityIndicator color={variant === "ghost" ? palette.navy : palette.white} />
+      ) : (
+        <Text numberOfLines={1} style={[textStyle, compact ? styles.compactText : null, labelStyle]}>
+          {label}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -45,6 +56,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
+  },
+  compactBase: {
+    minHeight: 32,
+    borderRadius: 12,
+    paddingHorizontal: 10,
   },
   primary: {
     backgroundColor: palette.navy,
@@ -73,6 +89,9 @@ const styles = StyleSheet.create({
     color: palette.navy,
     fontSize: 16,
     fontWeight: "700",
+  },
+  compactText: {
+    fontSize: 12,
   },
   pressed: {
     transform: [{ scale: 0.98 }],

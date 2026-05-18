@@ -334,6 +334,10 @@ export interface ClassroomActivityDuplicateRequest {
   activityId: string;
 }
 
+export interface ClassroomActivityUpdateRequest extends ClassroomActivityCreateRequest {
+  activityId: string;
+}
+
 export interface ClassroomActivityListRequest {
   profile: UserProfile;
 }

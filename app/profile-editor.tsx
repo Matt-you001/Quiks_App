@@ -70,23 +70,18 @@ export default function ProfileEditorScreen() {
       return;
     }
 
-    const age = Number(form.age);
-    if (!Number.isFinite(age) || age < 3) {
-      Alert.alert(t(form.language, "invalidAgeTitle"), t(form.language, "invalidAgeMessage"));
-      return;
-    }
-
     const isTeacher = form.role === "teacher";
+    const age = Number(form.age);
     const goal = Number(form.dailyGoalMinutes);
 
     if (!isTeacher) {
-      if (!Number.isFinite(goal) || goal < 5) {
-        Alert.alert(t(form.language, "invalidGoalTitle"), t(form.language, "invalidGoalMessage"));
+      if (!Number.isFinite(age) || age < 3) {
+        Alert.alert(t(form.language, "invalidAgeTitle"), t(form.language, "invalidAgeMessage"));
         return;
       }
-    } else {
-      if (!form.schoolName.trim() || !form.teachingFocus.trim()) {
-        Alert.alert("Teacher profile", "Enter school name and teaching focus.");
+
+      if (!Number.isFinite(goal) || goal < 5) {
+        Alert.alert(t(form.language, "invalidGoalTitle"), t(form.language, "invalidGoalMessage"));
         return;
       }
     }
@@ -105,7 +100,7 @@ export default function ProfileEditorScreen() {
     const profile: UserProfile = {
       id: editingProfile?.id ?? createId(),
       name: form.name.trim(),
-      age,
+      age: isTeacher ? (Number.isFinite(age) && age >= 18 ? age : editingProfile?.age ?? 18) : age,
       targetExam: isTeacher ? "Teacher account" : form.targetExam.trim() || "General school prep",
       dailyGoalMinutes: isTeacher ? 0 : goal,
       schoolName: isTeacher ? form.schoolName.trim() : "",
@@ -163,24 +158,24 @@ export default function ProfileEditorScreen() {
           placeholderTextColor="#7C8EA3"
         />
 
-        <Text style={styles.label}>{t(form.language, "age")}</Text>
-        <TextInput
-          value={form.age}
-          onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
-          style={styles.input}
-          placeholder={t(form.language, "age")}
-          keyboardType="number-pad"
-          placeholderTextColor="#7C8EA3"
-        />
-
         {form.role === "teacher" && appVariant.id !== "children" ? (
           <>
+            <Text style={styles.label}>{t(form.language, "age")}</Text>
+            <TextInput
+              value={form.age}
+              onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
+              style={styles.input}
+              placeholder="Optional"
+              keyboardType="number-pad"
+              placeholderTextColor="#7C8EA3"
+            />
+
             <Text style={styles.label}>School name</Text>
             <TextInput
               value={form.schoolName}
               onChangeText={(value) => setForm((current) => ({ ...current, schoolName: value }))}
               style={styles.input}
-              placeholder="School or institution"
+              placeholder="Optional"
               placeholderTextColor="#7C8EA3"
             />
 
@@ -189,12 +184,22 @@ export default function ProfileEditorScreen() {
               value={form.teachingFocus}
               onChangeText={(value) => setForm((current) => ({ ...current, teachingFocus: value }))}
               style={styles.input}
-              placeholder="Subjects, class, or department"
+              placeholder="Optional"
               placeholderTextColor="#7C8EA3"
             />
           </>
         ) : (
           <>
+            <Text style={styles.label}>{t(form.language, "age")}</Text>
+            <TextInput
+              value={form.age}
+              onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
+              style={styles.input}
+              placeholder={t(form.language, "age")}
+              keyboardType="number-pad"
+              placeholderTextColor="#7C8EA3"
+            />
+
             <Text style={styles.label}>{t(form.language, "targetExam")}</Text>
             <TextInput
               value={form.targetExam}

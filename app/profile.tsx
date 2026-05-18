@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { appVariant } from "../lib/app-variant";
 import { signOutAccount } from "../lib/firebase";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { canCreateAnotherProfile } from "../lib/subscription";
@@ -197,24 +198,42 @@ export default function ProfileScreen() {
         <Text style={styles.metricText}>Quiks ID: {activeProfile.quiksId}</Text>
       </View>
 
-      <View style={styles.actionColumn}>
-        <PrimaryButton label={t(language, "editProfileAction")} onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "edit" } } as never)} />
+      <View style={styles.actionGrid}>
         <PrimaryButton
-          label={t(language, "createAnotherProfile")}
+          label={t(language, "editProfileAction")}
+          onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "edit" } } as never)}
+          style={styles.gridButton}
+          compact
+        />
+        {activeProfile && appVariant.id !== "children" ? (
+          <PrimaryButton
+            label="Classroom"
+            variant="secondary"
+            onPress={() => router.push({ pathname: "/classroom" } as never)}
+            style={styles.gridButton}
+            compact
+          />
+        ) : null}
+        <PrimaryButton
+          label="Subscription"
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/subscription" } as never)}
+          style={styles.gridButton}
+          compact
+        />
+        <PrimaryButton
+          label="Create Profile"
           variant="secondary"
           onPress={() =>
             canCreateMoreProfiles
               ? router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
               : router.push({ pathname: "/subscription" } as never)
           }
+          style={styles.gridButton}
+          compact
         />
-        <PrimaryButton
-          label={t(language, "manageSubscription")}
-          variant="secondary"
-          onPress={() => router.push({ pathname: "/subscription" } as never)}
-        />
-        <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} />
-        <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
+        <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} style={styles.gridButton} compact />
+        <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} style={styles.gridButton} compact />
       </View>
     </AppBackground>
   );
@@ -318,5 +337,16 @@ const styles = StyleSheet.create({
   actionColumn: {
     marginTop: 18,
     gap: 12,
+  },
+  actionGrid: {
+    marginTop: 18,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  gridButton: {
+    flexBasis: "31%",
+    flexGrow: 1,
+    minWidth: 0,
   },
 });

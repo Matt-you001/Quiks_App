@@ -1,6 +1,8 @@
 import { useFocusEffect, router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -13,6 +15,7 @@ import {
   createClassroomClass,
   duplicateClassroomActivity,
   generateClassroomQuestionCandidates,
+  getClassroomActivityDetails,
   getClassroomDetails,
   inviteStudentToClassroom,
   listClassroomActivities,
@@ -21,7 +24,7 @@ import {
   requestJoinClassroom,
   respondToClassroomMembership,
   syncClassroomProfile,
-  updateClassroomClass,
+  updateClassroomActivity,
 } from "../services/ai";
 import { getLocalizedSubjects } from "../lib/subjects";
 import type {
@@ -55,7 +58,37 @@ function parseDateTimeInput(dateText: string, timeText: string) {
   return Number.isNaN(candidate.getTime()) ? null : candidate.getTime();
 }
 
+function formatLocalDateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDateValue(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getMonthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function canEditScheduledActivity(activity: ClassroomActivitySummary) {
+  if (activity.type !== "test") {
+    return true;
+  }
+
+  return activity.startAt - Date.now() > 5 * 60 * 1000;
+}
+
 export default function ClassroomScreen() {
+  const hydratingActivityRef = useRef(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [classes, setClasses] = useState<ClassroomSummary[]>([]);
@@ -65,10 +98,10 @@ export default function ClassroomScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newClassName, setNewClassName] = useState("");
-  const [editClassName, setEditClassName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [inviteStudentId, setInviteStudentId] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [activityType, setActivityType] = useState<ClassroomActivityType>("assignment");
   const [grade, setGrade] = useState(appVariant.allowedGrades[0] ?? "Grade 6");
   const [level, setLevel] = useState("1");
@@ -80,7 +113,7 @@ export default function ClassroomScreen() {
   const [customSubjectName, setCustomSubjectName] = useState("");
   const [customTopicLabel, setCustomTopicLabel] = useState("");
   const [questionCount, setQuestionCount] = useState("5");
-  const [durationMinutes, setDurationMinutes] = useState("30");
+  const [durationSeconds, setDurationSeconds] = useState("600");
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -94,13 +127,31 @@ export default function ClassroomScreen() {
   const [showCustomQuestionForm, setShowCustomQuestionForm] = useState(false);
   const [customQuestionPrompt, setCustomQuestionPrompt] = useState("");
   const [customQuestionOptions, setCustomQuestionOptions] = useState(["", "", "", ""]);
-  const [customQuestionAnswerIndex, setCustomQuestionAnswerIndex] = useState(0);
+  const [customQuestionAnswerIndex, setCustomQuestionAnswerIndex] = useState<number | null>(null);
   const [customQuestionExplanation, setCustomQuestionExplanation] = useState("");
   const [candidateLoading, setCandidateLoading] = useState(false);
+  const [hasStartedQuestionSelection, setHasStartedQuestionSelection] = useState(false);
   const [publishingAssignment, setPublishingAssignment] = useState(false);
   const [classActionLoading, setClassActionLoading] = useState(false);
+  const [openPicker, setOpenPicker] = useState<"startDate" | "startTime" | "deadlineDate" | "deadlineTime" | null>(null);
+  const [pickerMonth, setPickerMonth] = useState(() => getMonthStart(new Date()));
+  const [pickerHour, setPickerHour] = useState("00");
+  const [pickerMinute, setPickerMinute] = useState("00");
+  const [managementExpanded, setManagementExpanded] = useState(true);
+  const [activityExpanded, setActivityExpanded] = useState(true);
 
   const language = profile?.language ?? "en";
+  const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0")), []);
+  const minuteOptions = useMemo(() => Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0")), []);
+  const quarterHourOptions = useMemo(
+    () =>
+      Array.from({ length: 24 * 4 }, (_, index) => {
+        const hour = String(Math.floor(index / 4)).padStart(2, "0");
+        const minute = String((index % 4) * 15).padStart(2, "0");
+        return `${hour}:${minute}`;
+      }),
+    []
+  );
   const localizedSubjects = useMemo(() => getLocalizedSubjects(language), [language]);
   const selectedSubject = useMemo(
     () => localizedSubjects.find((subject) => subject.id === subjectId) ?? localizedSubjects[0] ?? null,
@@ -163,6 +214,95 @@ export default function ClassroomScreen() {
     () => (selectedClassDetails?.members ?? []).filter((member) => member.status === "active"),
     [selectedClassDetails]
   );
+  const computedTestDurationMinutes = useMemo(() => {
+    if (activityType !== "test") {
+      return 0;
+    }
+
+    const seconds = Math.max(0, Number(durationSeconds) || 0);
+    if (seconds <= 0) {
+      return 0;
+    }
+
+    return Math.max(1, Math.ceil(seconds / 60));
+  }, [activityType, durationSeconds]);
+  const computedTestEndAt = useMemo(() => {
+    if (activityType !== "test") {
+      return null;
+    }
+
+    const parsedStart = parseDateTimeInput(startDate, startTime);
+    const seconds = Math.max(0, Number(durationSeconds) || 0);
+    if (!parsedStart || seconds <= 0) {
+      return null;
+    }
+
+    return parsedStart + seconds * 1000;
+  }, [activityType, durationSeconds, startDate, startTime]);
+  const computedTestEndTimeLabel = useMemo(() => {
+    if (!computedTestEndAt) {
+      return "Set start time and duration";
+    }
+
+    const endDate = new Date(computedTestEndAt);
+    const hours = String(endDate.getHours()).padStart(2, "0");
+    const minutes = String(endDate.getMinutes()).padStart(2, "0");
+    const seconds = String(endDate.getSeconds()).padStart(2, "0");
+    return `${hours}:${minutes}:${seconds}`;
+  }, [computedTestEndAt]);
+  const calendarDays = useMemo(() => {
+    const monthStart = getMonthStart(pickerMonth);
+    const firstWeekday = monthStart.getDay();
+    const firstCell = new Date(monthStart);
+    firstCell.setDate(monthStart.getDate() - firstWeekday);
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(firstCell);
+      date.setDate(firstCell.getDate() + index);
+      return {
+        key: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+        date,
+        value: formatLocalDateValue(date),
+        inMonth: date.getMonth() === monthStart.getMonth(),
+      };
+    });
+  }, [pickerMonth]);
+
+  useEffect(() => {
+    if (hydratingActivityRef.current) {
+      hydratingActivityRef.current = false;
+      return;
+    }
+
+    setCandidateQuestions([]);
+    setAcceptedQuestions([]);
+    setIsReviewingQuestions(false);
+    setReviewPage(0);
+    setHasStartedQuestionSelection(false);
+  }, [activityType, customSubjectName, customTopicLabel, difficulty, focusMode, grade, level, questionCount, questionOrderMode, resultVisibility, subjectId, topicId, useCustomSubject]);
+
+  useEffect(() => {
+    if (activityType !== "test") {
+      return;
+    }
+
+    if (!startDate) {
+      const today = formatLocalDateValue(new Date());
+      setStartDate(today);
+    }
+  }, [activityType, startDate]);
+
+  useEffect(() => {
+    if (!hasStartedQuestionSelection || candidateLoading || acceptedQuestions.length >= desiredQuestionCount) {
+      return;
+    }
+
+    if (candidateQuestions.length > 0) {
+      return;
+    }
+
+    void generateCandidates();
+  }, [acceptedQuestions.length, candidateLoading, candidateQuestions.length, desiredQuestionCount, hasStartedQuestionSelection]);
 
   useEffect(() => {
     if (!profile || !selectedClassId) {
@@ -179,7 +319,6 @@ export default function ClassroomScreen() {
         });
         if (!cancelled) {
           setSelectedClassDetails(details);
-          setEditClassName(details.classroom.className);
         }
       } catch {
         if (!cancelled) {
@@ -256,11 +395,78 @@ export default function ClassroomScreen() {
         classId: nextSelectedClassId,
       });
       setSelectedClassDetails(details);
-      setEditClassName(details.classroom.className);
     } else {
       setSelectedClassDetails(null);
-      setEditClassName("");
     }
+  };
+
+  const openDatePicker = (picker: "startDate" | "deadlineDate") => {
+    const currentValue =
+      picker === "startDate" ? startDate : deadlineDate;
+    const parsed = currentValue ? parseLocalDateValue(currentValue) : null;
+    setPickerMonth(getMonthStart(parsed ?? new Date()));
+    setOpenPicker(picker);
+  };
+
+  const selectDateValue = (value: string) => {
+    if (openPicker === "startDate") {
+      setStartDate(value);
+    } else if (openPicker === "deadlineDate") {
+      setDeadlineDate(value);
+    }
+
+    setOpenPicker(null);
+  };
+
+  const resetActivityBuilder = () => {
+    setEditingActivityId(null);
+    setAssignmentTitle("");
+    setAcceptedQuestions([]);
+    setCandidateQuestions([]);
+    setIsReviewingQuestions(false);
+    setReviewPage(0);
+    setDeadlineDate("");
+    setDeadlineTime("");
+    setStartDate("");
+    setStartTime("");
+    setDurationSeconds("600");
+    setCustomSubjectName("");
+    setCustomTopicLabel("");
+    setUseCustomSubject(false);
+    setShowCustomQuestionForm(false);
+    setHasStartedQuestionSelection(false);
+    setOpenPicker(null);
+    setCustomQuestionAnswerIndex(null);
+    setCustomQuestionPrompt("");
+    setCustomQuestionOptions(["", "", "", ""]);
+    setCustomQuestionExplanation("");
+  };
+
+  const copyClassCode = async (classCode: string) => {
+    try {
+      await Clipboard.setStringAsync(classCode);
+      Alert.alert("Classroom", "Class code copied.");
+    } catch {
+      Alert.alert("Classroom", "Unable to copy the class code.");
+    }
+  };
+
+  const openTimePicker = (picker: "startTime" | "deadlineTime") => {
+    const currentValue = picker === "startTime" ? startTime : deadlineTime;
+    const [hour = "00", minute = "00"] = currentValue ? currentValue.split(":") : ["00", "00"];
+    setPickerHour(hour);
+    setPickerMinute(minute);
+    setOpenPicker(picker);
+  };
+
+  const confirmTimeValue = () => {
+    const value = `${pickerHour}:${pickerMinute}`;
+    if (openPicker === "startTime") {
+      setStartTime(value);
+    } else if (openPicker === "deadlineTime") {
+      setDeadlineTime(value);
+    }
+    setOpenPicker(null);
   };
 
   const createClass = async () => {
@@ -329,26 +535,6 @@ export default function ClassroomScreen() {
     }
   };
 
-  const renameClass = async () => {
-    if (!profile || !selectedClass || !editClassName.trim()) {
-      return;
-    }
-
-    setClassActionLoading(true);
-    try {
-      await updateClassroomClass({
-        teacherProfile: profile,
-        classId: selectedClass.classId,
-        className: editClassName.trim(),
-      });
-      await refreshClassroomData();
-    } catch (error) {
-      Alert.alert("Classroom", error instanceof Error ? error.message : "Unable to update the class name.");
-    } finally {
-      setClassActionLoading(false);
-    }
-  };
-
   const removeMember = async (membership: ClassroomMemberSummary) => {
     if (!profile || !selectedClass) {
       return;
@@ -405,7 +591,9 @@ export default function ClassroomScreen() {
     }
 
     setCandidateLoading(true);
+    setHasStartedQuestionSelection(true);
     try {
+      const remainingCount = Math.max(1, desiredQuestionCount - acceptedQuestions.length);
       const response = await generateClassroomQuestionCandidates({
         teacherProfile: profile,
         classId: selectedClass.classId,
@@ -427,7 +615,7 @@ export default function ClassroomScreen() {
               : selectedSubject?.topics.find((topic) => topic.id === topicId)?.label
             : undefined,
         questionCount: desiredQuestionCount,
-        batchCount: Math.min(6, Math.max(3, desiredQuestionCount - acceptedQuestions.length)),
+        batchCount: Math.min(10, remainingCount),
       });
       setCandidateQuestions((current) => [
         ...current,
@@ -476,9 +664,14 @@ export default function ClassroomScreen() {
       return;
     }
 
+    if (customQuestionAnswerIndex === null) {
+      Alert.alert("Custom question", "Choose the correct answer.");
+      return;
+    }
+
     const answer = customQuestionOptions[customQuestionAnswerIndex]?.trim();
     if (!answer) {
-      Alert.alert("Custom question", "Choose the correct answer.");
+      Alert.alert("Custom question", "The marked correct option cannot be empty.");
       return;
     }
 
@@ -498,7 +691,7 @@ export default function ClassroomScreen() {
     setAcceptedQuestions((current) => [...current, customQuestion]);
     setCustomQuestionPrompt("");
     setCustomQuestionOptions(["", "", "", ""]);
-    setCustomQuestionAnswerIndex(0);
+    setCustomQuestionAnswerIndex(null);
     setCustomQuestionExplanation("");
     setShowCustomQuestionForm(false);
   };
@@ -524,6 +717,7 @@ export default function ClassroomScreen() {
     }
 
     const parsedStartAt = activityType === "test" ? parseDateTimeInput(startDate, startTime) : null;
+    const parsedEndAt = activityType === "test" ? computedTestEndAt : null;
     const parsedDeadline = activityType === "assignment" ? parseDateTimeInput(deadlineDate, deadlineTime) : null;
 
     if (activityType === "test" && !parsedStartAt) {
@@ -531,14 +725,38 @@ export default function ClassroomScreen() {
       return;
     }
 
+    if (activityType === "test" && !parsedEndAt) {
+      Alert.alert("Test", "Enter a valid duration in seconds.");
+      return;
+    }
+
+    if (activityType === "test" && parsedStartAt && parsedEndAt && parsedEndAt <= parsedStartAt) {
+      Alert.alert("Test", "End time must be later than start time.");
+      return;
+    }
+
+    if (activityType === "test" && parsedStartAt && parsedEndAt) {
+      const startDateValue = formatLocalDateValue(new Date(parsedStartAt));
+      const endDateValue = formatLocalDateValue(new Date(parsedEndAt));
+      if (startDateValue !== endDateValue) {
+        Alert.alert("Test", "Test end time must remain on the same day as the test date.");
+        return;
+      }
+    }
+
     if (activityType === "assignment" && !parsedDeadline) {
       Alert.alert("Assignment", "Enter a valid deadline date and time.");
       return;
     }
 
+    if (activityType === "assignment" && parsedDeadline && parsedDeadline <= Date.now()) {
+      Alert.alert("Assignment", "Deadline must be in the future.");
+      return;
+    }
+
     setPublishingAssignment(true);
     try {
-      await createClassroomAssignment({
+      const payload = {
         teacherProfile: profile,
         classId: selectedClass.classId,
         type: activityType,
@@ -562,37 +780,38 @@ export default function ClassroomScreen() {
               ? customTopicLabel.trim() || undefined
               : selectedSubject?.topics.find((topic) => topic.id === topicId)?.label
             : undefined,
-        durationMinutes: Math.max(5, Number(durationMinutes) || 30),
+        durationMinutes:
+          activityType === "test"
+            ? Math.max(1, computedTestDurationMinutes)
+            : Math.max(5, Math.ceil(((parsedDeadline ?? Date.now()) - Date.now()) / 60000)),
         availabilityHours: 24,
         startAt: parsedStartAt ?? undefined,
         endAt:
-          parsedDeadline ??
-          (parsedStartAt
-            ? parsedStartAt + Math.max(5, Number(durationMinutes) || 30) * 60 * 1000
-            : undefined),
+          activityType === "test"
+            ? parsedEndAt ?? undefined
+            : parsedDeadline ?? undefined,
         resultVisibility,
         questionOrderMode,
         questions: acceptedQuestions.slice(0, desiredQuestionCount),
-      });
-      setAssignmentTitle("");
-      setAcceptedQuestions([]);
-      setCandidateQuestions([]);
-      setIsReviewingQuestions(false);
-      setReviewPage(0);
-      setDeadlineDate("");
-      setDeadlineTime("");
-      setStartDate("");
-      setStartTime("");
-      setCustomSubjectName("");
-      setCustomTopicLabel("");
-      setUseCustomSubject(false);
-      setShowCustomQuestionForm(false);
+      };
+
+      if (editingActivityId) {
+        await updateClassroomActivity({
+          ...payload,
+          activityId: editingActivityId,
+        });
+      } else {
+        await createClassroomAssignment(payload);
+      }
+      resetActivityBuilder();
       await refreshClassroomData();
       Alert.alert(
-        activityType === "test" ? "Test published" : "Assignment published",
-        activityType === "test"
-          ? "Your scheduled test is now ready for the class."
-          : "Your assignment is now available to the class."
+        editingActivityId ? "Activity updated" : activityType === "test" ? "Test published" : "Assignment published",
+        editingActivityId
+          ? "Your activity changes are saved."
+          : activityType === "test"
+            ? "Your scheduled test is now ready for the class."
+            : "Your assignment is now available to the class."
       );
     } catch (error) {
       Alert.alert("Assignment", error instanceof Error ? error.message : "Unable to publish the assignment.");
@@ -615,6 +834,89 @@ export default function ClassroomScreen() {
       await refreshClassroomData();
     } catch (error) {
       Alert.alert("Classroom", error instanceof Error ? error.message : "Unable to duplicate the activity.");
+    } finally {
+      setClassActionLoading(false);
+    }
+  };
+
+  const editActivity = async (activity: ClassroomActivitySummary) => {
+    if (!profile) {
+      return;
+    }
+
+    if (!canEditScheduledActivity(activity)) {
+      Alert.alert("Classroom", "Tests can no longer be edited within 5 minutes of the start time.");
+      return;
+    }
+
+    setClassActionLoading(true);
+    try {
+      const details = await getClassroomActivityDetails({
+        profile,
+        activityId: activity.activityId,
+      });
+      hydratingActivityRef.current = true;
+      setSelectedClassId(activity.classId);
+      setEditingActivityId(activity.activityId);
+      setActivityExpanded(true);
+      setAssignmentTitle(activity.title);
+      setActivityType(activity.type);
+      setGrade(activity.grade);
+      setLevel(String(activity.level));
+      setDifficulty(activity.difficulty);
+      setFocusMode(activity.focusMode);
+      setQuestionCount(String(activity.questionCount));
+      setResultVisibility(activity.resultVisibility);
+      setQuestionOrderMode(activity.questionOrderMode);
+      setAcceptedQuestions(details.questions);
+      setCandidateQuestions([]);
+      setIsReviewingQuestions(false);
+      setReviewPage(0);
+      setShowCustomQuestionForm(false);
+      setHasStartedQuestionSelection(true);
+      setOpenPicker(null);
+      setCustomQuestionAnswerIndex(null);
+      setCustomQuestionPrompt("");
+      setCustomQuestionOptions(["", "", "", ""]);
+      setCustomQuestionExplanation("");
+
+      if (activity.usesCustomSubject) {
+        setUseCustomSubject(true);
+        setCustomSubjectName(activity.subjectName);
+      } else {
+        setUseCustomSubject(false);
+        setSubjectId(activity.subjectId);
+      }
+
+      if (activity.focusMode === "topic") {
+        if (activity.usesCustomTopic) {
+          setCustomTopicLabel(activity.topicLabel ?? "");
+        } else {
+          setTopicId(activity.topicId ?? null);
+          setCustomTopicLabel("");
+        }
+      } else {
+        setTopicId(activity.topicId ?? null);
+        setCustomTopicLabel("");
+      }
+
+      if (activity.type === "test") {
+        const start = new Date(activity.startAt);
+        setStartDate(formatLocalDateValue(start));
+        setStartTime(`${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`);
+        setDurationSeconds(String(Math.max(1, Math.round((activity.endAt - activity.startAt) / 1000))));
+        setDeadlineDate("");
+        setDeadlineTime("");
+      } else {
+        const deadline = new Date(activity.endAt);
+        setDeadlineDate(formatLocalDateValue(deadline));
+        setDeadlineTime(`${String(deadline.getHours()).padStart(2, "0")}:${String(deadline.getMinutes()).padStart(2, "0")}`);
+        setStartDate("");
+        setStartTime("");
+        setDurationSeconds("600");
+      }
+    } catch (error) {
+      Alert.alert("Classroom", error instanceof Error ? error.message : "Unable to load the activity for editing.");
     } finally {
       setClassActionLoading(false);
     }
@@ -706,77 +1008,86 @@ export default function ClassroomScreen() {
         {profile.role === "teacher" ? (
           <>
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Create class</Text>
-              <TextInput
-                value={newClassName}
-                onChangeText={setNewClassName}
-                placeholder="Class name"
-                placeholderTextColor="#8092A7"
-                style={styles.input}
-              />
-              <PrimaryButton label="Create class" onPress={createClass} loading={saving} />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Your classes</Text>
-              {classes.length === 0 ? (
-                <Text style={styles.helperText}>No classes yet.</Text>
-              ) : (
-                classes.map((entry) => (
-                  <Pressable
-                    key={entry.classId}
-                    onPress={() => setSelectedClassId(entry.classId)}
-                    style={[styles.classCard, entry.classId === selectedClass?.classId ? styles.classCardActive : null]}
-                  >
-                    <Text style={styles.classTitle}>{entry.className}</Text>
-                    <Text style={styles.classMeta}>Code: {entry.classCode}</Text>
-                    <Text style={styles.classMeta}>Members: {entry.memberCount}</Text>
-                  </Pressable>
-                ))
-              )}
-            </View>
-
-            {selectedClass ? (
-              <>
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Class</Text>
+              <Pressable style={styles.sectionToggle} onPress={() => setManagementExpanded((current) => !current)}>
+                <Text style={styles.cardTitle}>Class management</Text>
+                <Text style={styles.sectionToggleIcon}>{managementExpanded ? "-" : "+"}</Text>
+              </Pressable>
+              {managementExpanded ? (
+                <>
                   <TextInput
-                    value={editClassName}
-                    onChangeText={setEditClassName}
+                    value={newClassName}
+                    onChangeText={setNewClassName}
                     placeholder="Class name"
                     placeholderTextColor="#8092A7"
                     style={styles.input}
                   />
-                  <PrimaryButton label="Save name" onPress={renameClass} loading={classActionLoading} />
-                  <Text style={styles.classMeta}>Code: {selectedClass.classCode}</Text>
-                </View>
+                  <PrimaryButton label="Create class" onPress={createClass} loading={saving} />
 
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Roster</Text>
-                  {activeMembers.length === 0 ? (
-                    <Text style={styles.helperText}>No members.</Text>
+                  <Text style={styles.sectionLabel}>Your classes</Text>
+                  {classes.length === 0 ? (
+                    <Text style={styles.helperText}>No classes yet.</Text>
                   ) : (
-                    activeMembers.map((membership) => (
-                      <View key={membership.membershipId} style={styles.memberRow}>
-                        <View style={styles.memberMeta}>
-                          <Text style={styles.requestTitle}>{membership.name}</Text>
-                          <Text style={styles.classMeta}>
-                            {membership.role === "teacher" ? "Teacher" : membership.quiksId}
-                          </Text>
+                    classes.map((entry) => (
+                      <Pressable
+                        key={entry.classId}
+                        onPress={() => setSelectedClassId(entry.classId)}
+                        style={[styles.classCard, entry.classId === selectedClass?.classId ? styles.classCardActive : null]}
+                      >
+                        <Text style={styles.classTitle}>{entry.className}</Text>
+                        <View style={styles.codeRow}>
+                          <Text style={styles.classMeta}>Code: {entry.classCode}</Text>
+                          <Pressable onPress={() => copyClassCode(entry.classCode)} style={styles.copyButton}>
+                            <MaterialIcons name="content-copy" size={16} color={palette.navy} />
+                          </Pressable>
                         </View>
-                        {membership.role === "student" ? (
-                          <PrimaryButton
-                            label="Remove"
-                            variant="secondary"
-                            onPress={() => removeMember(membership)}
-                            style={styles.memberAction}
-                          />
-                        ) : null}
-                      </View>
+                        <Text style={styles.classMeta}>Members: {entry.memberCount}</Text>
+                      </Pressable>
                     ))
                   )}
-                </View>
 
+                  {selectedClass ? (
+                    <>
+                      <Text style={styles.sectionLabel}>Roster</Text>
+                      {activeMembers.length === 0 ? (
+                        <Text style={styles.helperText}>No members.</Text>
+                      ) : (
+                        activeMembers.map((membership) => (
+                          <View key={membership.membershipId} style={styles.memberRow}>
+                            <View style={styles.memberMeta}>
+                              <Text style={styles.requestTitle}>{membership.name}</Text>
+                              <Text style={styles.classMeta}>
+                                {membership.role === "teacher" ? "Teacher" : membership.quiksId}
+                              </Text>
+                            </View>
+                            {membership.role === "student" ? (
+                              <PrimaryButton
+                                label="Remove"
+                                variant="secondary"
+                                onPress={() => removeMember(membership)}
+                                style={styles.memberAction}
+                              />
+                            ) : null}
+                          </View>
+                        ))
+                      )}
+
+                      <Text style={styles.sectionLabel}>Invite student by ID</Text>
+                      <TextInput
+                        value={inviteStudentId}
+                        onChangeText={setInviteStudentId}
+                        placeholder="Student Quiks ID"
+                        placeholderTextColor="#8092A7"
+                        style={styles.input}
+                      />
+                      <PrimaryButton label="Send invite" onPress={inviteStudent} loading={saving} />
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+            </View>
+
+            {selectedClass ? (
+              <>
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>Pending student requests</Text>
                   {pendingTeacherApprovals.length === 0 ? (
@@ -805,19 +1116,12 @@ export default function ClassroomScreen() {
                 </View>
 
                 <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Invite student by ID</Text>
-                  <TextInput
-                    value={inviteStudentId}
-                    onChangeText={setInviteStudentId}
-                    placeholder="Student Quiks ID"
-                    placeholderTextColor="#8092A7"
-                    style={styles.input}
-                  />
-                  <PrimaryButton label="Send invite" onPress={inviteStudent} loading={saving} />
-                </View>
-
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Create activity</Text>
+                  <Pressable style={styles.sectionToggle} onPress={() => setActivityExpanded((current) => !current)}>
+                    <Text style={styles.cardTitle}>Create activity</Text>
+                    <Text style={styles.sectionToggleIcon}>{activityExpanded ? "-" : "+"}</Text>
+                  </Pressable>
+                  {activityExpanded ? (
+                    <>
                   <Text style={styles.sectionLabel}>Activity type</Text>
                   <View style={styles.inlineActions}>
                     <PrimaryButton label="Assignment" onPress={() => setActivityType("assignment")} variant={activityType === "assignment" ? "primary" : "secondary"} style={styles.inlineButton} />
@@ -904,27 +1208,84 @@ export default function ClassroomScreen() {
                     </View>
                   </View>
 
-                  <View style={styles.dualInputRow}>
-                    <View style={styles.dualInputItem}>
-                      <Text style={styles.sectionLabel}>Duration (minutes)</Text>
-                      <TextInput value={durationMinutes} onChangeText={setDurationMinutes} keyboardType="number-pad" style={styles.input} />
-                    </View>
-                    <View style={styles.dualInputItem}>
-                      <Text style={styles.sectionLabel}>{activityType === "test" ? "Start date" : "Deadline date"}</Text>
-                      <TextInput value={activityType === "test" ? startDate : deadlineDate} onChangeText={activityType === "test" ? setStartDate : setDeadlineDate} placeholder="YYYY-MM-DD" placeholderTextColor="#7C8EA3" style={styles.input} />
-                    </View>
-                  </View>
+                  {activityType === "test" ? (
+                    <>
+                      <View style={styles.dualInputRow}>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>Test date</Text>
+                          <Pressable onPress={() => openDatePicker("startDate")} style={styles.pickerTrigger}>
+                            <Text style={[styles.pickerValue, !startDate ? styles.pickerPlaceholder : null]}>
+                              {startDate || "Select date"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>Duration (Seconds)</Text>
+                          <TextInput value={durationSeconds} onChangeText={setDurationSeconds} keyboardType="number-pad" style={styles.input} />
+                        </View>
+                      </View>
 
-                  <View style={styles.dualInputRow}>
-                    <View style={styles.dualInputItem}>
-                      <Text style={styles.sectionLabel}>{activityType === "test" ? "Start time" : "Deadline time"}</Text>
-                      <TextInput value={activityType === "test" ? startTime : deadlineTime} onChangeText={activityType === "test" ? setStartTime : setDeadlineTime} placeholder="HH:MM" placeholderTextColor="#7C8EA3" style={styles.input} />
-                    </View>
-                    <View style={styles.dualInputItem}>
-                      <Text style={styles.sectionLabel}>Custom question</Text>
-                      <PrimaryButton label={showCustomQuestionForm ? "Hide custom question" : "Custom question"} variant="secondary" onPress={() => setShowCustomQuestionForm((current) => !current)} />
-                    </View>
-                  </View>
+                      <View style={styles.dualInputRow}>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>Start time</Text>
+                          <Pressable onPress={() => openTimePicker("startTime")} style={styles.pickerTrigger}>
+                            <Text style={[styles.pickerValue, !startTime ? styles.pickerPlaceholder : null]}>
+                              {startTime || "Select time"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>End time</Text>
+                          <View style={styles.readOnlyField}>
+                            <Text style={styles.readOnlyValue}>{computedTestEndTimeLabel}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.dualInputRow}>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>Custom question</Text>
+                          <PrimaryButton
+                            label={showCustomQuestionForm ? "Hide custom question" : "Custom question"}
+                            variant="secondary"
+                            onPress={() => setShowCustomQuestionForm((current) => !current)}
+                          />
+                        </View>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.dualInputRow}>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>Deadline date</Text>
+                          <Pressable onPress={() => openDatePicker("deadlineDate")} style={styles.pickerTrigger}>
+                            <Text style={[styles.pickerValue, !deadlineDate ? styles.pickerPlaceholder : null]}>
+                              {deadlineDate || "Select date"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+
+                      <View style={styles.dualInputRow}>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>Deadline time</Text>
+                          <Pressable onPress={() => openTimePicker("deadlineTime")} style={styles.pickerTrigger}>
+                            <Text style={[styles.pickerValue, !deadlineTime ? styles.pickerPlaceholder : null]}>
+                              {deadlineTime || "Select time"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                        <View style={styles.dualInputItem}>
+                          <Text style={styles.sectionLabel}>Custom question</Text>
+                          <PrimaryButton
+                            label={showCustomQuestionForm ? "Hide custom question" : "Custom question"}
+                            variant="secondary"
+                            onPress={() => setShowCustomQuestionForm((current) => !current)}
+                          />
+                        </View>
+                      </View>
+                    </>
+                  )}
 
                   <Text style={styles.sectionLabel}>Results</Text>
                   <View style={styles.inlineActions}>
@@ -944,9 +1305,6 @@ export default function ClassroomScreen() {
                       <TextInput value={customQuestionPrompt} onChangeText={setCustomQuestionPrompt} placeholder="Enter your question" placeholderTextColor="#8092A7" style={[styles.input, styles.textAreaInput]} multiline />
                       {customQuestionOptions.map((option, index) => (
                         <View key={`custom-option-${index}`} style={styles.customOptionRow}>
-                          <Pressable onPress={() => setCustomQuestionAnswerIndex(index)} style={[styles.answerPick, customQuestionAnswerIndex === index ? styles.answerPickActive : null]}>
-                            <Text style={[styles.answerPickText, customQuestionAnswerIndex === index ? styles.answerPickTextActive : null]}>{index + 1}</Text>
-                          </Pressable>
                           <TextInput
                             value={option}
                             onChangeText={(value) => setCustomQuestionOptions((current) => current.map((entry, optionIndex) => (optionIndex === index ? value : entry)))}
@@ -954,6 +1312,11 @@ export default function ClassroomScreen() {
                             placeholderTextColor="#7C8EA3"
                             style={[styles.input, styles.customOptionInput]}
                           />
+                          <Pressable onPress={() => setCustomQuestionAnswerIndex(index)} style={[styles.answerPick, customQuestionAnswerIndex === index ? styles.answerPickActive : null]}>
+                            <Text style={[styles.answerPickText, customQuestionAnswerIndex === index ? styles.answerPickTextActive : null]}>
+                              {customQuestionAnswerIndex === index ? "Correct" : "Mark"}
+                            </Text>
+                          </Pressable>
                         </View>
                       ))}
                       <TextInput value={customQuestionExplanation} onChangeText={setCustomQuestionExplanation} placeholder="Explanation (optional)" placeholderTextColor="#7C8EA3" style={[styles.input, styles.textAreaInput]} multiline />
@@ -982,7 +1345,7 @@ export default function ClassroomScreen() {
                   ) : (
                     <View style={styles.inlineActions}>
                       <PrimaryButton label="Review" variant="secondary" onPress={() => { setIsReviewingQuestions(true); setReviewPage(0); }} style={styles.inlineButton} />
-                      <PrimaryButton label={activityType === "test" ? "Publish test" : "Publish assignment"} onPress={publishAssignment} loading={publishingAssignment} style={styles.inlineButton} />
+                      <PrimaryButton label={editingActivityId ? "Save changes" : activityType === "test" ? "Publish test" : "Publish assignment"} onPress={publishAssignment} loading={publishingAssignment} style={styles.inlineButton} />
                     </View>
                   )}
 
@@ -1000,6 +1363,8 @@ export default function ClassroomScreen() {
                         <PrimaryButton label="Next" variant="secondary" onPress={() => setReviewPage((current) => Math.min(reviewPageCount - 1, current + 1))} disabled={reviewPage >= reviewPageCount - 1} style={styles.inlineButton} />
                       </View>
                     </View>
+                  ) : null}
+                    </>
                   ) : null}
                 </View>
               </>
@@ -1071,18 +1436,29 @@ export default function ClassroomScreen() {
                 </Text>
                 <Text style={styles.classMeta}>Questions: {activity.questionCount}</Text>
                 {profile.role === "teacher" ? (
-                  <View style={styles.inlineActions}>
+                  <View style={styles.activityActionRow}>
+                    <PrimaryButton
+                      label={canEditScheduledActivity(activity) ? "Edit" : "Locked"}
+                      variant="secondary"
+                      onPress={() => editActivity(activity)}
+                      loading={classActionLoading}
+                      style={styles.activityActionButton}
+                      compact
+                      disabled={!canEditScheduledActivity(activity)}
+                    />
                     <PrimaryButton
                       label="Results"
                       variant="secondary"
                       onPress={() => openActivityDashboard(activity)}
-                      style={styles.inlineButton}
+                      style={styles.activityActionButton}
+                      compact
                     />
                     <PrimaryButton
                       label="Duplicate"
                       onPress={() => duplicateActivity(activity)}
                       loading={classActionLoading}
-                      style={styles.inlineButton}
+                      style={styles.activityActionButton}
+                      compact
                     />
                   </View>
                 ) : (
@@ -1113,6 +1489,126 @@ export default function ClassroomScreen() {
 
         {subscriptionTier === "free" ? <DemoAdBanner language={language} /> : null}
       </ScrollView>
+      <Modal visible={openPicker !== null} transparent animationType="fade" onRequestClose={() => setOpenPicker(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setOpenPicker(null)}>
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            {openPicker === "startDate" || openPicker === "deadlineDate" ? (
+              <>
+                <View style={styles.modalHeader}>
+                  <PrimaryButton
+                    label="Prev"
+                    variant="secondary"
+                    onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+                    style={styles.modalNavButton}
+                  />
+                  <Text style={styles.modalTitle}>
+                    {pickerMonth.toLocaleString(undefined, { month: "long", year: "numeric" })}
+                  </Text>
+                  <PrimaryButton
+                    label="Next"
+                    variant="secondary"
+                    onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+                    style={styles.modalNavButton}
+                  />
+                </View>
+                <View style={styles.calendarWeekRow}>
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                    <Text key={day} style={styles.calendarWeekday}>
+                      {day}
+                    </Text>
+                  ))}
+                </View>
+                <View style={styles.calendarGrid}>
+                  {calendarDays.map((entry) => {
+                    const selectedValue =
+                      openPicker === "startDate"
+                        ? startDate
+                        : deadlineDate;
+                    const todayValue = formatLocalDateValue(new Date());
+                    const isSelected = selectedValue === entry.value;
+                    const isPastDate = entry.value < todayValue;
+                    return (
+                      <Pressable
+                        key={entry.key}
+                        onPress={() => {
+                          if (!isPastDate) {
+                            selectDateValue(entry.value);
+                          }
+                        }}
+                        disabled={isPastDate}
+                        style={[
+                          styles.calendarCell,
+                          !entry.inMonth ? styles.calendarCellMuted : null,
+                          isPastDate ? styles.calendarCellDisabled : null,
+                          isSelected ? styles.calendarCellActive : null,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarCellText,
+                            !entry.inMonth ? styles.calendarCellTextMuted : null,
+                            isPastDate ? styles.calendarCellTextDisabled : null,
+                            isSelected ? styles.calendarCellTextActive : null,
+                          ]}
+                        >
+                          {entry.date.getDate()}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            ) : openPicker === "deadlineTime" ? (
+              <>
+                <Text style={styles.modalTitle}>Select time</Text>
+                <ScrollView style={styles.modalList} nestedScrollEnabled>
+                  {quarterHourOptions.map((value) => (
+                    <Pressable
+                      key={`deadline-${value}`}
+                      onPress={() => {
+                        setDeadlineTime(value);
+                        setOpenPicker(null);
+                      }}
+                      style={[styles.modalListItem, deadlineTime === value ? styles.modalListItemActive : null]}
+                    >
+                      <Text style={[styles.modalListItemText, deadlineTime === value ? styles.modalListItemTextActive : null]}>{value}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalTitle}>Select time</Text>
+                <View style={styles.timePickerRow}>
+                  <ScrollView style={styles.timePickerColumn} nestedScrollEnabled>
+                    {hourOptions.map((hour) => (
+                      <Pressable
+                        key={`hour-${hour}`}
+                        onPress={() => setPickerHour(hour)}
+                        style={[styles.modalListItem, pickerHour === hour ? styles.modalListItemActive : null]}
+                      >
+                        <Text style={[styles.modalListItemText, pickerHour === hour ? styles.modalListItemTextActive : null]}>{hour}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                  <ScrollView style={styles.timePickerColumn} nestedScrollEnabled>
+                    {minuteOptions.map((minute) => (
+                      <Pressable
+                        key={`minute-${minute}`}
+                        onPress={() => setPickerMinute(minute)}
+                        style={[styles.modalListItem, pickerMinute === minute ? styles.modalListItemActive : null]}
+                      >
+                        <Text style={[styles.modalListItemText, pickerMinute === minute ? styles.modalListItemTextActive : null]}>{minute}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+                <PrimaryButton label="Set time" onPress={confirmTimeValue} />
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </AppBackground>
   );
 }
@@ -1182,6 +1678,18 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
   },
+  sectionToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  sectionToggleIcon: {
+    color: palette.navy,
+    fontSize: 22,
+    fontWeight: "800",
+    lineHeight: 24,
+  },
   input: {
     minHeight: 50,
     borderRadius: 16,
@@ -1190,6 +1698,54 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FBFD",
     paddingHorizontal: 14,
     color: palette.ink,
+  },
+  pickerTrigger: {
+    minHeight: 50,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: "#F9FBFD",
+    paddingHorizontal: 14,
+    justifyContent: "center",
+  },
+  pickerValue: {
+    color: palette.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  pickerPlaceholder: {
+    color: "#7C8EA3",
+    fontWeight: "500",
+  },
+  pickerMenu: {
+    maxHeight: 180,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: palette.white,
+  },
+  pickerOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3F8",
+  },
+  pickerOptionText: {
+    color: palette.ink,
+    fontWeight: "600",
+  },
+  readOnlyField: {
+    minHeight: 50,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: "#F2F5F8",
+    paddingHorizontal: 14,
+    justifyContent: "center",
+  },
+  readOnlyValue: {
+    color: palette.ink,
+    fontWeight: "600",
   },
   textAreaInput: {
     minHeight: 90,
@@ -1219,6 +1775,19 @@ const styles = StyleSheet.create({
   classMeta: {
     color: palette.slate,
     lineHeight: 20,
+  },
+  codeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  copyButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F4F7",
   },
   requestCard: {
     borderRadius: 18,
@@ -1255,6 +1824,14 @@ const styles = StyleSheet.create({
   inlineButton: {
     flex: 1,
     minWidth: 130,
+  },
+  activityActionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  activityActionButton: {
+    flex: 1,
+    minWidth: 0,
   },
   sectionLabel: {
     color: palette.slate,
@@ -1339,5 +1916,107 @@ const styles = StyleSheet.create({
   },
   reviewWrap: {
     gap: 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(8,17,31,0.35)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    borderRadius: 24,
+    backgroundColor: palette.white,
+    padding: 18,
+    gap: 14,
+    ...shadows.card,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  modalTitle: {
+    flex: 1,
+    textAlign: "center",
+    color: palette.ink,
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  modalNavButton: {
+    minWidth: 84,
+  },
+  calendarWeekRow: {
+    flexDirection: "row",
+  },
+  calendarWeekday: {
+    flex: 1,
+    textAlign: "center",
+    color: palette.slate,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarCell: {
+    width: "14.2857%",
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+  },
+  calendarCellMuted: {
+    opacity: 0.35,
+  },
+  calendarCellDisabled: {
+    backgroundColor: "#F4F6F8",
+  },
+  calendarCellActive: {
+    backgroundColor: palette.navy,
+  },
+  calendarCellText: {
+    color: palette.ink,
+    fontWeight: "700",
+  },
+  calendarCellTextMuted: {
+    color: palette.slate,
+  },
+  calendarCellTextDisabled: {
+    color: "#B6C1CC",
+  },
+  calendarCellTextActive: {
+    color: palette.white,
+  },
+  modalList: {
+    maxHeight: 320,
+  },
+  timePickerRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  timePickerColumn: {
+    flex: 1,
+    maxHeight: 280,
+  },
+  modalListItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3F8",
+  },
+  modalListItemActive: {
+    backgroundColor: "#EEF8FB",
+  },
+  modalListItemText: {
+    color: palette.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalListItemTextActive: {
+    color: palette.navy,
+    fontWeight: "800",
   },
 });

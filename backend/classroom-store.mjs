@@ -590,6 +590,58 @@ export async function duplicateActivity(teacherProfile, activityId, appVariant) 
   });
 }
 
+export async function updateClassroomActivity(payload, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[payload.teacherProfile.id] = normalizeProfileRecord(payload.teacherProfile, appVariant);
+    const classroom = store.classrooms[payload.classId];
+    ensureTeacherOwnsClass(classroom, payload.teacherProfile.id);
+
+    const activity = store.activities[payload.activityId];
+    if (!activity || activity.classId !== payload.classId) {
+      throw new Error("Activity not found.");
+    }
+
+    if (activity.type === "test" && activity.startAt - Date.now() <= 5 * 60 * 1000) {
+      throw new Error("Tests can no longer be edited within 5 minutes of the start time.");
+    }
+
+    const questionCount = Math.max(1, Number(payload.questionCount ?? payload.questions.length));
+    const durationMinutes = Math.max(1, Number(payload.durationMinutes ?? 1));
+    const explicitStartAt = Number(payload.startAt ?? 0);
+    const explicitEndAt = Number(payload.endAt ?? 0);
+    const startAt = Number.isFinite(explicitStartAt) && explicitStartAt > 0 ? explicitStartAt : activity.startAt;
+    const endAt = Number.isFinite(explicitEndAt) && explicitEndAt > startAt ? explicitEndAt : activity.endAt;
+
+    activity.type = payload.type === "test" ? "test" : "assignment";
+    activity.title = payload.title.trim();
+    activity.subjectId = payload.subject.id;
+    activity.subjectName = payload.subject.name;
+    activity.usesCustomSubject = Boolean(payload.usesCustomSubject);
+    activity.grade = payload.grade;
+    activity.level = payload.level;
+    activity.difficulty = payload.difficulty;
+    activity.focusMode = payload.focusMode ?? "general";
+    activity.topicId = payload.topicId;
+    activity.topicLabel = payload.topicLabel;
+    activity.usesCustomTopic = Boolean(payload.usesCustomTopic);
+    activity.durationMinutes = durationMinutes;
+    activity.startAt = startAt;
+    activity.endAt = endAt;
+    activity.resultVisibility = payload.resultVisibility ?? "private";
+    activity.questionOrderMode = payload.questionOrderMode ?? "same";
+    activity.questions = payload.questions;
+    activity.questionCount = questionCount;
+
+    Object.keys(store.submissions).forEach((submissionId) => {
+      if (store.submissions[submissionId].activityId === activity.id) {
+        delete store.submissions[submissionId];
+      }
+    });
+
+    return buildActivitySummary(store, activity, payload.teacherProfile.id);
+  });
+}
+
 export async function listActivitiesForProfile(profile, appVariant) {
   return mutateStore(async (store) => {
     store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
