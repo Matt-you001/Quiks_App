@@ -1,19 +1,27 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { PropsWithChildren } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { palette } from "../lib/theme";
+import { VariantSiteHeader } from "./VariantSiteHeader";
+import { WebLegalFooter } from "./WebLegalFooter";
 
 interface AppBackgroundProps extends PropsWithChildren {
   scroll?: boolean;
 }
 
 export function AppBackground({ children, scroll = true }: AppBackgroundProps) {
+  const { width } = useWindowDimensions();
+  const useDesktopShell = width >= 1024;
   const content = (
     <View style={styles.content}>
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
-      {children}
+      <View style={[styles.contentShell, useDesktopShell ? styles.contentShellDesktop : null]}>
+        <View style={styles.glowTop} />
+        <View style={styles.glowBottom} />
+        <VariantSiteHeader />
+        {children}
+        <WebLegalFooter />
+      </View>
     </View>
   );
 
@@ -41,9 +49,18 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 28,
+  },
+  contentShell: {
+    flex: 1,
+    width: "100%",
+    paddingHorizontal: 4,
     position: "relative",
+  },
+  contentShellDesktop: {
+    alignSelf: "center",
+    maxWidth: 1200,
   },
   glowTop: {
     position: "absolute",

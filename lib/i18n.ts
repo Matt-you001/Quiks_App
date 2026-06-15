@@ -17,6 +17,12 @@ type TranslationKey =
   | "noAccountYet"
   | "alreadyHaveAccount"
   | "logOut"
+  | "deleteAccount"
+  | "deleteAccountTitle"
+  | "deleteAccountMessage"
+  | "openDeletionCenter"
+  | "deleteAccountUnavailableTitle"
+  | "deleteAccountUnavailableMessage"
   | "invalidCredentialsTitle"
   | "invalidCredentialsMessage"
   | "accountExistsTitle"
@@ -189,6 +195,10 @@ type TranslationKey =
   | "createChallengeHint"
   | "waitingForAcceptance"
   | "challengeAccepted"
+  | "competitionReminderSoonTitle"
+  | "competitionReminderSoonBody"
+  | "competitionReminderNowTitle"
+  | "competitionReminderNowBody"
   | "countdownToStart"
   | "liveScores"
   | "noChallengesAvailable"
@@ -266,7 +276,146 @@ type TranslationKey =
   | "proPlanStatus"
   | "localSubscriptionNote"
   | "sponsoredLearningSpot"
-  | "demoAdBannerHint";
+  | "demoAdBannerHint"
+  | "roleLabel"
+  | "quiksIdLabel"
+  | "classroomTitle"
+  | "classManagement"
+  | "className"
+  | "createClassAction"
+  | "yourClasses"
+  | "noClassesYet"
+  | "membersLabel"
+  | "roster"
+  | "noMembers"
+  | "inviteStudentById"
+  | "studentQuiksId"
+  | "sendInvite"
+  | "pendingStudentRequests"
+  | "noRequests"
+  | "createActivity"
+  | "activityType"
+  | "assignmentType"
+  | "testType"
+  | "assignmentTitle"
+  | "testTitle"
+  | "formLabel"
+  | "preset"
+  | "custom"
+  | "subjectLabel"
+  | "topicLabel"
+  | "testDate"
+  | "durationSeconds"
+  | "startTimeLabel"
+  | "endTimeLabel"
+  | "setStartTimeAndDuration"
+  | "deadlineDate"
+  | "deadlineTime"
+  | "selectDate"
+  | "selectTime"
+  | "privateLabel"
+  | "publicLabel"
+  | "sameForAll"
+  | "shufflePerStudent"
+  | "customQuestion"
+  | "hideCustomQuestion"
+  | "promptLabel"
+  | "enterYourQuestion"
+  | "optionLabel"
+  | "markCorrect"
+  | "correctOption"
+  | "explanationOptional"
+  | "addCustomQuestion"
+  | "loadQuestionCandidates"
+  | "loadMoreQuestions"
+  | "accept"
+  | "skip"
+  | "reviewLabel"
+  | "previous"
+  | "next"
+  | "publishTest"
+  | "publishAssignment"
+  | "joinClass"
+  | "enterClassCode"
+  | "requestJoin"
+  | "invites"
+  | "noInvites"
+  | "teacherLabel"
+  | "approve"
+  | "reject"
+  | "publishedActivities"
+  | "classActivities"
+  | "noActivitiesYet"
+  | "closedLabel"
+  | "submittedLabel"
+  | "startsLabel"
+  | "openUntilLabel"
+  | "questionsLabel"
+  | "viewResult"
+  | "waitForStart"
+  | "remove"
+  | "edit"
+  | "locked"
+  | "duplicate"
+  | "schoolName"
+  | "teachingFocus"
+  | "optional"
+  | "teacherAccount"
+  | "competitionWins"
+  | "challengesPlayed"
+  | "classCode"
+  | "loadingClassroom"
+  | "chooseProfileBeforeClassroom"
+  | "activityDetailsLabel"
+  | "resultsLabel"
+  | "questionOrderLabel"
+  | "questionCountLabel"
+  | "resultsAction"
+  | "copyClassCodeSuccess"
+  | "copyClassCodeFailure"
+  | "enterClassNameFirst"
+  | "unableCreateClass"
+  | "enterClassCodeFirst"
+  | "joinRequestSent"
+  | "unableSendJoinRequest"
+  | "selectClassAndStudentFirst"
+  | "inviteSent"
+  | "unableInviteStudent"
+  | "unableRemoveMember"
+  | "unableUpdateRequest"
+  | "questionSelectionTitle"
+  | "enterCustomTopicFirst"
+  | "unableLoadCandidateQuestions"
+  | "customQuestionTitle"
+  | "enterQuestionPrompt"
+  | "fillAllFourAnswerOptions"
+  | "chooseCorrectAnswer"
+  | "markedCorrectOptionEmpty"
+  | "questionCountAlreadyComplete"
+  | "teacherAuthoredQuestion"
+  | "publishAssignmentTitle"
+  | "acceptQuestionsBeforePublishing"
+  | "enterAssignmentTitleFirst"
+  | "publishTestTitle"
+  | "enterValidTestStart"
+  | "enterValidDurationSeconds"
+  | "endTimeLaterThanStart"
+  | "testEndSameDay"
+  | "enterValidDeadline"
+  | "deadlineMustBeFuture"
+  | "activityUpdatedTitle"
+  | "testPublishedTitle"
+  | "assignmentPublishedTitle"
+  | "activityChangesSaved"
+  | "testReadyForClass"
+  | "assignmentReadyForClass"
+  | "unablePublishActivity"
+  | "unableDuplicateActivity"
+  | "testEditLocked"
+  | "unableLoadActivityForEditing"
+  | "selectTimeTitle"
+  | "setTime"
+  | "createProfileSubtitle";
 
 type TranslationMap = Record<TranslationKey, string>;
 
@@ -304,6 +453,12 @@ const english: TranslationMap = {
   noAccountYet: "No account yet? Sign up",
   alreadyHaveAccount: "Already have an account? Sign in",
   logOut: "Log out",
+  deleteAccount: "Delete Account",
+  deleteAccountTitle: "Delete account",
+  deleteAccountMessage: "This will open the Quiks account deletion page in your browser so you can submit a deletion request for this app.",
+  openDeletionCenter: "Open Deletion Center",
+  deleteAccountUnavailableTitle: "Unable to open page",
+  deleteAccountUnavailableMessage: "We could not open the Quiks deletion page right now. Please try again shortly.",
   invalidCredentialsTitle: "Invalid login",
   invalidCredentialsMessage: "The email or password is incorrect.",
   accountExistsTitle: "Account already exists",
@@ -476,6 +631,10 @@ const english: TranslationMap = {
   createChallengeHint: "Choose the exact challenge settings you want another learner to face.",
   waitingForAcceptance: "Waiting for another learner to accept your challenge.",
   challengeAccepted: "Your challenge has been accepted.",
+  competitionReminderSoonTitle: "Competition starts soon",
+  competitionReminderSoonBody: "{subject} vs {opponent} starts in 5 minutes.",
+  competitionReminderNowTitle: "Competition starting now",
+  competitionReminderNowBody: "{subject} vs {opponent} is ready. Tap to continue.",
   countdownToStart: "Contest starts in {count}...",
   liveScores: "Live scores",
   noChallengesAvailable: "No open challenges yet. Create one and invite another learner to respond.",
@@ -554,6 +713,145 @@ const english: TranslationMap = {
   localSubscriptionNote: "For now, plan changes are stored on this device while full store billing is prepared.",
   sponsoredLearningSpot: "Sponsored learning spot",
   demoAdBannerHint: "This is the fallback test banner. Install a fresh native preview or production build to see live ad rendering.",
+  roleLabel: "Role",
+  quiksIdLabel: "Quiks ID",
+  classroomTitle: "Classroom",
+  classManagement: "Class management",
+  className: "Class name",
+  createClassAction: "Create class",
+  yourClasses: "Your classes",
+  noClassesYet: "No classes yet.",
+  membersLabel: "Members",
+  roster: "Roster",
+  noMembers: "No members.",
+  inviteStudentById: "Invite student by ID",
+  studentQuiksId: "Student Quiks ID",
+  sendInvite: "Send invite",
+  pendingStudentRequests: "Pending student requests",
+  noRequests: "No requests.",
+  createActivity: "Create activity",
+  activityType: "Activity type",
+  assignmentType: "Assignment",
+  testType: "Test",
+  assignmentTitle: "Assignment title",
+  testTitle: "Test title",
+  formLabel: "Form",
+  preset: "Preset",
+  custom: "Custom",
+  subjectLabel: "Subject",
+  topicLabel: "Topic",
+  testDate: "Test date",
+  durationSeconds: "Duration (Seconds)",
+  startTimeLabel: "Start time",
+  endTimeLabel: "End time",
+  setStartTimeAndDuration: "Set start time and duration",
+  deadlineDate: "Deadline date",
+  deadlineTime: "Deadline time",
+  selectDate: "Select date",
+  selectTime: "Select time",
+  privateLabel: "Private",
+  publicLabel: "Public",
+  sameForAll: "Same for all",
+  shufflePerStudent: "Shuffle per student",
+  customQuestion: "Custom question",
+  hideCustomQuestion: "Hide custom question",
+  promptLabel: "Prompt",
+  enterYourQuestion: "Enter your question",
+  optionLabel: "Option {number}",
+  markCorrect: "Mark",
+  correctOption: "Correct",
+  explanationOptional: "Explanation (optional)",
+  addCustomQuestion: "Add custom question",
+  loadQuestionCandidates: "Load question candidates",
+  loadMoreQuestions: "Load more questions",
+  accept: "Accept",
+  skip: "Skip",
+  reviewLabel: "Review",
+  previous: "Previous",
+  next: "Next",
+  publishTest: "Publish test",
+  publishAssignment: "Publish assignment",
+  joinClass: "Join a class",
+  enterClassCode: "Enter class code",
+  requestJoin: "Request to join",
+  invites: "Invites",
+  noInvites: "No invites.",
+  teacherLabel: "Teacher",
+  approve: "Approve",
+  reject: "Reject",
+  publishedActivities: "Published activities",
+  classActivities: "Class activities",
+  noActivitiesYet: "No activities yet.",
+  closedLabel: "Closed",
+  submittedLabel: "Submitted",
+  startsLabel: "Starts {value}",
+  openUntilLabel: "Open until {value}",
+  questionsLabel: "Questions: {count}",
+  viewResult: "View result",
+  waitForStart: "Wait for start",
+  remove: "Remove",
+  edit: "Edit",
+  locked: "Locked",
+  duplicate: "Duplicate",
+  schoolName: "School name",
+  teachingFocus: "Teaching focus",
+  optional: "Optional",
+  teacherAccount: "Teacher account",
+  competitionWins: "Wins",
+  challengesPlayed: "Challenges played",
+  classCode: "Code",
+  loadingClassroom: "Loading classroom...",
+  chooseProfileBeforeClassroom: "Choose or create a profile before using classroom tools.",
+  activityDetailsLabel: "Activity details",
+  resultsLabel: "Results",
+  questionOrderLabel: "Question order",
+  questionCountLabel: "Question count",
+  resultsAction: "Results",
+  copyClassCodeSuccess: "Class code copied.",
+  copyClassCodeFailure: "Unable to copy the class code.",
+  enterClassNameFirst: "Enter a class name first.",
+  unableCreateClass: "Unable to create class.",
+  enterClassCodeFirst: "Enter a class code first.",
+  joinRequestSent: "Join request sent",
+  unableSendJoinRequest: "Unable to send join request.",
+  selectClassAndStudentFirst: "Select a class and enter a student ID first.",
+  inviteSent: "Invite sent",
+  unableInviteStudent: "Unable to invite the student.",
+  unableRemoveMember: "Unable to remove the member.",
+  unableUpdateRequest: "Unable to update the request.",
+  questionSelectionTitle: "Question selection",
+  enterCustomTopicFirst: "Enter the custom topic first.",
+  unableLoadCandidateQuestions: "Unable to load candidate questions.",
+  customQuestionTitle: "Custom question",
+  enterQuestionPrompt: "Enter the question prompt.",
+  fillAllFourAnswerOptions: "Fill all four answer options.",
+  chooseCorrectAnswer: "Choose the correct answer.",
+  markedCorrectOptionEmpty: "The marked correct option cannot be empty.",
+  questionCountAlreadyComplete: "Question count is already complete.",
+  teacherAuthoredQuestion: "Teacher-authored question.",
+  publishAssignmentTitle: "Assignment",
+  acceptQuestionsBeforePublishing: "Accept {count} questions before publishing.",
+  enterAssignmentTitleFirst: "Enter an assignment title first.",
+  publishTestTitle: "Test",
+  enterValidTestStart: "Enter a valid test date and start time.",
+  enterValidDurationSeconds: "Enter a valid duration in seconds.",
+  endTimeLaterThanStart: "End time must be later than start time.",
+  testEndSameDay: "Test end time must remain on the same day as the test date.",
+  enterValidDeadline: "Enter a valid deadline date and time.",
+  deadlineMustBeFuture: "Deadline must be in the future.",
+  activityUpdatedTitle: "Activity updated",
+  testPublishedTitle: "Test published",
+  assignmentPublishedTitle: "Assignment published",
+  activityChangesSaved: "Your activity changes are saved.",
+  testReadyForClass: "Your scheduled test is now ready for the class.",
+  assignmentReadyForClass: "Your assignment is now available to the class.",
+  unablePublishActivity: "Unable to publish the assignment.",
+  unableDuplicateActivity: "Unable to duplicate the activity.",
+  testEditLocked: "Tests can no longer be edited within 5 minutes of the start time.",
+  unableLoadActivityForEditing: "Unable to load the activity for editing.",
+  selectTimeTitle: "Select time",
+  setTime: "Set time",
+  createProfileSubtitle: "Set up this learner profile and save the details.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = {
@@ -698,6 +996,145 @@ const translations: Record<AppLanguage, TranslationMap> = {
   },
   fr: {
     ...english,
+    roleLabel: "Role",
+    quiksIdLabel: "ID Quiks",
+    classroomTitle: "Classe",
+    classManagement: "Gestion de classe",
+    className: "Nom de la classe",
+    createClassAction: "Creer la classe",
+    yourClasses: "Vos classes",
+    noClassesYet: "Aucune classe pour le moment.",
+    membersLabel: "Membres",
+    roster: "Liste des membres",
+    noMembers: "Aucun membre.",
+    inviteStudentById: "Inviter un eleve par ID",
+    studentQuiksId: "ID Quiks de l'eleve",
+    sendInvite: "Envoyer l'invitation",
+    pendingStudentRequests: "Demandes d'eleves en attente",
+    noRequests: "Aucune demande.",
+    createActivity: "Creer une activite",
+    activityType: "Type d'activite",
+    assignmentType: "Devoir",
+    testType: "Test",
+    assignmentTitle: "Titre du devoir",
+    testTitle: "Titre du test",
+    formLabel: "Mode",
+    preset: "Predefini",
+    custom: "Personnalise",
+    subjectLabel: "Matiere",
+    topicLabel: "Sujet",
+    testDate: "Date du test",
+    durationSeconds: "Duree (Secondes)",
+    startTimeLabel: "Heure de debut",
+    endTimeLabel: "Heure de fin",
+    setStartTimeAndDuration: "Definissez l'heure de debut et la duree",
+    deadlineDate: "Date limite",
+    deadlineTime: "Heure limite",
+    selectDate: "Choisir une date",
+    selectTime: "Choisir l'heure",
+    privateLabel: "Prive",
+    publicLabel: "Public",
+    sameForAll: "Identique pour tous",
+    shufflePerStudent: "Melanger par eleve",
+    customQuestion: "Question personnalisee",
+    hideCustomQuestion: "Masquer la question",
+    promptLabel: "Enonce",
+    enterYourQuestion: "Saisissez votre question",
+    optionLabel: "Option {number}",
+    markCorrect: "Marquer",
+    correctOption: "Correcte",
+    explanationOptional: "Explication (facultatif)",
+    addCustomQuestion: "Ajouter la question",
+    loadQuestionCandidates: "Charger les questions",
+    loadMoreQuestions: "Charger plus de questions",
+    accept: "Accepter",
+    skip: "Passer",
+    reviewLabel: "Revoir",
+    previous: "Precedent",
+    next: "Suivant",
+    publishTest: "Publier le test",
+    publishAssignment: "Publier le devoir",
+    joinClass: "Rejoindre une classe",
+    enterClassCode: "Saisir le code de la classe",
+    requestJoin: "Demander a rejoindre",
+    invites: "Invitations",
+    noInvites: "Aucune invitation.",
+    teacherLabel: "Professeur",
+    approve: "Approuver",
+    reject: "Refuser",
+    publishedActivities: "Activites publiees",
+    classActivities: "Activites de la classe",
+    noActivitiesYet: "Aucune activite pour le moment.",
+    closedLabel: "Cloture",
+    submittedLabel: "Soumis",
+    startsLabel: "Commence {value}",
+    openUntilLabel: "Ouvert jusqu'au {value}",
+    questionsLabel: "Questions : {count}",
+    viewResult: "Voir le resultat",
+    waitForStart: "Attendre le debut",
+    remove: "Retirer",
+    edit: "Modifier",
+    locked: "Verrouille",
+    duplicate: "Dupliquer",
+    schoolName: "Nom de l'ecole",
+    teachingFocus: "Domaine d'enseignement",
+    optional: "Facultatif",
+    teacherAccount: "Compte enseignant",
+    competitionWins: "Victoires",
+    challengesPlayed: "Defis joues",
+    classCode: "Code",
+    loadingClassroom: "Chargement de la classe...",
+    chooseProfileBeforeClassroom: "Choisissez ou creez un profil avant d'utiliser les outils de classe.",
+    activityDetailsLabel: "Details de l'activite",
+    resultsLabel: "Resultats",
+    questionOrderLabel: "Ordre des questions",
+    questionCountLabel: "Nombre de questions",
+    resultsAction: "Resultats",
+    copyClassCodeSuccess: "Code de la classe copie.",
+    copyClassCodeFailure: "Impossible de copier le code de la classe.",
+    enterClassNameFirst: "Saisissez d'abord un nom de classe.",
+    unableCreateClass: "Impossible de creer la classe.",
+    enterClassCodeFirst: "Saisissez d'abord un code de classe.",
+    joinRequestSent: "Demande envoyee",
+    unableSendJoinRequest: "Impossible d'envoyer la demande.",
+    selectClassAndStudentFirst: "Choisissez une classe et saisissez d'abord un ID eleve.",
+    inviteSent: "Invitation envoyee",
+    unableInviteStudent: "Impossible d'inviter l'eleve.",
+    unableRemoveMember: "Impossible de retirer le membre.",
+    unableUpdateRequest: "Impossible de mettre a jour la demande.",
+    questionSelectionTitle: "Selection des questions",
+    enterCustomTopicFirst: "Saisissez d'abord le sujet personnalise.",
+    unableLoadCandidateQuestions: "Impossible de charger les questions proposees.",
+    customQuestionTitle: "Question personnalisee",
+    enterQuestionPrompt: "Saisissez l'enonce de la question.",
+    fillAllFourAnswerOptions: "Remplissez les quatre options de reponse.",
+    chooseCorrectAnswer: "Choisissez la bonne reponse.",
+    markedCorrectOptionEmpty: "L'option marquee correcte ne peut pas etre vide.",
+    questionCountAlreadyComplete: "Le nombre de questions est deja atteint.",
+    teacherAuthoredQuestion: "Question redigee par l'enseignant.",
+    publishAssignmentTitle: "Devoir",
+    acceptQuestionsBeforePublishing: "Acceptez {count} questions avant la publication.",
+    enterAssignmentTitleFirst: "Saisissez d'abord un titre pour le devoir.",
+    publishTestTitle: "Test",
+    enterValidTestStart: "Saisissez une date de test et une heure de debut valides.",
+    enterValidDurationSeconds: "Saisissez une duree valide en secondes.",
+    endTimeLaterThanStart: "L'heure de fin doit etre apres l'heure de debut.",
+    testEndSameDay: "L'heure de fin du test doit rester le meme jour que la date du test.",
+    enterValidDeadline: "Saisissez une date et une heure limites valides.",
+    deadlineMustBeFuture: "La date limite doit etre dans le futur.",
+    activityUpdatedTitle: "Activite mise a jour",
+    testPublishedTitle: "Test publie",
+    assignmentPublishedTitle: "Devoir publie",
+    activityChangesSaved: "Les modifications de l'activite ont ete enregistrees.",
+    testReadyForClass: "Votre test programme est maintenant pret pour la classe.",
+    assignmentReadyForClass: "Votre devoir est maintenant disponible pour la classe.",
+    unablePublishActivity: "Impossible de publier l'activite.",
+    unableDuplicateActivity: "Impossible de dupliquer l'activite.",
+    testEditLocked: "Les tests ne peuvent plus etre modifies dans les 5 minutes precedant l'heure de debut.",
+    unableLoadActivityForEditing: "Impossible de charger l'activite pour modification.",
+    selectTimeTitle: "Choisir l'heure",
+    setTime: "Definir l'heure",
+    createProfileSubtitle: "Configurez ce profil d'apprenant et enregistrez les informations.",
     createProfile: "Creer un profil",
     editProfile: "Modifier le profil",
     name: "Nom",
@@ -707,14 +1144,21 @@ const translations: Record<AppLanguage, TranslationMap> = {
     language: "Langue",
     cancel: "Annuler",
     saveChanges: "Enregistrer",
+    updateLearnerDetails: "Mettez a jour les informations de cet apprenant et enregistrez les modifications.",
     backHome: "Retour accueil",
     chooseLearner: "Choisir l'apprenant",
     createLearner: "Creer un apprenant",
     noProfilesYet: "Aucun profil eleve pour le moment.",
     studentsList: "Liste des eleves",
     currentLearner: "Apprenant actuel",
+    todaysStudyTime: "Temps d'etude aujourd'hui",
     learningRecord: "Historique d'apprentissage",
     profileDetails: "Details du profil",
+    bestScore: "Meilleur score",
+    sessionsCompleted: "Sessions terminees",
+    latestScore: "Dernier score",
+    dailyTarget: "Objectif quotidien",
+    currentLanguage: "Langue actuelle",
     chooseMode: "Choisir le mode",
     grade: "Classe",
     questionFocus: "Type de questions",
@@ -1122,6 +1566,10 @@ export function normalizeLanguage(value?: string | null): AppLanguage {
 
 export function getLanguageLabel(language: AppLanguage) {
   return LANGUAGE_OPTIONS.find((entry) => entry.code === language)?.nativeLabel ?? "English";
+}
+
+export function getLanguagePromptLabel(language: AppLanguage) {
+  return LANGUAGE_OPTIONS.find((entry) => entry.code === language)?.englishLabel ?? "English";
 }
 
 export function t(language: AppLanguage | undefined, key: TranslationKey, vars?: Record<string, string | number>) {

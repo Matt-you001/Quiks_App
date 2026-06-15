@@ -5,16 +5,78 @@ type AppVariant = "children" | "teens" | "uni";
 const variant = ((process.env.APP_VARIANT ?? "children") as AppVariant);
 const variantSubscriptionFallbacks: Record<AppVariant, { monthly: string; yearly: string }> = {
   children: {
-    monthly: "quiks_children_pro_monthly",
-    yearly: "quiks_children_pro_yearly",
+    monthly: "pri_01ktmm16hbdzdw2t1k8adnf62p",
+    yearly: "pri_01ktmm5s5t0ad93yrdae3rr8vf",
   },
   teens: {
-    monthly: "quiks_teens_pro_monthly",
-    yearly: "quiks_teens_pro_yearly",
+    monthly: "pri_01ktw7bftss9tz8fj059vjnbfy",
+    yearly: "pri_01ktw7er8a15qf2d4pw7v0s4b8",
   },
   uni: {
-    monthly: "quiks_uni_pro_monthly",
-    yearly: "quiks_uni_pro_yearly",
+    monthly: "pri_01ktmmh5xf4yn0yn1vwq8pg2rh",
+    yearly: "pri_01ktmmm7cmh5tg4tm93cv8pk5e",
+  },
+};
+const variantEntitlementFallbacks: Record<AppVariant, string> = {
+  children: "entl5792d09222",
+  teens: "entl799f03ddcc",
+  uni: "entl5ab41c922b",
+};
+const variantRevenueCatFallbacks: Record<
+  AppVariant,
+  {
+    androidApiKey: string;
+    iosApiKey: string;
+    webApiKey: string;
+  }
+> = {
+  children: {
+    androidApiKey: "goog_jPXDDFSylXKTcMvzPNPPhTHIyeA",
+    iosApiKey: "",
+    webApiKey: "pdl_uDcNQNxHeNqGuOkDvOYPPlbVuAyp",
+  },
+  teens: {
+    androidApiKey: "goog_ciDxoaodJlvQwkRHzOEqvZFsktJ",
+    iosApiKey: "",
+    webApiKey: "pdl_WQjymgirStoqLGNJCSLDrLJqlFJV",
+  },
+  uni: {
+    androidApiKey: "goog_jMWcZCwUSjbsYzrLdmREAjyMNYY",
+    iosApiKey: "",
+    webApiKey: "pdl_zMZDPBTDiEmPYiEvOBcZSQVGkgpY",
+  },
+};
+const variantPaddleClientTokenFallbacks: Record<AppVariant, string> = {
+  children: "live_58cf05e9abc2e3daa263e2d86b1",
+  teens: "live_58cf05e9abc2e3daa263e2d86b1",
+  uni: "live_58cf05e9abc2e3daa263e2d86b1",
+};
+const variantGoogleClientFallbacks: Record<
+  AppVariant,
+  {
+    expoClientId: string;
+    androidClientId: string;
+    iosClientId: string;
+    webClientId: string;
+  }
+> = {
+  children: {
+    expoClientId: "",
+    androidClientId: "51562512706-nhgm58kmbr32kem4r1dcegiodklerf0v.apps.googleusercontent.com",
+    iosClientId: "",
+    webClientId: "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+  },
+  teens: {
+    expoClientId: "",
+    androidClientId: "51562512706-j8drs7hvr53spqo5a99au3mfj0t1luuh.apps.googleusercontent.com",
+    iosClientId: "",
+    webClientId: "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+  },
+  uni: {
+    expoClientId: "",
+    androidClientId: "656940564357-0nr4qronf5e38t4ki5t7i0ur6thrppg7.apps.googleusercontent.com",
+    iosClientId: "",
+    webClientId: "656940564357-of0e62ugcgdnb4jt98q7qm80cn2mnr5v.apps.googleusercontent.com",
   },
 };
 const fallbackPublicEnv = {
@@ -50,6 +112,49 @@ function readVariantSubscriptionProductId(kind: "monthly" | "yearly") {
   const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_PRO_${kind.toUpperCase()}_PRODUCT_ID` as keyof NodeJS.ProcessEnv;
   const genericKey = `EXPO_PUBLIC_PRO_${kind.toUpperCase()}_PRODUCT_ID` as keyof NodeJS.ProcessEnv;
   const value = process.env[variantKey] ?? process.env[genericKey] ?? variantSubscriptionFallbacks[variant][kind];
+  return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantEntitlementId() {
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_PRO_ENTITLEMENT_ID` as keyof NodeJS.ProcessEnv;
+  const genericKey = "EXPO_PUBLIC_PRO_ENTITLEMENT_ID" as keyof NodeJS.ProcessEnv;
+  const value = process.env[variantKey] ?? process.env[genericKey] ?? variantEntitlementFallbacks[variant];
+  return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantRevenueCatApiKey(kind: "androidApiKey" | "iosApiKey" | "webApiKey") {
+  const suffixMap = {
+    androidApiKey: "ANDROID_API_KEY",
+    iosApiKey: "IOS_API_KEY",
+    webApiKey: "WEB_API_KEY",
+  } as const;
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_REVENUECAT_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const genericKey = `EXPO_PUBLIC_REVENUECAT_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const value = process.env[variantKey] ?? process.env[genericKey] ?? variantRevenueCatFallbacks[variant][kind];
+  return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantPaddleClientToken() {
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_PADDLE_CLIENT_TOKEN` as keyof NodeJS.ProcessEnv;
+  const genericKey = "EXPO_PUBLIC_PADDLE_CLIENT_TOKEN" as keyof NodeJS.ProcessEnv;
+  const value = process.env[variantKey] ?? process.env[genericKey] ?? variantPaddleClientTokenFallbacks[variant];
+  return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantGoogleClientId(kind: "expoClientId" | "androidClientId" | "iosClientId" | "webClientId") {
+  const suffixMap = {
+    expoClientId: "EXPO_CLIENT_ID",
+    androidClientId: "ANDROID_CLIENT_ID",
+    iosClientId: "IOS_CLIENT_ID",
+    webClientId: "WEB_CLIENT_ID",
+  } as const;
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_GOOGLE_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const genericKey = `EXPO_PUBLIC_GOOGLE_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const variantFallback = variantGoogleClientFallbacks[variant][kind];
+  const value =
+    kind === "androidClientId"
+      ? process.env[variantKey] ?? variantFallback
+      : process.env[variantKey] ?? process.env[genericKey] ?? variantFallback;
   return value ? value.replace(/^"(.*)"$/, "$1") : "";
 }
 
@@ -106,7 +211,19 @@ const config: ExpoConfig = {
   assetBundlePatterns: ["**/*"],
   android: {
     package: current.androidPackage,
-    blockedPermissions: variant === "children" ? ["com.google.android.gms.permission.AD_ID"] : undefined,
+    googleServicesFile:
+      variant === "children"
+        ? "./src/google-services-children.json"
+        : variant === "uni"
+          ? "./src/google-services-uni.json"
+          : undefined,
+    blockedPermissions:
+      variant === "children"
+        ? [
+            "com.google.android.gms.permission.AD_ID",
+            "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+          ]
+        : undefined,
     adaptiveIcon: {
       foregroundImage: `./assets/images/quiks-${variant}-adaptive-foreground.png`,
       backgroundColor,
@@ -120,7 +237,6 @@ const config: ExpoConfig = {
         root: "./app",
       },
     ],
-    "expo-iap",
     [
       "react-native-google-mobile-ads",
       {
@@ -131,6 +247,7 @@ const config: ExpoConfig = {
     ] as const,
     "expo-audio",
     "expo-web-browser",
+    "expo-notifications",
   ],
   experiments: {
     typedRoutes: true,
@@ -153,10 +270,15 @@ const config: ExpoConfig = {
     EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: readEnvValue("EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET"),
     EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: readEnvValue("EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
     EXPO_PUBLIC_FIREBASE_APP_ID: readEnvValue("EXPO_PUBLIC_FIREBASE_APP_ID"),
-    EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID: readEnvValue("EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID"),
-    EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: readEnvValue("EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID"),
-    EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: readEnvValue("EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID"),
-    EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: readEnvValue("EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID"),
+    EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID: readVariantGoogleClientId("expoClientId"),
+    EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: readVariantGoogleClientId("androidClientId"),
+    EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: readVariantGoogleClientId("iosClientId"),
+    EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: readVariantGoogleClientId("webClientId"),
+    EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: readVariantRevenueCatApiKey("androidApiKey"),
+    EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: readVariantRevenueCatApiKey("iosApiKey"),
+    EXPO_PUBLIC_REVENUECAT_WEB_API_KEY: readVariantRevenueCatApiKey("webApiKey"),
+    EXPO_PUBLIC_PADDLE_CLIENT_TOKEN: readVariantPaddleClientToken(),
+    EXPO_PUBLIC_PRO_ENTITLEMENT_ID: readVariantEntitlementId(),
     EXPO_PUBLIC_PRO_MONTHLY_PRODUCT_ID: readVariantSubscriptionProductId("monthly"),
     EXPO_PUBLIC_PRO_YEARLY_PRODUCT_ID: readVariantSubscriptionProductId("yearly"),
     "react-native-google-mobile-ads": {

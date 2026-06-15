@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { BackIconButton } from "../components/BackIconButton";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
@@ -339,6 +340,7 @@ export default function CompetitionScreen() {
   if (screenMode === "accept") {
     return (
       <AppBackground>
+        <BackIconButton fallbackHref="/" />
         <View style={styles.heroCard}>
           <Text style={styles.eyebrow}>{t(language, "challengeBoard")}</Text>
           <Text style={styles.title}>{t(language, "competitionArena")}</Text>
@@ -433,6 +435,7 @@ export default function CompetitionScreen() {
   if (screenMode === "create" && setupSubject) {
     return (
       <AppBackground>
+        <BackIconButton fallbackHref="/" />
         <View style={styles.heroCard}>
           <Text style={styles.eyebrow}>{t(language, "createChallenge")}</Text>
           <Text style={styles.title}>{setupSubject.name}</Text>

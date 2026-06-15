@@ -1,11 +1,13 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { BackIconButton } from "../components/BackIconButton";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { signOutAccount } from "../lib/firebase";
 import { getLanguageLabel, t } from "../lib/i18n";
+import { syncRevenueCatIdentity } from "../lib/revenuecat";
 import { canCreateAnotherProfile } from "../lib/subscription";
 import { logoutAccount, readAppState } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
@@ -40,6 +42,12 @@ function isSameLocalDay(dateIso: string) {
   );
 }
 
+function formatResultDuration(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
+
 export default function ProfileScreen() {
   const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
@@ -49,7 +57,7 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     const state = await readAppState();
     if (!state.isAuthenticated) {
-      router.replace({ pathname: "/login" } as never);
+      router.replace({ pathname: "/signup" } as never);
       return;
     }
     const profile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
@@ -62,6 +70,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     await signOutAccount().catch(() => undefined);
     await logoutAccount();
+    await syncRevenueCatIdentity(null).catch(() => undefined);
     router.replace({ pathname: "/login" } as never);
   };
 
@@ -106,10 +115,37 @@ export default function ProfileScreen() {
 
   const todaySeconds = results.filter((result) => isSameLocalDay(result.date)).reduce((sum, result) => sum + result.timeTakenSeconds, 0);
   const todayMinutes = Math.round(todaySeconds / 60);
+  const todayResults = results.filter((result) => isSameLocalDay(result.date));
   const goalMinutes = activeProfile?.dailyGoalMinutes ?? 0;
   const competitionResults = results.filter((result) => Boolean(result.competitionId));
   const competitionWins = competitionResults.filter((result) => result.competitionOutcome === "won").length;
   const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profileCount);
+  const isMobile = Platform.OS !== "web";
+
+  const handleDeleteAccount = async () => {
+    const deletionUrl = `https://techsolutionproviders.net/account-deletion-quiks.html?variant=${appVariant.id}`;
+
+    Alert.alert(
+      t(language, "deleteAccountTitle"),
+      t(language, "deleteAccountMessage"),
+      [
+        {
+          text: t(language, "cancel"),
+          style: "cancel",
+        },
+        {
+          text: t(language, "openDeletionCenter"),
+          onPress: async () => {
+            try {
+              await Linking.openURL(deletionUrl);
+            } catch {
+              Alert.alert(t(language, "deleteAccountUnavailableTitle"), t(language, "deleteAccountUnavailableMessage"));
+            }
+          },
+        },
+      ]
+    );
+  };
 
   let goalFeedback = t(language, "noTargetYet");
   if (activeProfile) {
@@ -142,6 +178,7 @@ export default function ProfileScreen() {
 
   return (
     <AppBackground>
+      <BackIconButton fallbackHref="/" />
       <View style={styles.heroCard}>
         <View style={styles.heroTopRow}>
           <View style={styles.heroIdentity}>
@@ -167,6 +204,22 @@ export default function ProfileScreen() {
           {todayMinutes} min / {goalMinutes} min
         </Text>
         <Text style={styles.metricText}>{goalFeedback}</Text>
+        {todayResults.length > 0 ? (
+          <View style={styles.todayHistoryWrap}>
+            {todayResults.slice(0, 6).map((result) => (
+              <View key={result.id} style={styles.todayHistoryItem}>
+                <Text style={styles.todayHistoryTitle}>
+                  {result.subjectName} · {result.score}% · {result.grade}
+                </Text>
+                <Text style={styles.todayHistoryMeta}>
+                  {result.mode} · {result.totalQuestions}Q · {formatResultDuration(result.timeTakenSeconds)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.metricText}>{t(language, "noSessionsYet")}</Text>
+        )}
       </View>
 
       <View style={styles.card}>
@@ -179,8 +232,8 @@ export default function ProfileScreen() {
       {competitionResults.length > 0 ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t(language, "competitionSummary")}</Text>
-          <Text style={styles.metricText}>Wins: {competitionWins}</Text>
-          <Text style={styles.metricText}>Challenges played: {competitionResults.length}</Text>
+          <Text style={styles.metricText}>{t(language, "competitionWins")}: {competitionWins}</Text>
+          <Text style={styles.metricText}>{t(language, "challengesPlayed")}: {competitionResults.length}</Text>
           {competitionResults.slice(0, 3).map((result) => (
             <Text key={result.id} style={styles.metricText}>
               {result.subjectName}: {result.competitionOutcome ?? "pending"} vs {result.competitionOpponentName ?? "-"} ({result.score}%)
@@ -194,8 +247,10 @@ export default function ProfileScreen() {
         <Text style={styles.metricText}>{t(language, "targetExam")}: {activeProfile.targetExam}</Text>
         <Text style={styles.metricText}>{t(language, "dailyTarget")}: {activeProfile.dailyGoalMinutes} minutes</Text>
         <Text style={styles.metricText}>{t(language, "currentLanguage")}: {getLanguageLabel(activeProfile.language)}</Text>
-        <Text style={styles.metricText}>Role: {activeProfile.role === "teacher" ? "Teacher" : "Student"}</Text>
-        <Text style={styles.metricText}>Quiks ID: {activeProfile.quiksId}</Text>
+        <Text style={styles.metricText}>
+          {t(language, "roleLabel")}: {activeProfile.role === "teacher" ? t(language, "teacherRole") : t(language, "studentRole")}
+        </Text>
+        <Text style={styles.metricText}>{t(language, "quiksIdLabel")}: {activeProfile.quiksId}</Text>
       </View>
 
       <View style={styles.actionGrid}>
@@ -207,7 +262,7 @@ export default function ProfileScreen() {
         />
         {activeProfile && appVariant.id !== "children" ? (
           <PrimaryButton
-            label="Classroom"
+            label={t(language, "classroomTitle")}
             variant="secondary"
             onPress={() => router.push({ pathname: "/classroom" } as never)}
             style={styles.gridButton}
@@ -215,14 +270,14 @@ export default function ProfileScreen() {
           />
         ) : null}
         <PrimaryButton
-          label="Subscription"
+          label={t(language, "subscription")}
           variant="secondary"
           onPress={() => router.push({ pathname: "/subscription" } as never)}
           style={styles.gridButton}
           compact
         />
         <PrimaryButton
-          label="Create Profile"
+          label={t(language, "createProfile")}
           variant="secondary"
           onPress={() =>
             canCreateMoreProfiles
@@ -233,6 +288,15 @@ export default function ProfileScreen() {
           compact
         />
         <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} style={styles.gridButton} compact />
+        {isMobile ? (
+          <PrimaryButton
+            label={t(language, "deleteAccount")}
+            variant="secondary"
+            onPress={handleDeleteAccount}
+            style={styles.gridButton}
+            compact
+          />
+        ) : null}
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} style={styles.gridButton} compact />
       </View>
     </AppBackground>
@@ -316,6 +380,28 @@ const styles = StyleSheet.create({
     color: palette.slate,
     lineHeight: 24,
     marginTop: 6,
+  },
+  todayHistoryWrap: {
+    marginTop: 12,
+    gap: 10,
+  },
+  todayHistoryItem: {
+    borderRadius: 16,
+    backgroundColor: "#F6FAFC",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#E3EDF4",
+  },
+  todayHistoryTitle: {
+    color: palette.ink,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  todayHistoryMeta: {
+    marginTop: 4,
+    color: palette.slate,
+    fontSize: 13,
   },
   emptyCard: {
     marginTop: 30,

@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import { appVariant } from "../lib/app-variant";
-import { getLanguageLabel, normalizeLanguage } from "../lib/i18n";
+import { getLanguageLabel, getLanguagePromptLabel, normalizeLanguage } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
 import type {
   BreatherContent,
@@ -162,7 +162,7 @@ function buildPromptLines(request: QuestionRequest) {
     `Question focus: ${request.focusMode === "topic" ? `Topic only (${request.topicLabel ?? request.topicId ?? "selected topic"})` : "General mixed practice"}`,
     `Question count: ${request.questionCount}`,
     `App audience: ${appVariant.appName} (${appVariant.audienceLabel})`,
-    `Learner language: ${getLanguageLabel(language)}`,
+    `Learner language: ${getLanguagePromptLabel(language)}`,
     `Learner target exam: ${request.profile?.targetExam ?? "General study"}`,
     `Subject guidance: ${request.subject.aiPromptHint}`,
     `Variant guidance: ${appVariant.aiGuidance}`,
@@ -176,7 +176,7 @@ function buildPromptLines(request: QuestionRequest) {
     "The questions must match the real reasoning level expected for that class, band, level, difficulty, and app variant.",
     "Avoid generic filler, placeholders, or over-simplified questions that belong to a lower academic stage.",
     "Never answer a teens or university request with primary-school style content.",
-    `Write all question prompts, answer options, and explanations in ${getLanguageLabel(language)}.`,
+    `Write all question prompts, answer options, and explanations in ${getLanguagePromptLabel(language)}.`,
   ];
 }
 
@@ -210,7 +210,7 @@ function withVariantMeta<T extends object>(body: T) {
     appAudienceLabel: appVariant.audienceLabel,
     appGuidance: appVariant.aiGuidance,
     learnerLanguage: language,
-    learnerLanguageLabel: getLanguageLabel(language),
+    learnerLanguageLabel: getLanguagePromptLabel(language),
   };
 }
 

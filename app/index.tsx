@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -13,7 +13,14 @@ import { canCreateAnotherProfile, shouldShowUpgradePrompts } from "../lib/subscr
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getLocalizedSubjects, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
+import { readWebCheckoutIntentFromLocation } from "../lib/web-checkout";
 import type { SessionResult, UserProfile } from "../types/app";
+
+const heroLogos = {
+  children: require("../assets/images/quiks-children-playstore-icon-512.png"),
+  teens: require("../assets/images/quiks-teens-playstore-icon-512.png"),
+  uni: require("../assets/images/quiks-uni-playstore-icon-512.png"),
+} as const;
 
 function getGradeRank(grade: string) {
   const gradeNumber = Number(grade.replace(/[^\d]/g, ""));
@@ -33,6 +40,8 @@ function getGradeRank(grade: string) {
 }
 
 export default function HomeScreen() {
+  const { width } = useWindowDimensions();
+  const isWeb = Platform.OS === "web";
   const [authChecked, setAuthChecked] = useState(false);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [currentProfileId, setCurrentProfileIdState] = useState<string | null>(null);
@@ -41,11 +50,33 @@ export default function HomeScreen() {
 
   const loadData = useCallback(async () => {
     const state = await readAppState();
+    const webCheckout = readWebCheckoutIntentFromLocation();
     if (!state.isAuthenticated) {
       setAuthChecked(true);
-      router.replace({ pathname: "/login" } as never);
+      router.replace(
+        webCheckout.checkout
+          ? ({
+              pathname: "/signup",
+              params: {
+                redirect: "subscription",
+                ...(webCheckout.plan ? { plan: webCheckout.plan } : {}),
+              },
+            } as never)
+          : ({ pathname: "/signup" } as never)
+      );
       return;
     }
+
+    if (webCheckout.checkout) {
+      setAuthChecked(true);
+      router.replace(
+        webCheckout.plan
+          ? ({ pathname: "/subscription", params: { plan: webCheckout.plan } } as never)
+          : ({ pathname: "/subscription" } as never)
+      );
+      return;
+    }
+
     setProfiles(state.profiles);
     setCurrentProfileIdState(state.currentProfileId);
     setResultsByProfile(state.results);
@@ -136,6 +167,14 @@ export default function HomeScreen() {
   };
 
   const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
+  const subjectColumns = width >= 1420 ? 5 : width >= 1120 ? 4 : width >= 820 ? 3 : width >= 560 ? 2 : 1;
+  const subjectGap = 14;
+  const desktopCanvasWidth = Math.min(Math.max(width - 40, 320), 1200);
+  const subjectCardWidth =
+    subjectColumns === 1
+      ? desktopCanvasWidth
+      : Math.floor((desktopCanvasWidth - subjectGap * (subjectColumns - 1)) / subjectColumns);
+  const showWideActions = width >= 900;
 
   if (!authChecked) {
     return (
@@ -149,8 +188,9 @@ export default function HomeScreen() {
 
   return (
     <AppBackground>
-      <View style={styles.heroCard}>
-        <Text style={styles.title}>{appVariant.heroTitle}</Text>
+      <View style={[styles.heroCard, isWeb ? styles.heroCardWeb : null]}>
+        {!isWeb ? <Image source={heroLogos[appVariant.id]} style={styles.heroLogo} resizeMode="cover" /> : null}
+        <Text style={[styles.title, isWeb ? styles.titleWeb : null]}>{appVariant.heroTitle}</Text>
         <Text style={styles.audienceBadge}>{appVariant.audienceLabel}</Text>
         <Text style={styles.subtitle}>{appVariant.heroSubtitle}</Text>
 
@@ -282,7 +322,7 @@ export default function HomeScreen() {
       </View>
 
       {appVariant.id !== "children" ? (
-        <View style={styles.homeActionColumn}>
+        <View style={[styles.homeActionColumn, showWideActions ? styles.homeActionRowDesktop : null]}>
           <PrimaryButton
             label="Classroom"
             variant="secondary"
@@ -291,6 +331,7 @@ export default function HomeScreen() {
                 ? router.push("/classroom" as never)
                 : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
             }
+            style={showWideActions ? styles.homeActionButtonDesktop : undefined}
           />
           <PrimaryButton
             label={t(language, "enterCompetition")}
@@ -299,7 +340,7 @@ export default function HomeScreen() {
                 ? router.push("/competition" as never)
                 : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
             }
-            style={styles.homeCompetitionButton}
+            style={showWideActions ? styles.homeActionButtonDesktop : styles.homeCompetitionButton}
           />
         </View>
       ) : null}
@@ -331,7 +372,11 @@ export default function HomeScreen() {
 
       <View style={styles.subjectGrid}>
         {localizedSubjects.map((subject) => (
-          <Pressable key={subject.id} onPress={() => openSubject(subject.id)} style={styles.subjectPressable}>
+          <Pressable
+            key={subject.id}
+            onPress={() => openSubject(subject.id)}
+            style={[styles.subjectPressable, { width: subjectCardWidth }]}
+          >
             <LinearGradient colors={subject.accent} style={[styles.subjectCard, !activeProfile ? styles.subjectCardDim : null]}>
               <MaterialCommunityIcons name={subject.icon as never} size={28} color={palette.white} />
               <Text style={styles.subjectName}>{subject.name}</Text>
@@ -356,16 +401,26 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   heroCard: {
-    marginTop: 12,
     borderRadius: 30,
     backgroundColor: "rgba(255,255,255,0.12)",
     padding: 22,
+  },
+  heroCardWeb: {
+    paddingTop: 12,
+  },
+  heroLogo: {
+    width: 120,
+    height: 120,
+    borderRadius: 28,
+    marginBottom: 18,
   },
   title: {
     color: palette.white,
     fontSize: 42,
     fontWeight: "900",
-    marginTop: 10,
+  },
+  titleWeb: {
+    marginTop: -2,
   },
   subtitle: {
     color: "#E9F4FA",
@@ -584,6 +639,13 @@ const styles = StyleSheet.create({
     marginTop: 18,
     gap: 12,
   },
+  homeActionRowDesktop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  homeActionButtonDesktop: {
+    flex: 1,
+  },
   subscriptionCard: {
     marginTop: 18,
     borderRadius: 24,
@@ -617,6 +679,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   subjectGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 14,
   },
   subjectPressable: {

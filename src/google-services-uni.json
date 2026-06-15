@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "656940564357",
+    "project_id": "quiks-uni",
+    "storage_bucket": "quiks-uni.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:656940564357:android:c5d7f9a7d55954f4438eec",
+        "android_client_info": {
+          "package_name": "com.quiks.uni"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "656940564357-0nr4qronf5e38t4ki5t7i0ur6thrppg7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quiks.uni",
+            "certificate_hash": "ff421b8d5eb69c15aaf67f7dda2ee881456e6cbd"
+          }
+        },
+        {
+          "client_id": "656940564357-of0e62ugcgdnb4jt98q7qm80cn2mnr5v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBXu6Z1yTF17N1RuUItGQmadpYIYG61zlA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "656940564357-of0e62ugcgdnb4jt98q7qm80cn2mnr5v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { cancelCompetitionReminderNotifications, scheduleCompetitionReminderNotifications } from "../lib/notifications";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
@@ -100,6 +101,7 @@ export default function SessionScreen() {
   const [isRequestingCompetitionRematch, setIsRequestingCompetitionRematch] = useState(false);
   const [isAcceptingCompetitionRematch, setIsAcceptingCompetitionRematch] = useState(false);
   const hasAutoStartedRef = useRef(false);
+  const lastScheduledCompetitionRef = useRef<string | null>(null);
   const isCompetition = typeof params.competitionId === "string";
   const isClassroomActivity = typeof params.classroomActivityId === "string";
   const competitionOpponentName =
@@ -317,6 +319,74 @@ export default function SessionScreen() {
 
     return () => clearInterval(interval);
   }, [competitionStartAt, phase]);
+
+  useEffect(() => {
+    if (!isCompetition || !params.competitionId) {
+      return;
+    }
+
+    if (phase === "countdown" && competitionStartAt && subject) {
+      const reminderKey = [
+        params.competitionId,
+        competitionStartAt,
+        competitionOpponentName ?? "",
+        params.subjectId ?? subject.id,
+        grade,
+        selectedLevel,
+        difficulty,
+        focusMode,
+        params.topicId ?? "",
+      ].join(":");
+
+      if (lastScheduledCompetitionRef.current === reminderKey) {
+        return;
+      }
+
+      lastScheduledCompetitionRef.current = reminderKey;
+      void scheduleCompetitionReminderNotifications({
+        competitionId: params.competitionId,
+        subjectId: params.subjectId ?? subject.id,
+        grade,
+        level: String(selectedLevel),
+        difficulty,
+        focusMode,
+        topicId: params.topicId,
+        opponentName: competitionOpponentName,
+        startAt: competitionStartAt,
+        soonTitle: t(language, "competitionReminderSoonTitle"),
+        soonBody: t(language, "competitionReminderSoonBody", {
+          subject: resolvedSubjectName,
+          opponent: competitionOpponentName ?? t(language, "opponent"),
+        }),
+        startTitle: t(language, "competitionReminderNowTitle"),
+        startBody: t(language, "competitionReminderNowBody", {
+          subject: resolvedSubjectName,
+          opponent: competitionOpponentName ?? t(language, "opponent"),
+        }),
+      });
+      return;
+    }
+
+    if (phase === "active" || phase === "review" || phase === "awaitingResult") {
+      lastScheduledCompetitionRef.current = null;
+      void cancelCompetitionReminderNotifications(params.competitionId);
+    }
+  }, [
+    competitionOpponentName,
+    competitionStartAt,
+    difficulty,
+    focusMode,
+    grade,
+    isCompetition,
+    language,
+    params.competitionId,
+    params.subjectId,
+    params.topicId,
+    phase,
+    resolvedSubjectName,
+    selectedLevel,
+    subject,
+  ]);
 
   useEffect(() => {
     if (!isCompetition || !profile || !["countdown", "active", "review", "awaitingResult"].includes(phase)) {

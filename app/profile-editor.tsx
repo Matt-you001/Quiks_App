@@ -101,7 +101,7 @@ export default function ProfileEditorScreen() {
       id: editingProfile?.id ?? createId(),
       name: form.name.trim(),
       age: isTeacher ? (Number.isFinite(age) && age >= 18 ? age : editingProfile?.age ?? 18) : age,
-      targetExam: isTeacher ? "Teacher account" : form.targetExam.trim() || "General school prep",
+      targetExam: isTeacher ? t(form.language, "teacherAccount") : form.targetExam.trim() || "General school prep",
       dailyGoalMinutes: isTeacher ? 0 : goal,
       schoolName: isTeacher ? form.schoolName.trim() : "",
       teachingFocus: isTeacher ? form.teachingFocus.trim() : "",
@@ -120,7 +120,7 @@ export default function ProfileEditorScreen() {
       <View style={styles.heroCard}>
         <Text style={styles.title}>{isEditMode ? t(form.language, "editProfile") : t(form.language, "createProfile")}</Text>
         <Text style={styles.subtitle}>
-          {isEditMode ? t(form.language, "updateLearnerDetails") : appVariant.profileEditorSubtitle}
+          {isEditMode ? t(form.language, "updateLearnerDetails") : t(form.language, "createProfileSubtitle")}
         </Text>
       </View>
 
@@ -165,26 +165,26 @@ export default function ProfileEditorScreen() {
               value={form.age}
               onChangeText={(value) => setForm((current) => ({ ...current, age: value }))}
               style={styles.input}
-              placeholder="Optional"
+              placeholder={t(form.language, "optional")}
               keyboardType="number-pad"
               placeholderTextColor="#7C8EA3"
             />
 
-            <Text style={styles.label}>School name</Text>
+            <Text style={styles.label}>{t(form.language, "schoolName")}</Text>
             <TextInput
               value={form.schoolName}
               onChangeText={(value) => setForm((current) => ({ ...current, schoolName: value }))}
               style={styles.input}
-              placeholder="Optional"
+              placeholder={t(form.language, "optional")}
               placeholderTextColor="#7C8EA3"
             />
 
-            <Text style={styles.label}>Teaching focus</Text>
+            <Text style={styles.label}>{t(form.language, "teachingFocus")}</Text>
             <TextInput
               value={form.teachingFocus}
               onChangeText={(value) => setForm((current) => ({ ...current, teachingFocus: value }))}
               style={styles.input}
-              placeholder="Optional"
+              placeholder={t(form.language, "optional")}
               placeholderTextColor="#7C8EA3"
             />
           </>

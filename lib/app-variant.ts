@@ -214,9 +214,35 @@ function normalizeVariant(value: string | undefined): AppVariant {
   return "children";
 }
 
+function readVariantFromWebLocation(): AppVariant | undefined {
+  if (typeof globalThis === "undefined" || !("location" in globalThis) || !globalThis.location) {
+    return undefined;
+  }
+
+  const location = globalThis.location;
+  const queryValue = new URLSearchParams(location.search).get("variant") ?? undefined;
+  if (queryValue) {
+    return normalizeVariant(queryValue);
+  }
+
+  const hostname = location.hostname.toLowerCase();
+  const hostFirstSegment = hostname.split(".")[0];
+  if (hostFirstSegment === "children" || hostFirstSegment === "teens" || hostFirstSegment === "uni") {
+    return hostFirstSegment;
+  }
+
+  const pathFirstSegment = location.pathname.split("/").filter(Boolean)[0];
+  if (pathFirstSegment === "children" || pathFirstSegment === "teens" || pathFirstSegment === "uni") {
+    return pathFirstSegment;
+  }
+
+  return undefined;
+}
+
 export function getConfiguredVariant(): AppVariant {
   const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>;
-  return normalizeVariant(process.env.EXPO_PUBLIC_APP_VARIANT ?? extra.EXPO_PUBLIC_APP_VARIANT ?? extra.APP_VARIANT);
+  const webVariant = readVariantFromWebLocation();
+  return normalizeVariant(webVariant ?? process.env.EXPO_PUBLIC_APP_VARIANT ?? extra.EXPO_PUBLIC_APP_VARIANT ?? extra.APP_VARIANT);
 }
 
 export const activeVariant = getConfiguredVariant();

@@ -3,6 +3,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../../components/AppBackground";
+import { BackIconButton } from "../../components/BackIconButton";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { appVariant } from "../../lib/app-variant";
 import { t } from "../../lib/i18n";
@@ -67,6 +68,7 @@ export default function SubjectDetailScreen() {
 
   return (
     <AppBackground>
+      <BackIconButton fallbackHref="/" />
       <View style={styles.heroCard}>
         <MaterialCommunityIcons name={subject.icon as never} size={34} color={palette.white} />
         <Text style={styles.subjectTitle}>{subject.name}</Text>

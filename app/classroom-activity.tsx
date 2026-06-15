@@ -45,7 +45,7 @@ export default function ClassroomActivityScreen() {
     setLoading(true);
     const state = await readAppState();
     if (!state.isAuthenticated) {
-      router.replace({ pathname: "/login" } as never);
+      router.replace({ pathname: "/signup" } as never);
       return;
     }
 

@@ -1,10 +1,15 @@
 import Constants from "expo-constants";
+import Purchases, { PACKAGE_TYPE, type PurchasesPackage } from "react-native-purchases";
 import { appVariant } from "./app-variant";
+import { getAuthenticatedAccount } from "./firebase";
+import {
+  ensureRevenueCatConfigured,
+  getRevenueCatConfigErrorMessage,
+  getRevenueCatEntitlementId,
+  hasActiveProEntitlement,
+  hasRevenueCatConfig,
+} from "./revenuecat";
 import { setSubscriptionTier } from "./storage";
-
-type ExpoIapModule = typeof import("expo-iap");
-type ProductSubscription = import("expo-iap").ProductSubscription;
-type Purchase = import("expo-iap").Purchase;
 
 export interface SubscriptionPlan {
   productId: string;
@@ -31,16 +36,16 @@ export interface SubscriptionPurchaseResult {
 
 const fallbackProductIds = {
   children: {
-    monthly: "quiks_children_pro_monthly",
-    yearly: "quiks_children_pro_yearly",
+    monthly: "pri_01ktmm16hbdzdw2t1k8adnf62p",
+    yearly: "pri_01ktmm5s5t0ad93yrdae3rr8vf",
   },
   teens: {
-    monthly: "quiks_teens_pro_monthly",
-    yearly: "quiks_teens_pro_yearly",
+    monthly: "pri_01ktw7bftss9tz8fj059vjnbfy",
+    yearly: "pri_01ktw7er8a15qf2d4pw7v0s4b8",
   },
   uni: {
-    monthly: "quiks_uni_pro_monthly",
-    yearly: "quiks_uni_pro_yearly",
+    monthly: "pri_01ktmmh5xf4yn0yn1vwq8pg2rh",
+    yearly: "pri_01ktmmm7cmh5tg4tm93cv8pk5e",
   },
 } as const;
 
@@ -78,33 +83,34 @@ const productIds = {
     normalizeEnvValue(process.env.EXPO_PUBLIC_PRO_YEARLY_PRODUCT_ID ?? extra.EXPO_PUBLIC_PRO_YEARLY_PRODUCT_ID) ??
     fallbackProductIds[appVariant.id].yearly,
 };
-
-let connectionReady = false;
-
-function getExpoIapModule(): ExpoIapModule | null {
-  try {
-    return require("expo-iap") as ExpoIapModule;
-  } catch {
-    return null;
-  }
-}
+const packageCache = new Map<string, PurchasesPackage>();
 
 function getSubscriptionProductIds() {
   return [productIds.monthly, productIds.yearly].filter(Boolean);
 }
 
-function inferPeriod(productId: string, title: string) {
-  const combined = `${productId} ${title}`.toLowerCase();
-  if (combined.includes("year")) {
-    return "yearly";
+function inferPeriod(aPackage: PurchasesPackage) {
+  if (aPackage.packageType === PACKAGE_TYPE.ANNUAL) {
+    return "yearly" as SubscriptionPeriod;
   }
-  if (combined.includes("month")) {
-    return "monthly";
+
+  if (aPackage.packageType === PACKAGE_TYPE.MONTHLY) {
+    return "monthly" as SubscriptionPeriod;
   }
+
+  const period = aPackage.product.subscriptionPeriod?.toUpperCase() ?? "";
+  if (period.includes("Y")) {
+    return "yearly" as SubscriptionPeriod;
+  }
+
+  if (period.includes("M")) {
+    return "monthly" as SubscriptionPeriod;
+  }
+
   return "unknown" as SubscriptionPeriod;
 }
 
-function normalizePlans(items: ProductSubscription[]) {
+function normalizePlans(items: PurchasesPackage[]) {
   const rank: Record<SubscriptionPeriod, number> = {
     monthly: 0,
     yearly: 1,
@@ -113,27 +119,13 @@ function normalizePlans(items: ProductSubscription[]) {
 
   return items
     .map((item) => ({
-      productId: item.id,
-      title: item.displayName ?? item.title ?? item.id,
-      description: item.description ?? "",
-      displayPrice: item.displayPrice ?? "",
-      period: inferPeriod(item.id, item.displayName ?? item.title ?? item.id) as SubscriptionPeriod,
+      productId: item.identifier,
+      title: item.product.title ?? item.identifier,
+      description: item.product.description ?? "",
+      displayPrice: item.product.priceString ?? "",
+      period: inferPeriod(item),
     }))
     .sort((left, right) => rank[left.period] - rank[right.period]);
-}
-
-async function ensureConnection() {
-  const iap = getExpoIapModule();
-  if (!iap) {
-    return null;
-  }
-
-  if (!connectionReady) {
-    await iap.initConnection();
-    connectionReady = true;
-  }
-
-  return iap;
 }
 
 async function updateStoredTierFromActive(active: boolean) {
@@ -143,116 +135,89 @@ async function updateStoredTierFromActive(active: boolean) {
 }
 
 export async function endPurchaseConnection() {
-  const iap = getExpoIapModule();
-  if (!iap || !connectionReady) {
-    return;
-  }
-
-  try {
-    await iap.endConnection();
-  } finally {
-    connectionReady = false;
-  }
+  return;
 }
 
 export function purchaseRuntimeAvailable() {
-  return Boolean(getExpoIapModule());
+  return true;
 }
 
 export function subscriptionsConfigured() {
-  return getSubscriptionProductIds().length > 0;
+  return hasRevenueCatConfig();
+}
+
+export function getProEntitlementId() {
+  return getRevenueCatEntitlementId();
 }
 
 export async function loadSubscriptionStoreState(): Promise<SubscriptionStoreState> {
-  const iap = await ensureConnection();
-  const subscriptionIds = getSubscriptionProductIds();
-
-  if (!iap) {
+  if (!hasRevenueCatConfig()) {
     return {
       plans: [],
       active: false,
       available: false,
-      reason: "runtime_unavailable",
+      reason: "sdk_key_missing",
     };
   }
 
-  if (subscriptionIds.length === 0) {
-    return {
-      plans: [],
-      active: false,
-      available: false,
-      reason: "products_missing",
-    };
+  await ensureRevenueCatConfigured(getAuthenticatedAccount());
+  const offerings = await Purchases.getOfferings();
+  const availablePackages = offerings.current?.availablePackages ?? [];
+  packageCache.clear();
+  for (const item of availablePackages) {
+    packageCache.set(item.identifier, item);
   }
 
-  const fetched = await iap.fetchProducts({
-    skus: subscriptionIds,
-    type: "subs",
-  });
-
-  const plans = normalizePlans((fetched ?? []).filter((item): item is ProductSubscription => item.type === "subs"));
-  const active = await iap.hasActiveSubscriptions(subscriptionIds);
+  const customerInfo = await Purchases.getCustomerInfo();
+  const plans = normalizePlans(availablePackages);
+  const active = hasActiveProEntitlement(customerInfo);
   await updateStoredTierFromActive(active);
 
   return {
     plans,
     active,
-    available: true,
+    available: availablePackages.length > 0,
     reason: plans.length === 0 ? "products_unavailable" : undefined,
   };
 }
 
-function getPurchaseRequest(productId: string) {
-  return {
-    type: "subs" as const,
-    request: {
-      apple: {
-        sku: productId,
-      },
-      ios: {
-        sku: productId,
-      },
-      android: {
-        skus: [productId],
-      },
-      google: {
-        skus: [productId],
-      },
-    },
-  };
-}
-
-function resolvePurchase(result: Purchase | Purchase[] | null | undefined) {
-  if (!result) {
-    return null;
+async function getCachedPackage(packageId: string) {
+  const cached = packageCache.get(packageId);
+  if (cached) {
+    return cached;
   }
 
-  return Array.isArray(result) ? result[0] ?? null : result;
+  const offerings = await Purchases.getOfferings();
+  const availablePackages = offerings.current?.availablePackages ?? [];
+  packageCache.clear();
+  for (const item of availablePackages) {
+    packageCache.set(item.identifier, item);
+  }
+
+  return packageCache.get(packageId) ?? null;
 }
 
 export async function purchaseProSubscription(productId: string): Promise<SubscriptionPurchaseResult> {
-  const iap = await ensureConnection();
-  const subscriptionIds = getSubscriptionProductIds();
-
-  if (!iap) {
+  if (!hasRevenueCatConfig()) {
     return {
       active: false,
       pending: false,
-      message: "runtime_unavailable",
+      message: getRevenueCatConfigErrorMessage() ?? "sdk_key_missing",
     };
   }
 
-  const rawPurchase = await iap.requestPurchase(getPurchaseRequest(productId));
-  const purchase = resolvePurchase(rawPurchase);
-
-  if (purchase) {
-    await iap.finishTransaction({
-      purchase,
-      isConsumable: false,
-    });
+  await ensureRevenueCatConfigured(getAuthenticatedAccount());
+  const selectedPackage = await getCachedPackage(productId);
+  if (!selectedPackage) {
+    return {
+      active: false,
+      pending: false,
+      message: "products_unavailable",
+    };
   }
 
-  const active = await iap.hasActiveSubscriptions(subscriptionIds);
+  const { customerInfo } = await Purchases.purchasePackage(selectedPackage);
+  const active = hasActiveProEntitlement(customerInfo);
   await updateStoredTierFromActive(active);
 
   return {
@@ -262,19 +227,17 @@ export async function purchaseProSubscription(productId: string): Promise<Subscr
 }
 
 export async function restoreProSubscription(): Promise<SubscriptionPurchaseResult> {
-  const iap = await ensureConnection();
-  const subscriptionIds = getSubscriptionProductIds();
-
-  if (!iap) {
+  if (!hasRevenueCatConfig()) {
     return {
       active: false,
       pending: false,
-      message: "runtime_unavailable",
+      message: getRevenueCatConfigErrorMessage() ?? "sdk_key_missing",
     };
   }
 
-  await iap.restorePurchases();
-  const active = await iap.hasActiveSubscriptions(subscriptionIds);
+  await ensureRevenueCatConfigured(getAuthenticatedAccount());
+  const customerInfo = await Purchases.restorePurchases();
+  const active = hasActiveProEntitlement(customerInfo);
   await updateStoredTierFromActive(active);
 
   return {

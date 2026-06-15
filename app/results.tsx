@@ -390,15 +390,25 @@ export default function ResultsScreen() {
 
       <View style={styles.actionColumn}>
         {passed && showBreather ? <PrimaryButton label={t(language, "takeLearningBreather")} onPress={openBreather} /> : null}
-        {passed ? (
+        <View style={styles.actionRow}>
+          {passed ? (
+            <PrimaryButton
+              label={showBreather ? t(language, "skipBreatherAndContinue") : t(language, "nextLevel")}
+              variant={showBreather ? "secondary" : "primary"}
+              onPress={goToNextLevel}
+              style={styles.actionButton}
+              compact
+            />
+          ) : null}
           <PrimaryButton
-            label={showBreather ? t(language, "skipBreatherAndContinue") : t(language, "nextLevel")}
-            variant={showBreather ? "secondary" : "primary"}
-            onPress={goToNextLevel}
+            label={t(language, "repeatThisLevel")}
+            variant={passed ? "secondary" : "primary"}
+            onPress={repeatLevel}
+            style={styles.actionButton}
+            compact
           />
-        ) : null}
-        <PrimaryButton label={t(language, "repeatThisLevel")} variant={passed ? "secondary" : "primary"} onPress={repeatLevel} />
-        <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={backHome} />
+          <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={backHome} style={styles.actionButton} compact />
+        </View>
       </View>
     </AppBackground>
   );
@@ -499,5 +509,12 @@ const styles = StyleSheet.create({
   actionColumn: {
     gap: 12,
     marginTop: 18,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
   },
 });

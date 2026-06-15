@@ -17,6 +17,7 @@ import {
 import { doc, getDoc, getFirestore, setDoc } from "firebase/firestore";
 import type { Persistence } from "firebase/auth";
 import type { AppAccount, StoredAppState } from "../types/app";
+import { clearNativeGoogleSession } from "./google-auth";
 
 const rnAuth = require("@firebase/auth") as {
   getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
@@ -222,6 +223,7 @@ export async function signOutAccount() {
   }
 
   await signOut(firebaseAuth);
+  await clearNativeGoogleSession();
 }
 
 export async function loadCloudState(userId: string) {

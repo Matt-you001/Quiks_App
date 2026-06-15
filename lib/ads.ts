@@ -1,8 +1,43 @@
 import Constants from "expo-constants";
+import type { ComponentType } from "react";
+import { Platform } from "react-native";
 import { appVariant } from "./app-variant";
 import type { SubscriptionTier } from "../types/app";
 
-type MobileAdsModule = typeof import("react-native-google-mobile-ads");
+type MobileAdsModule = {
+  TestIds: {
+    ADAPTIVE_BANNER: string;
+    INTERSTITIAL: string;
+  };
+  BannerAd: ComponentType<{
+    unitId: string;
+    size: string;
+    requestOptions?: {
+      requestNonPersonalizedAdsOnly?: boolean;
+    };
+  }>;
+  BannerAdSize: {
+    LARGE_ANCHORED_ADAPTIVE_BANNER: string;
+  };
+  InterstitialAd: {
+    createForAdRequest: (
+      unitId: string,
+      options?: { requestNonPersonalizedAdsOnly?: boolean }
+    ) => {
+      addAdEventListener: (event: string, listener: () => void) => () => void;
+      show: () => void;
+      load: () => void;
+    };
+  };
+  AdEventType: {
+    LOADED: string;
+    CLOSED: string;
+    ERROR: string;
+  };
+  default: () => {
+    initialize: () => Promise<unknown>;
+  };
+};
 
 const fallbackAdsConfig = {
   EXPO_PUBLIC_ADMOB_ANDROID_APP_ID: "ca-app-pub-3940256099942544~3347511713",
@@ -63,6 +98,10 @@ export function canShowAds(subscriptionTier: SubscriptionTier) {
 }
 
 export function getMobileAdsModule(): MobileAdsModule | null {
+  if (Platform.OS === "web") {
+    return null;
+  }
+
   try {
     return require("react-native-google-mobile-ads") as MobileAdsModule;
   } catch {
@@ -79,7 +118,7 @@ export function getInterstitialAdUnitId(module: MobileAdsModule) {
 }
 
 export async function initializeMobileAds() {
-  if (appVariant.id === "children") {
+  if (appVariant.id === "children" || Platform.OS === "web") {
     return false;
   }
 
@@ -100,7 +139,7 @@ export async function initializeMobileAds() {
 }
 
 export async function showInterstitialAd() {
-  if (!adsConfig.interstitialEnabled) {
+  if (!adsConfig.interstitialEnabled || Platform.OS === "web") {
     return false;
   }
 

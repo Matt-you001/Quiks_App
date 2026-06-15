@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiks | Checkout</title>
+  <meta name="description" content="Checkout entry page for Quiks subscriptions and premium plans." />
+  <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <div class="header-top">
+        <a class="brand" href="./index.html" aria-label="Quiks home">
+          <img src="./logo.svg" alt="Quiks logo" class="brand-logo" />
+          <div>
+            <p class="brand-name">Quiks</p>
+            <p class="brand-tag">Learn fast. Grow steady.</p>
+          </div>
+        </a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle="site-nav">Menu</button>
+      </div>
+      <nav class="site-nav" id="site-nav" data-open="false">
+        <a href="./index.html">Home</a>
+        <a href="./pricing.html">Pricing</a>
+        <a href="./checkout.html">Checkout</a>
+        <a href="./contact.html">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="inner-hero">
+        <span class="eyebrow">Secure billing</span>
+        <h1>Choose the Quiks plan you want to purchase.</h1>
+        <p>Quiks web subscriptions are billed through Paddle. Select the variant you want to subscribe to, then continue inside that product experience.</p>
+      </section>
+
+      <section class="content-panel">
+        <div class="section-heading">
+          <span class="eyebrow pricing-eyebrow">Checkout destinations</span>
+          <h2>Variant checkout entry points</h2>
+          <p>Use the pricing page for plan details, then open the matching variant checkout page to complete your subscription through Paddle.</p>
+        </div>
+        <div class="variant-grid">
+          <article class="variant-card children-card">
+            <span class="variant-badge">Children</span>
+            <h3>Quiks Children Pro</h3>
+            <p>Premium learning support for younger learners.</p>
+            <a class="variant-link" href="https://children.quiks.site/checkout.html">Open Children checkout</a>
+          </article>
+          <article class="variant-card teens-card">
+            <span class="variant-badge">Teens</span>
+            <h3>Quiks Teens Pro</h3>
+            <p>Premium revision, classroom, and competition support.</p>
+            <a class="variant-link" href="https://teens.quiks.site/checkout.html">Open Teens checkout</a>
+          </article>
+          <article class="variant-card uni-card">
+            <span class="variant-badge">Uni</span>
+            <h3>Quiks Uni Pro</h3>
+            <p>Premium tertiary and university-level study support.</p>
+            <a class="variant-link" href="https://uni.quiks.site/checkout.html">Open Uni checkout</a>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Quiks.site is operated by Tech Solution Providers Ltd.</p>
+      <div class="footer-links">
+        <a href="./pricing.html">Pricing</a>
+        <a href="./checkout.html">Checkout</a>
+        <a href="./terms.html">Terms</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./refund.html">Refund Policy</a>
+        <a href="./contact.html">Contact</a>
+      </div>
+    </footer>
+  </div>
+  <script src="./menu.js"></script>
+</body>
+</html>

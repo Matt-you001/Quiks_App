@@ -1,9 +1,7 @@
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +13,12 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { googleAuthConfig } from "../lib/auth-config";
 import {
+  beginNativeGoogleSignIn,
+  formatGoogleSignInError,
+  hasGoogleSignInConfig,
+  isNativeGoogleSignInSupported,
+} from "../lib/google-auth";
+import {
   formatFirebaseError,
   getAuthenticatedAccount,
   getFirebaseConfigErrorMessage,
@@ -24,25 +28,42 @@ import {
   signInWithGoogleAccount,
 } from "../lib/firebase";
 import { t } from "../lib/i18n";
+import { syncRevenueCatIdentity } from "../lib/revenuecat";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
+import { getPostAuthRoute } from "../lib/web-checkout";
 
 function GoogleLoginButton({
   onSuccess,
 }: {
   onSuccess: (idToken: string, accessToken?: string) => Promise<void>;
 }) {
-  const Google = require("expo-auth-session/providers/google") as typeof import("expo-auth-session/providers/google");
-  const WebBrowser = require("expo-web-browser") as typeof import("expo-web-browser");
   const language = "en";
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [request, response, promptAsync] = Google.useAuthRequest(googleAuthConfig);
+  const isNativeFlow = isNativeGoogleSignInSupported();
+  const [request, response, promptAsync] = !isNativeFlow
+    ? (
+        require("expo-auth-session/providers/google") as typeof import("expo-auth-session/providers/google")
+      ).useAuthRequest({
+        clientId: googleAuthConfig.webClientId || googleAuthConfig.expoClientId,
+        iosClientId: googleAuthConfig.iosClientId,
+      })
+    : [null, null, null];
 
   useEffect(() => {
+    if (isNativeFlow) {
+      return;
+    }
+
+    const WebBrowser = require("expo-web-browser") as typeof import("expo-web-browser");
     WebBrowser.maybeCompleteAuthSession();
-  }, [WebBrowser]);
+  }, [isNativeFlow]);
 
   useEffect(() => {
+    if (isNativeFlow) {
+      return;
+    }
+
     const completeGoogle = async () => {
       if (response?.type !== "success") {
         return;
@@ -63,7 +84,7 @@ function GoogleLoginButton({
     };
 
     void completeGoogle();
-  }, [onSuccess, response]);
+  }, [isNativeFlow, onSuccess, response]);
 
   return (
     <PrimaryButton
@@ -71,36 +92,42 @@ function GoogleLoginButton({
       variant="secondary"
       onPress={async () => {
         setGoogleLoading(true);
-        await promptAsync();
+        try {
+          if (isNativeFlow) {
+            const { idToken, accessToken } = await beginNativeGoogleSignIn();
+            await onSuccess(idToken, accessToken);
+          } else {
+            await promptAsync?.();
+          }
+        } catch (error) {
+          Alert.alert(t(language, "invalidCredentialsTitle"), formatGoogleSignInError(error));
+        } finally {
+          setGoogleLoading(false);
+        }
       }}
       loading={googleLoading}
-      disabled={!request}
+      disabled={!isNativeFlow && !request}
     />
   );
 }
 
 export default function LoginScreen() {
   const language = "en";
-  const scrollRef = useRef<ScrollView>(null);
+  const params = useLocalSearchParams<{ redirect?: string; plan?: string }>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const hasGoogleConfig = Boolean(googleAuthConfig.androidClientId || googleAuthConfig.expoClientId);
-
-  const revealPasswordField = useCallback(() => {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: 320, animated: true });
-    });
-  }, []);
+  const hasGoogleConfig = hasGoogleSignInConfig();
 
   useFocusEffect(
     useCallback(() => {
       readAppState().then((state) => {
         if (state.isAuthenticated || getAuthenticatedAccount()) {
-          router.replace("/");
+          const nextRoute = getPostAuthRoute(params.redirect, params.plan);
+          router.replace(nextRoute as never);
         }
       });
-    }, [])
+    }, [params.plan, params.redirect])
   );
 
   const handleLogin = async () => {
@@ -116,7 +143,8 @@ export default function LoginScreen() {
     try {
       const account = await signInWithEmailAccount(email, password);
       await setAuthenticatedAccount(account, true);
-      router.replace("/");
+      await syncRevenueCatIdentity(account).catch(() => undefined);
+      router.replace(getPostAuthRoute(params.redirect, params.plan) as never);
     } catch (error) {
       Alert.alert(t(language, "invalidCredentialsTitle"), formatFirebaseError(error));
     } finally {
@@ -143,19 +171,12 @@ export default function LoginScreen() {
 
   return (
     <AppBackground scroll={false}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "android" ? 24 : 0}
-        style={styles.flex}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets
-        >
           <View style={styles.heroCard}>
             <Text style={styles.eyebrow}>{appVariant.appName}</Text>
             <Text style={styles.title}>{t(language, "welcomeBack")}</Text>
@@ -184,7 +205,6 @@ export default function LoginScreen() {
               placeholderTextColor="#7E93A8"
               style={styles.input}
               returnKeyType="done"
-              onFocus={revealPasswordField}
             />
 
             <View style={styles.actionColumn}>
@@ -195,7 +215,8 @@ export default function LoginScreen() {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
                       await setAuthenticatedAccount(account, true);
-                      router.replace("/");
+                      await syncRevenueCatIdentity(account).catch(() => undefined);
+                      router.replace(getPostAuthRoute(params.redirect, params.plan) as never);
                     } catch {
                       Alert.alert(t(language, "invalidCredentialsTitle"), t(language, "invalidCredentialsMessage"));
                     }
@@ -206,12 +227,19 @@ export default function LoginScreen() {
               <PrimaryButton
                 label={t(language, "noAccountYet")}
                 variant="secondary"
-                onPress={() => router.push({ pathname: "/signup" } as never)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/signup",
+                    params: {
+                      ...(params.redirect ? { redirect: params.redirect } : {}),
+                      ...(params.plan ? { plan: params.plan } : {}),
+                    },
+                  } as never)
+                }
               />
             </View>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
     </AppBackground>
   );
 }

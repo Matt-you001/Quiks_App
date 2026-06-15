@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>Quiks Uni</title><link rel="icon" type="image/svg+xml" href="./logo.svg" /><link rel="icon" type="image/png" sizes="512x512" href="./favicon.png" /><link rel="apple-touch-icon" href="./favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./variant-shell.css" />
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="variant-header-shell">
+      <header class="variant-header">
+        <div class="variant-header-top">
+          <a class="variant-brand" href="https://uni.quiks.site/" aria-label="Quiks Uni home">
+            <img src="./favicon.png" alt="Quiks Uni logo" />
+            <div>
+              <p class="variant-brand-name">Quiks Uni</p>
+              <p class="variant-brand-tag">Learn fast. Grow steady.</p>
+            </div>
+          </a>
+          <button class="variant-menu-toggle" type="button" aria-expanded="false" aria-controls="variant-nav">Menu</button>
+        </div>
+        <nav class="variant-nav" id="variant-nav" data-open="false">
+          <a href="https://uni.quiks.site/" data-match="/">Home</a>
+          <a href="https://uni.quiks.site/profile/" data-match="/profile">Profile</a>
+          <a href="https://uni.quiks.site/classroom/" data-match="/classroom">Classroom</a>
+          <a href="https://uni.quiks.site/competition/" data-match="/competition">Competition</a>
+          <a href="https://uni.quiks.site/subscription/" data-match="/subscription">Subscription</a>
+          <a href="https://play.google.com/store/apps/details?id=com.quiks.uni">Download App</a>
+          <a href="https://quiks.site/contact.html">Support</a>
+        </nav>
+      </header>
+    </div>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
+    <noscript>
+      You need to enable JavaScript to run this app.
+    </noscript>
+    <!-- The root element for your Expo app. -->
+    <div id="root"></div>
+  <script src="./expo/static/js/web/entry-97acdc8ba8d93eb60bb5391fe82c039c.js" defer></script>
+  <script>
+    (function () {
+      var path = window.location.pathname || "/";
+      var menuButton = document.querySelector(".variant-menu-toggle");
+      var menu = document.getElementById("variant-nav");
+      var navLinks = document.querySelectorAll(".variant-nav a[data-match]");
+      navLinks.forEach(function (link) {
+        var match = link.getAttribute("data-match");
+        if (!match) return;
+        if ((match === "/" && path === "/") || (match !== "/" && path.indexOf(match) === 0)) {
+          link.classList.add("active");
+        }
+      });
+
+      if (menuButton && menu) {
+        menuButton.addEventListener("click", function () {
+          var nextOpen = menu.getAttribute("data-open") !== "true";
+          menu.setAttribute("data-open", nextOpen ? "true" : "false");
+          menuButton.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+          menuButton.textContent = nextOpen ? "Close" : "Menu";
+        });
+
+        menu.querySelectorAll("a").forEach(function (link) {
+          link.addEventListener("click", function () {
+            menu.setAttribute("data-open", "false");
+            menuButton.setAttribute("aria-expanded", "false");
+            menuButton.textContent = "Menu";
+          });
+        });
+      }
+
+      if (window.location.protocol !== "file:") {
+        return;
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        document.body.innerHTML =
+          '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#0B1F33 0%,#245C88 55%,#EEF5FB 100%);font-family:Arial,sans-serif;padding:24px;">' +
+            '<div style="max-width:720px;background:rgba(255,255,255,0.96);border-radius:28px;padding:32px;box-shadow:0 18px 50px rgba(8,17,31,0.14);color:#13202A;">' +
+              '<h1 style="margin:0 0 14px;font-size:40px;line-height:1.08;">Local file preview is not supported</h1>' +
+              '<p style="margin:0 0 16px;line-height:1.7;font-size:18px;">This exported Quiks Uni app should be opened through a web server or its live domain, not directly with <strong>file://</strong>.</p>' +
+              '<p style="margin:0 0 20px;line-height:1.7;">Use the live site below, or run a local server for this folder before testing.</p>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:12px;">' +
+                '<a href="https://uni.quiks.site" style="display:inline-block;padding:14px 18px;border-radius:999px;background:#0B1F33;color:#fff;text-decoration:none;font-weight:700;">Open live site</a>' +
+              '</div>' +
+              '<p style="margin:20px 0 0;line-height:1.7;color:#48626B;">Example local test: serve this folder with a local web server, then open it over <strong>http://</strong>.</p>' +
+            '</div>' +
+          '</div>';
+      });
+    })();
+  </script>
+</body>
+</html>
