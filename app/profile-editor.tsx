@@ -125,29 +125,27 @@ export default function ProfileEditorScreen() {
       </View>
 
       <View style={styles.card}>
-        {appVariant.id !== "children" ? (
-          <>
-            <Text style={styles.label}>{t(form.language, "classroomRole")}</Text>
-            <View style={styles.languageWrap}>
-              {([
-                { code: "student", label: t(form.language, "studentRole") },
-                { code: "teacher", label: t(form.language, "teacherRole") },
-              ] as const).map((entry) => (
-                <Pressable
-                  key={entry.code}
-                  onPress={() => setForm((current) => ({ ...current, role: entry.code }))}
-                  style={[styles.languageChip, form.role === entry.code ? styles.languageChipActive : null]}
+        <>
+          <Text style={styles.label}>{t(form.language, "classroomRole")}</Text>
+          <View style={styles.languageWrap}>
+            {([
+              { code: "student", label: t(form.language, "studentRole") },
+              { code: "teacher", label: t(form.language, "teacherRole") },
+            ] as const).map((entry) => (
+              <Pressable
+                key={entry.code}
+                onPress={() => setForm((current) => ({ ...current, role: entry.code }))}
+                style={[styles.languageChip, form.role === entry.code ? styles.languageChipActive : null]}
+              >
+                <Text
+                  style={[styles.languageChipText, form.role === entry.code ? styles.languageChipTextActive : null]}
                 >
-                  <Text
-                    style={[styles.languageChipText, form.role === entry.code ? styles.languageChipTextActive : null]}
-                  >
-                    {entry.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
+                  {entry.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
 
         <Text style={styles.label}>{t(form.language, "name")}</Text>
         <TextInput
@@ -158,7 +156,7 @@ export default function ProfileEditorScreen() {
           placeholderTextColor="#7C8EA3"
         />
 
-        {form.role === "teacher" && appVariant.id !== "children" ? (
+        {form.role === "teacher" ? (
           <>
             <Text style={styles.label}>{t(form.language, "age")}</Text>
             <TextInput

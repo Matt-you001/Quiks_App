@@ -1,11 +1,19 @@
 import { Linking, Platform, StyleSheet, Text, View } from "react-native";
+import { appVariant } from "../lib/app-variant";
 import { palette } from "../lib/theme";
+
+const mobileAppLinks = {
+  children: "https://play.google.com/store/apps/details?id=com.quiks.mobile",
+  teens: "https://play.google.com/store/apps/details?id=com.quiks.teens",
+  uni: "https://play.google.com/store/apps/details?id=com.quiks.uni",
+} as const;
 
 const legalLinks = [
   { label: "Pricing", href: "https://quiks.site/pricing.html" },
   { label: "Terms", href: "https://quiks.site/terms.html" },
   { label: "Privacy", href: "https://quiks.site/privacy.html" },
   { label: "Refund", href: "https://quiks.site/refund.html" },
+  { label: "Download App", href: mobileAppLinks[appVariant.id] },
   { label: "Support", href: "https://quiks.site/contact.html" },
 ];
 

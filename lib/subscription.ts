@@ -11,7 +11,7 @@ const FREE_AI_SESSION_LIMITS = {
 } as const;
 
 const FREE_COMPETITION_LIMITS = {
-  children: 0,
+  children: 2,
   teens: 2,
   uni: 2,
 } as const;

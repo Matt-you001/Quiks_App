@@ -48,6 +48,17 @@ function formatResultDuration(totalSeconds: number) {
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
 }
 
+function formatGoalDuration(totalSeconds: number) {
+  if (totalSeconds < 3600) {
+    return formatResultDuration(totalSeconds);
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
 export default function ProfileScreen() {
   const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
@@ -114,9 +125,9 @@ export default function ProfileScreen() {
   }, [language, results]);
 
   const todaySeconds = results.filter((result) => isSameLocalDay(result.date)).reduce((sum, result) => sum + result.timeTakenSeconds, 0);
-  const todayMinutes = Math.round(todaySeconds / 60);
   const todayResults = results.filter((result) => isSameLocalDay(result.date));
   const goalMinutes = activeProfile?.dailyGoalMinutes ?? 0;
+  const goalSeconds = goalMinutes * 60;
   const competitionResults = results.filter((result) => Boolean(result.competitionId));
   const competitionWins = competitionResults.filter((result) => result.competitionOutcome === "won").length;
   const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profileCount);
@@ -149,12 +160,14 @@ export default function ProfileScreen() {
 
   let goalFeedback = t(language, "noTargetYet");
   if (activeProfile) {
-    if (todayMinutes > goalMinutes) {
+    if (todaySeconds > goalSeconds) {
       goalFeedback = t(language, "targetExceeded");
-    } else if (todayMinutes === goalMinutes) {
+    } else if (todaySeconds === goalSeconds) {
       goalFeedback = t(language, "targetReached");
     } else {
-      goalFeedback = t(language, "targetNotReached", { minutes: Math.max(goalMinutes - todayMinutes, 0) });
+      goalFeedback = t(language, "targetNotReached", {
+        minutes: Math.ceil(Math.max(goalSeconds - todaySeconds, 0) / 60),
+      });
     }
   }
 
@@ -201,7 +214,7 @@ export default function ProfileScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "todaysStudyTime")}</Text>
         <Text style={styles.metricHighlight}>
-          {todayMinutes} min / {goalMinutes} min
+          {formatGoalDuration(todaySeconds)} / {goalMinutes} min
         </Text>
         <Text style={styles.metricText}>{goalFeedback}</Text>
         {todayResults.length > 0 ? (
@@ -260,7 +273,7 @@ export default function ProfileScreen() {
           style={styles.gridButton}
           compact
         />
-        {activeProfile && appVariant.id !== "children" ? (
+        {activeProfile ? (
           <PrimaryButton
             label={t(language, "classroomTitle")}
             variant="secondary"

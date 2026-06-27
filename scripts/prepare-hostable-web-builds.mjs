@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const variants = ["children", "teens", "uni"];
@@ -24,6 +24,97 @@ const variantWebAssets = {
   },
 };
 
+const variantRouteTitles = {
+  children: "Quiks Children",
+  teens: "Quiks Teens",
+  uni: "Quiks Uni",
+};
+
+const hostedRouteWrappers = {
+  children: [
+    { route: "login", title: "Login" },
+    { route: "signup", title: "Sign up" },
+    { route: "select-profile", title: "Choose learner" },
+    { route: "profile", title: "Profile" },
+    { route: "profile-editor", title: "Create profile" },
+    { route: "subscription", title: "Subscription" },
+    { route: "session", title: "Session" },
+    { route: "results", title: "Results" },
+    { route: "breather", title: "Breather" },
+  ],
+  teens: [
+    { route: "login", title: "Login" },
+    { route: "signup", title: "Sign up" },
+    { route: "select-profile", title: "Choose learner" },
+    { route: "profile", title: "Profile" },
+    { route: "profile-editor", title: "Create profile" },
+    { route: "subscription", title: "Subscription" },
+    { route: "classroom", title: "Classroom" },
+    { route: "classroom-activity", title: "Classroom activity" },
+    { route: "classroom-result", title: "Classroom results" },
+    { route: "competition", title: "Competition" },
+    { route: "session", title: "Session" },
+    { route: "results", title: "Results" },
+    { route: "breather", title: "Breather" },
+  ],
+  uni: [
+    { route: "login", title: "Login" },
+    { route: "signup", title: "Sign up" },
+    { route: "select-profile", title: "Choose learner" },
+    { route: "profile", title: "Profile" },
+    { route: "profile-editor", title: "Create profile" },
+    { route: "subscription", title: "Subscription" },
+    { route: "classroom", title: "Classroom" },
+    { route: "classroom-activity", title: "Classroom activity" },
+    { route: "classroom-result", title: "Classroom results" },
+    { route: "competition", title: "Competition" },
+    { route: "session", title: "Session" },
+    { route: "results", title: "Results" },
+    { route: "breather", title: "Breather" },
+  ],
+};
+
+function getEntryScriptName(expoDir) {
+  const webDir = join(expoDir, "static", "js", "web");
+  if (!existsSync(webDir)) {
+    return null;
+  }
+
+  return readdirSync(webDir).find((file) => /^entry-.*\.js$/.test(file)) ?? null;
+}
+
+function createRouteWrapperHtml(variant, title, entryScriptName) {
+  const appTitle = variantRouteTitles[variant];
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>${appTitle} | ${title}</title>
+    <link rel="icon" type="image/png" sizes="512x512" href="../favicon.png" />
+    <link rel="apple-touch-icon" href="../favicon.png" />
+    <link rel="stylesheet" href="../variant-shell.css" />
+    <style id="expo-reset">html,body{height:100%;}body{margin:0;}#root{display:flex;flex:1;min-height:100%;}</style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script src="../expo/static/js/web/${entryScriptName}" defer></script>
+  </body>
+</html>
+`;
+}
+
+function writeHostedRouteWrappers(targetDir, variant, entryScriptName) {
+  const routes = hostedRouteWrappers[variant] ?? [];
+  for (const route of routes) {
+    const routeDir = join(targetDir, route.route);
+    mkdirSync(routeDir, { recursive: true });
+    writeFileSync(join(routeDir, "index.html"), createRouteWrapperHtml(variant, route.title, entryScriptName), "utf8");
+  }
+}
+
 function injectHeadMarkup(html, variant) {
   const assets = variantWebAssets[variant];
   const faviconMarkup = [
@@ -37,6 +128,17 @@ function injectHeadMarkup(html, variant) {
   if (!/<link rel="icon"/i.test(updated)) {
     updated = updated.replace("</head>", `${faviconMarkup}</head>`);
   }
+
+  return updated;
+}
+
+function stripHostedHeaderShell(html) {
+  let updated = html.replace(/\s*<div class="variant-header-shell">[\s\S]*?<\/div>\s*/i, "\n");
+
+  updated = updated.replace(
+    /\s*<script>\s*\(function \(\) \{\s*var path = window\.location\.pathname \|\| "\/";[\s\S]*?\}\)\(\);\s*<\/script>\s*/i,
+    "\n"
+  );
 
   return updated;
 }
@@ -94,15 +196,21 @@ for (const variant of variants) {
     rmSync(join(targetDir, "_expo"), { recursive: true, force: true });
   }
 
+  const entryScriptName = getEntryScriptName(targetExpoDir);
+
   if (existsSync(indexFile)) {
     const original = readFileSync(indexFile, "utf8");
     const rewiredExpoPath = original.replace(/src="\/?_expo\/static\/js\/web\//g, 'src="./expo/static/js/web/');
-    const updated = injectLocalFileGuard(injectHeadMarkup(rewiredExpoPath, variant), variant);
+    const cleaned = stripHostedHeaderShell(rewiredExpoPath);
+    const updated = injectLocalFileGuard(injectHeadMarkup(cleaned, variant), variant);
     writeFileSync(indexFile, updated, "utf8");
   }
 
   cpSync(join(assetRoot, assets.svgLogo), join(targetDir, "logo.svg"));
   cpSync(join(assetRoot, assets.faviconPng), join(targetDir, "favicon.png"));
+  if (entryScriptName) {
+    writeHostedRouteWrappers(targetDir, variant, entryScriptName);
+  }
 }
 
 console.log("Prepared hostable web builds in web-hosting.");

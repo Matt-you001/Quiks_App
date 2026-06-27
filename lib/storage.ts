@@ -163,6 +163,20 @@ async function readLocalAppState(): Promise<StoredAppState> {
   }
 }
 
+async function readMutableAppState(): Promise<StoredAppState> {
+  const localState = await readLocalAppState();
+
+  if (!localState.isAuthenticated || !localState.account) {
+    return localState;
+  }
+
+  try {
+    return await readAppState();
+  } catch {
+    return localState;
+  }
+}
+
 export async function readAppState(): Promise<StoredAppState> {
   let localState = await readLocalAppState();
 
@@ -172,26 +186,23 @@ export async function readAppState(): Promise<StoredAppState> {
       return localState;
     }
 
-    const merged = {
+    const merged = normalizeState({
       ...localState,
       account: remoteAccount,
       isAuthenticated: true,
-    } satisfies StoredAppState;
+    } satisfies StoredAppState);
 
     if (isFirebaseConfigured()) {
-      void loadCloudState(remoteAccount.uid)
-        .then(async (remoteState) => {
-          if (!remoteState) {
-            return;
-          }
-
+      try {
+        const remoteState = await loadCloudState(remoteAccount.uid);
+        if (remoteState) {
           const refreshed = mergeStoredStates(merged, remoteState, remoteAccount);
-
           await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(refreshed));
-        })
-        .catch(() => {
-          // Keep local state if cloud hydration is unavailable.
-        });
+          return refreshed;
+        }
+      } catch {
+        // Keep local state if cloud hydration is unavailable.
+      }
     }
 
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
@@ -205,14 +216,16 @@ export async function writeAppState(nextState: StoredAppState) {
   const normalized = normalizeState(nextState);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   if (normalized.account?.uid && normalized.isAuthenticated && isFirebaseConfigured()) {
-    void saveCloudState(normalized.account.uid, normalized).catch(() => {
+    try {
+      await saveCloudState(normalized.account.uid, normalized);
+    } catch {
       // Keep local progress even if cloud sync is temporarily unavailable.
-    });
+    }
   }
 }
 
 export async function upsertProfile(profile: UserProfile) {
-  const state = await readLocalAppState();
+  const state = await readMutableAppState();
   const normalizedProfile = normalizeProfile(profile);
   const index = state.profiles.findIndex((item) => item.id === normalizedProfile.id);
 
@@ -228,7 +241,7 @@ export async function upsertProfile(profile: UserProfile) {
 }
 
 export async function deleteProfile(profileId: string) {
-  const state = await readLocalAppState();
+  const state = await readMutableAppState();
   state.profiles = state.profiles.filter((profile) => profile.id !== profileId);
   delete state.results[profileId];
   if (state.currentProfileId === profileId) {
@@ -239,14 +252,14 @@ export async function deleteProfile(profileId: string) {
 }
 
 export async function setCurrentProfile(profileId: string | null) {
-  const state = await readLocalAppState();
+  const state = await readMutableAppState();
   state.currentProfileId = profileId;
   await writeAppState(state);
   return state;
 }
 
 export async function appendResult(profileId: string, result: SessionResult) {
-  const state = await readLocalAppState();
+  const state = await readMutableAppState();
   const existing = state.results[profileId] ?? [];
   state.results[profileId] = [result, ...existing];
   await writeAppState(state);
@@ -254,7 +267,7 @@ export async function appendResult(profileId: string, result: SessionResult) {
 }
 
 export async function setSubscriptionTier(subscriptionTier: SubscriptionTier) {
-  const state = await readLocalAppState();
+  const state = await readMutableAppState();
   state.subscriptionTier = subscriptionTier;
   const normalized = normalizeState(state);
   await writeAppState(normalized);
@@ -262,7 +275,7 @@ export async function setSubscriptionTier(subscriptionTier: SubscriptionTier) {
 }
 
 export async function setAuthenticatedAccount(account: AppAccount | null, isAuthenticated: boolean) {
-  const state = await readLocalAppState();
+  const state = account && isAuthenticated ? await readMutableAppState() : await readLocalAppState();
   state.account = account;
   state.isAuthenticated = isAuthenticated && Boolean(account);
   await writeAppState(state);

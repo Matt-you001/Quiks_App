@@ -321,29 +321,27 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {appVariant.id !== "children" ? (
-        <View style={[styles.homeActionColumn, showWideActions ? styles.homeActionRowDesktop : null]}>
-          <PrimaryButton
-            label="Classroom"
-            variant="secondary"
-            onPress={() =>
-              activeProfile
-                ? router.push("/classroom" as never)
-                : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
-            }
-            style={showWideActions ? styles.homeActionButtonDesktop : undefined}
-          />
-          <PrimaryButton
-            label={t(language, "enterCompetition")}
-            onPress={() =>
-              activeProfile
-                ? router.push("/competition" as never)
-                : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
-            }
-            style={showWideActions ? styles.homeActionButtonDesktop : styles.homeCompetitionButton}
-          />
-        </View>
-      ) : null}
+      <View style={[styles.homeActionColumn, showWideActions ? styles.homeActionRowDesktop : null]}>
+        <PrimaryButton
+          label="Classroom"
+          variant="secondary"
+          onPress={() =>
+            activeProfile
+              ? router.push("/classroom" as never)
+              : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
+          }
+          style={showWideActions ? styles.homeActionButtonDesktop : undefined}
+        />
+        <PrimaryButton
+          label={t(language, "enterCompetition")}
+          onPress={() =>
+            activeProfile
+              ? router.push("/competition" as never)
+              : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
+          }
+          style={showWideActions ? styles.homeActionButtonDesktop : styles.homeCompetitionButton}
+        />
+      </View>
 
       {shouldShowUpgradePrompts(subscriptionTier) ? (
         <View style={styles.subscriptionCard}>

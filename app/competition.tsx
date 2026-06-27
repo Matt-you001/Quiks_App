@@ -271,18 +271,6 @@ export default function CompetitionScreen() {
     }
   };
 
-  if (appVariant.id === "children") {
-    return (
-      <AppBackground>
-        <View style={styles.card}>
-          <Text style={styles.title}>{t(language, "competitionArena")}</Text>
-          <Text style={styles.text}>{t(language, "competitionNotAvailable")}</Text>
-          <PrimaryButton label={t(language, "backHome")} onPress={() => router.replace("/")} />
-        </View>
-      </AppBackground>
-    );
-  }
-
   if (!profile) {
     return (
       <AppBackground>

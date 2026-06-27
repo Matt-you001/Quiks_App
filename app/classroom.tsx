@@ -358,7 +358,7 @@ export default function ClassroomScreen() {
     setProfile(activeProfile);
     setSubscriptionTier(state.subscriptionTier);
 
-    if (!activeProfile || appVariant.id === "children") {
+    if (!activeProfile) {
       setLoading(false);
       return;
     }
@@ -382,7 +382,7 @@ export default function ClassroomScreen() {
   };
 
   const refreshClassroomData = async () => {
-    if (!profile || appVariant.id === "children") {
+    if (!profile) {
       return;
     }
 
@@ -971,17 +971,6 @@ export default function ClassroomScreen() {
       <AppBackground>
         <View style={styles.centerCard}>
           <Text style={styles.centerTitle}>{t(language, "loadingClassroom")}</Text>
-        </View>
-      </AppBackground>
-    );
-  }
-
-  if (appVariant.id === "children") {
-    return (
-      <AppBackground>
-        <View style={styles.centerCard}>
-          <Text style={styles.centerTitle}>Classroom tools are available in Quiks Teens and Quiks Uni.</Text>
-          <PrimaryButton label="Back Home" onPress={() => router.replace("/")} />
         </View>
       </AppBackground>
     );

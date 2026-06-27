@@ -71,8 +71,10 @@ export function VariantSiteHeader() {
           <Pressable
             onPress={() => setMenuOpen((current) => !current)}
             style={[styles.menuButton, menuOpen ? styles.menuButtonActive : null]}
+            accessibilityRole="button"
+            accessibilityLabel={menuOpen ? "Close navigation menu" : "Open navigation menu"}
           >
-            <Text style={styles.menuButtonText}>{menuOpen ? "Close" : "Menu"}</Text>
+            <Text style={styles.menuButtonText}>{menuOpen ? "×" : "≡"}</Text>
           </Pressable>
         ) : null}
       </View>

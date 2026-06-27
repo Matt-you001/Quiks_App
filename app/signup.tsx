@@ -219,7 +219,7 @@ export default function SignupScreen() {
             />
 
             <View style={styles.actionColumn}>
-              <PrimaryButton label={t(language, "signUp")} onPress={handleSignup} loading={loading} />
+              {/*<PrimaryButton label={t(language, "signUp")} onPress={handleSignup} loading={loading} />
               {hasGoogleConfig ? (
                 <GoogleSignupButton
                   onSuccess={async (idToken, accessToken) => {
@@ -233,7 +233,7 @@ export default function SignupScreen() {
                     }
                   }}
                 />
-              ) : null}
+              ) : null}*/}
               <PrimaryButton
                 label={t(language, "alreadyHaveAccount")}
                 variant="secondary"

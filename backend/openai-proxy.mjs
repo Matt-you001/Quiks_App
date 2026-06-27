@@ -909,11 +909,6 @@ async function handleBreather(body, response) {
 }
 
 async function handleCompetitionJoin(body, response) {
-  if (body.appVariant === "children") {
-    sendJson(response, 400, { error: "Competition is not available for Quiks Children." });
-    return;
-  }
-
   const playerId = body.profile?.id;
   const playerName = body.profile?.name ?? "Learner";
   if (!playerId || !body.subject?.id || !body.grade || !body.level) {
@@ -1077,11 +1072,6 @@ async function handleCompetitionProgress(body, response) {
 }
 
 async function handleChallengeCreate(body, response) {
-  if (body.appVariant === "children") {
-    sendJson(response, 400, { error: "Competition is not available for Quiks Children." });
-    return;
-  }
-
   const profile = body.profile;
   if (!profile?.id || !body.subject?.id || !body.grade || !body.level) {
     sendJson(response, 400, { error: "Challenge request is missing required fields." });
