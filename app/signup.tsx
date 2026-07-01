@@ -31,6 +31,7 @@ import { syncRevenueCatIdentity } from "../lib/revenuecat";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import { getPostAuthRoute } from "../lib/web-checkout";
+import type { AppLanguage } from "../types/app";
 
 function GoogleSignupButton({
   onSuccess,
@@ -111,8 +112,8 @@ function GoogleSignupButton({
 }
 
 export default function SignupScreen() {
-  const language = "en";
   const params = useLocalSearchParams<{ redirect?: string; plan?: string }>();
+  const [language, setLanguage] = useState<AppLanguage>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -122,6 +123,12 @@ export default function SignupScreen() {
   useFocusEffect(
     useCallback(() => {
       readAppState().then((state) => {
+        const preferredLanguage =
+          state.profiles.find((profile) => profile.id === state.currentProfileId)?.language ??
+          state.profiles[0]?.language ??
+          "en";
+        setLanguage(preferredLanguage);
+
         if (state.isAuthenticated || getAuthenticatedAccount()) {
           const nextRoute = getPostAuthRoute(params.redirect, params.plan);
           router.replace(nextRoute as never);
@@ -219,7 +226,7 @@ export default function SignupScreen() {
             />
 
             <View style={styles.actionColumn}>
-              {/*<PrimaryButton label={t(language, "signUp")} onPress={handleSignup} loading={loading} />
+              <PrimaryButton label={t(language, "signUp")} onPress={handleSignup} loading={loading} />
               {hasGoogleConfig ? (
                 <GoogleSignupButton
                   onSuccess={async (idToken, accessToken) => {
@@ -233,7 +240,7 @@ export default function SignupScreen() {
                     }
                   }}
                 />
-              ) : null}*/}
+              ) : null}
               <PrimaryButton
                 label={t(language, "alreadyHaveAccount")}
                 variant="secondary"

@@ -39,7 +39,7 @@ export function VariantSiteHeader() {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const [menuOpen, setMenuOpen] = useState(false);
-  const internalLinks = appVariant.id === "children" ? sharedLinks : [...sharedLinks.slice(0, 2), ...advancedLinks, sharedLinks[2]];
+  const internalLinks = [...sharedLinks.slice(0, 2), ...advancedLinks, sharedLinks[2]];
   const isCompact = width < 920;
 
   if (Platform.OS !== "web") {

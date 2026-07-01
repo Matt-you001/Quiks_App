@@ -22,6 +22,96 @@ const heroLogos = {
   uni: require("../assets/images/quiks-uni-playstore-icon-512.png"),
 } as const;
 
+function getVariantAudienceLabel(language: string) {
+  if (language === "fr") {
+    if (appVariant.id === "children") return "Ages 5 a 12 ans";
+    if (appVariant.id === "teens") return "Ages 11 a 20 ans";
+    return "Tertiaire et universite";
+  }
+
+  if (language === "es") {
+    if (appVariant.id === "children") return "Edades 5 a 12";
+    if (appVariant.id === "teens") return "Edades 11 a 20";
+    return "Terciario y universidad";
+  }
+
+  if (language === "pt") {
+    if (appVariant.id === "children") return "Idades 5 a 12";
+    if (appVariant.id === "teens") return "Idades 11 a 20";
+    return "Ensino superior e universidade";
+  }
+
+  if (language === "sw") {
+    if (appVariant.id === "children") return "Umri wa miaka 5 hadi 12";
+    if (appVariant.id === "teens") return "Umri wa miaka 11 hadi 20";
+    return "Taasisi ya juu na chuo kikuu";
+  }
+
+  if (language === "zh") {
+    if (appVariant.id === "children") return "5至12岁";
+    if (appVariant.id === "teens") return "11至20岁";
+    return "高等及大学";
+  }
+
+  if (language === "ar") {
+    if (appVariant.id === "children") return "من 5 إلى 12 سنة";
+    if (appVariant.id === "teens") return "من 11 إلى 20 سنة";
+    return "التعليم العالي والجامعة";
+  }
+
+  if (language === "de") {
+    if (appVariant.id === "children") return "Alter 5 bis 12";
+    if (appVariant.id === "teens") return "Alter 11 bis 20";
+    return "Tertiar und Universitat";
+  }
+
+  return appVariant.audienceLabel;
+}
+
+function getVariantHeroSubtitle(language: string) {
+  if (language === "fr") {
+    if (appVariant.id === "children") {
+      return "Une application lumineuse pour les jeunes apprenants avec une pratique guidee, un suivi par profil et un accompagnement rassurant.";
+    }
+    if (appVariant.id === "teens") {
+      return "Une pratique orientee examens pour les collegiens et lyceens avec des exercices plus pousses, des revisions ciblees et un meilleur suivi.";
+    }
+    return "Un appui avance pour les etudiants du superieur avec une pratique ciblee, une generation de questions par IA et de meilleurs flux academiques.";
+  }
+
+  if (language === "es") {
+    if (appVariant.id === "children") {
+      return "Una app de aprendizaje clara para ninos con practica guiada, progreso por perfil y apoyo amigable.";
+    }
+    if (appVariant.id === "teens") {
+      return "Practica orientada a examenes para secundaria y college con ejercicios mas profundos, repaso enfocado y mejor seguimiento.";
+    }
+    return "Apoyo avanzado para estudiantes terciarios con practica enfocada, generacion de preguntas con IA y mejores flujos academicos.";
+  }
+
+  if (language === "pt") {
+    if (appVariant.id === "children") {
+      return "Um app de aprendizagem acolhedor para criancas com pratica guiada, progresso por perfil e apoio amigavel.";
+    }
+    if (appVariant.id === "teens") {
+      return "Pratica pronta para exames para alunos do secundario e college com exercicios mais profundos, revisao focada e melhor acompanhamento.";
+    }
+    return "Suporte avancado para estudantes do ensino superior com pratica focada, geracao de questoes por IA e fluxos academicos mais fortes.";
+  }
+
+  if (language === "sw") {
+    if (appVariant.id === "children") {
+      return "Programu rafiki ya kujifunza kwa watoto yenye mazoezi ya kuongozwa, maendeleo ya wasifu na msaada wa karibu.";
+    }
+    if (appVariant.id === "teens") {
+      return "Mazoezi ya kujiandaa kwa mitihani kwa wanafunzi wa sekondari na college yenye majaribio ya kina, marudio maalum na ufuatiliaji bora.";
+    }
+    return "Msaada wa juu kwa wanafunzi wa taasisi za juu wenye mazoezi yaliyolengwa, utengenezaji wa maswali kwa AI na mtiririko imara wa kitaaluma.";
+  }
+
+  return appVariant.heroSubtitle;
+}
+
 function getGradeRank(grade: string) {
   const gradeNumber = Number(grade.replace(/[^\d]/g, ""));
   if (Number.isFinite(gradeNumber) && gradeNumber > 0) {
@@ -77,8 +167,13 @@ export default function HomeScreen() {
       return;
     }
 
+    const resolvedProfileId =
+      state.currentProfileId && state.profiles.some((profile) => profile.id === state.currentProfileId)
+        ? state.currentProfileId
+        : state.profiles[0]?.id ?? null;
+
     setProfiles(state.profiles);
-    setCurrentProfileIdState(state.currentProfileId);
+    setCurrentProfileIdState(resolvedProfileId);
     setResultsByProfile(state.results);
     setSubscriptionTier(state.subscriptionTier);
     setAuthChecked(true);
@@ -100,6 +195,9 @@ export default function HomeScreen() {
     [activeProfile, resultsByProfile]
   );
   const language = activeProfile?.language ?? "en";
+  const selectedProfileLabel = activeProfile?.name ?? t(language, "noneSelected");
+  const heroAudienceLabel = getVariantAudienceLabel(language);
+  const heroSubtitle = getVariantHeroSubtitle(language);
   const localizedSubjects = useMemo(() => getLocalizedSubjects(language), [language]);
 
   const highestUnlockedBySubject = useMemo(() => {
@@ -153,8 +251,8 @@ export default function HomeScreen() {
   }, [activeProfile, activeProfileResults, localizedSubjects]);
 
   const selectProfile = async (profileId: string) => {
-    await setCurrentProfile(profileId);
     setCurrentProfileIdState(profileId);
+    await setCurrentProfile(profileId);
   };
 
   const openSubject = (subjectId: string) => {
@@ -191,12 +289,12 @@ export default function HomeScreen() {
       <View style={[styles.heroCard, isWeb ? styles.heroCardWeb : null]}>
         {!isWeb ? <Image source={heroLogos[appVariant.id]} style={styles.heroLogo} resizeMode="cover" /> : null}
         <Text style={[styles.title, isWeb ? styles.titleWeb : null]}>{appVariant.heroTitle}</Text>
-        <Text style={styles.audienceBadge}>{appVariant.audienceLabel}</Text>
-        <Text style={styles.subtitle}>{appVariant.heroSubtitle}</Text>
+        <Text style={styles.audienceBadge}>{heroAudienceLabel}</Text>
+        <Text style={styles.subtitle}>{heroSubtitle}</Text>
 
         <View style={styles.statRow}>
           <StatPill label={`${appVariant.profileNoun}s`} value={String(profiles.length)} />
-          <StatPill label={`Selected ${appVariant.profileNoun}`} value={activeProfile?.name ?? t(language, "noneSelected")} />
+          <StatPill label={t(language, "currentLearner")} value={selectedProfileLabel} />
         </View>
 
         <View style={styles.ctaRow}>
@@ -212,7 +310,16 @@ export default function HomeScreen() {
           <PrimaryButton
             label={activeProfile ? t(language, "homeOpenProfile") : t(language, "homeChooseLearner")}
             variant="secondary"
-            onPress={() => router.push(activeProfile ? "/profile" : "/")}
+            onPress={async () => {
+              if (activeProfile) {
+                await setCurrentProfile(activeProfile.id);
+                setCurrentProfileIdState(activeProfile.id);
+                router.push("/profile");
+                return;
+              }
+
+              router.push("/");
+            }}
             style={styles.flexButton}
           />
         </View>

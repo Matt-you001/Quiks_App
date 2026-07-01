@@ -2,11 +2,10 @@ env: load .env
 env: export EXPO_PUBLIC_AI_API_URL EXPO_PUBLIC_AI_MODE EXPO_PUBLIC_GEMINI_MODEL OPENAI_MODEL PORT EXPO_PUBLIC_FIREBASE_API_KEY EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN EXPO_PUBLIC_FIREBASE_PROJECT_ID EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID EXPO_PUBLIC_FIREBASE_APP_ID EXPO_PUBLIC_CHILDREN_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_CHILDREN_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_TEENS_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_TEENS_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_UNI_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_UNI_GOOGLE_WEB_CLIENT_ID
 Starting Metro Bundler
 Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 54.9% (434/586)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 33.6% (191/342)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 67.6% (642/781)
 Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.8% (1057/1058)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1058/1058)
-Web Bundled 32040ms node_modules\expo-router\entry.js (1058 modules)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1058/1058)
+Web Bundled 13837ms node_modules\expo-router\entry.js (1058 modules)
 
 › Assets (41):
 assets\audio\challenge-accepted.fb3bd5044b7e1ec383c1d7485ebe6ce3.wav (10.6 kB)
@@ -46,7 +45,7 @@ node_modules\expo-router\assets\sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png (46
 node_modules\expo-router\assets\unmatched.20e71bdf79e3a97bf55fd9e164041578.png (4.75 kB)
 
 › web bundles (1):
-_expo/static/js/web/entry-432ecd56dfe04fe64141ed10122b91e0.js (4.18 MB)
+_expo/static/js/web/entry-731ad53ba124b2a3497d67b48d52b663.js (4.18 MB)
 
 › Files (2):
 index.html (1.18 kB)

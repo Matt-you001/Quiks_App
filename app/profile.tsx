@@ -9,7 +9,7 @@ import { signOutAccount } from "../lib/firebase";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRevenueCatIdentity } from "../lib/revenuecat";
 import { canCreateAnotherProfile } from "../lib/subscription";
-import { logoutAccount, readAppState } from "../lib/storage";
+import { logoutAccount, readAppState, setCurrentProfile } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import type { SessionResult, UserProfile } from "../types/app";
@@ -71,7 +71,15 @@ export default function ProfileScreen() {
       router.replace({ pathname: "/signup" } as never);
       return;
     }
-    const profile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
+    const profile =
+      state.profiles.find((item) => item.id === state.currentProfileId) ??
+      state.profiles[0] ??
+      null;
+
+    if (profile && profile.id !== state.currentProfileId) {
+      await setCurrentProfile(profile.id).catch(() => undefined);
+    }
+
     setActiveProfile(profile);
     setResults(profile ? state.results[profile.id] ?? [] : []);
     setSubscriptionTier(state.subscriptionTier);

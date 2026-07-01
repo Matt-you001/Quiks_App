@@ -4,6 +4,7 @@ import { googleAuthConfig } from "./auth-config";
 type NativeGoogleSigninModule = typeof import("@react-native-google-signin/google-signin");
 
 let nativeConfigured = false;
+const GOOGLE_SIGN_IN_ENABLED = false;
 
 function getNativeGoogleModule(): NativeGoogleSigninModule {
   return require("@react-native-google-signin/google-signin") as NativeGoogleSigninModule;
@@ -24,6 +25,10 @@ function configureNativeGoogleSignin() {
 }
 
 export function hasGoogleSignInConfig() {
+  if (!GOOGLE_SIGN_IN_ENABLED) {
+    return false;
+  }
+
   return Platform.OS === "web"
     ? Boolean(googleAuthConfig.webClientId || googleAuthConfig.expoClientId)
     : Boolean(googleAuthConfig.webClientId);
