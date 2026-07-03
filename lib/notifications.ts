@@ -3,11 +3,27 @@ import { router } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
 import { Platform } from "react-native";
+import { t } from "./i18n";
+import { readAppState } from "./storage";
+import { getCompetitionChallengeStatus } from "../services/ai";
 
 const COMPETITION_REMINDER_STORAGE_KEY = "quiks_competition_reminders_v1";
 const COMPETITION_REMINDER_CHANNEL_ID = "competition-reminders";
+const PENDING_CHALLENGE_STORAGE_KEY = "quiks_pending_challenge_v1";
 
 type CompetitionReminderMap = Record<string, string[]>;
+
+interface PendingCompetitionChallenge {
+  challengeId: string;
+  playerId: string;
+  playerLanguage: string;
+  subjectId: string;
+  grade: string;
+  level: string;
+  difficulty: string;
+  focusMode: string;
+  topicId?: string;
+}
 
 interface CompetitionReminderScheduleRequest {
   competitionId: string;
@@ -49,6 +65,28 @@ async function readCompetitionReminderMap(): Promise<CompetitionReminderMap> {
 
 async function writeCompetitionReminderMap(nextState: CompetitionReminderMap) {
   await AsyncStorage.setItem(COMPETITION_REMINDER_STORAGE_KEY, JSON.stringify(nextState));
+}
+
+async function readPendingChallenge(): Promise<PendingCompetitionChallenge | null> {
+  const raw = await AsyncStorage.getItem(PENDING_CHALLENGE_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return (JSON.parse(raw) as PendingCompetitionChallenge) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function writePendingChallenge(nextState: PendingCompetitionChallenge | null) {
+  if (!nextState) {
+    await AsyncStorage.removeItem(PENDING_CHALLENGE_STORAGE_KEY);
+    return;
+  }
+
+  await AsyncStorage.setItem(PENDING_CHALLENGE_STORAGE_KEY, JSON.stringify(nextState));
 }
 
 function buildSessionNotificationData(request: CompetitionReminderScheduleRequest) {
@@ -107,6 +145,14 @@ export async function cancelCompetitionReminderNotifications(competitionId: stri
 
   delete reminderMap[competitionId];
   await writeCompetitionReminderMap(reminderMap);
+}
+
+export async function trackPendingCompetitionChallenge(challenge: PendingCompetitionChallenge) {
+  await writePendingChallenge(challenge);
+}
+
+export async function clearPendingCompetitionChallenge() {
+  await writePendingChallenge(null);
 }
 
 export async function scheduleCompetitionReminderNotifications(
@@ -169,6 +215,45 @@ export async function scheduleCompetitionReminderNotifications(
   return identifiers.length > 0;
 }
 
+async function presentCompetitionAcceptedNotification(params: {
+  challenge: PendingCompetitionChallenge;
+  competitionId: string;
+  opponentName?: string;
+}) {
+  const hasPermission = await ensureNotificationPermission();
+  if (!hasPermission) {
+    return false;
+  }
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: t(params.challenge.playerLanguage, "competitionReminderNowTitle"),
+      body: t(params.challenge.playerLanguage, "competitionReminderNowBody", {
+        subject: "Challenge",
+        opponent: params.opponentName ?? t(params.challenge.playerLanguage, "opponent"),
+      }),
+      sound: "default",
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      data: {
+        route: "/session",
+        subjectId: params.challenge.subjectId,
+        grade: params.challenge.grade,
+        level: params.challenge.level,
+        difficulty: params.challenge.difficulty,
+        focusMode: params.challenge.focusMode,
+        topicId: params.challenge.topicId ?? "",
+        competitionId: params.competitionId,
+        competitionOpponentName: params.opponentName ?? "",
+        autoStart: "1",
+        mode: "quiz",
+      },
+    },
+    trigger: null,
+  });
+
+  return true;
+}
+
 function routeFromNotificationData(data: Record<string, unknown> | undefined) {
   if (!data || data.route !== "/session") {
     return null;
@@ -227,6 +312,66 @@ export function useNotificationNavigation() {
 
     return () => {
       subscription.remove();
+    };
+  }, []);
+}
+
+export function usePendingChallengeWatcher() {
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = async () => {
+      if (cancelled || inFlight) {
+        return;
+      }
+
+      inFlight = true;
+
+      try {
+        const pending = await readPendingChallenge();
+        if (!pending) {
+          return;
+        }
+
+        const state = await readAppState();
+        const activeProfile = state.profiles.find((profile) => profile.id === state.currentProfileId);
+        if (!activeProfile || activeProfile.id !== pending.playerId) {
+          return;
+        }
+
+        const response = await getCompetitionChallengeStatus({
+          challengeId: pending.challengeId,
+          playerId: pending.playerId,
+        });
+
+        if (response.status === "accepted" && response.competition) {
+          await presentCompetitionAcceptedNotification({
+            challenge: pending,
+            competitionId: response.competition.competitionId,
+            opponentName: response.competition.opponentName,
+          });
+          await clearPendingCompetitionChallenge();
+        }
+      } catch {
+        // Keep polling quietly while the app is active.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void tick();
+    const interval = setInterval(() => {
+      void tick();
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 }

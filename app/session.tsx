@@ -8,7 +8,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
-import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState } from "../lib/storage";
+import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState, upsertResult } from "../lib/storage";
 import { canUseAiToday, hasProAccess } from "../lib/subscription";
 import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
 import { getSubjectById, getTopicById, grades, QUESTIONS_PER_LEVEL, validateTopicInput } from "../lib/subjects";
@@ -102,6 +102,8 @@ export default function SessionScreen() {
   const [isAcceptingCompetitionRematch, setIsAcceptingCompetitionRematch] = useState(false);
   const hasAutoStartedRef = useRef(false);
   const lastScheduledCompetitionRef = useRef<string | null>(null);
+  const isFinishingRef = useRef(false);
+  const sessionResultIdRef = useRef<string>(`${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
   const isCompetition = typeof params.competitionId === "string";
   const isClassroomActivity = typeof params.classroomActivityId === "string";
   const competitionOpponentName =
@@ -143,6 +145,11 @@ export default function SessionScreen() {
       }
     });
   }, [params.subjectId]);
+
+  useEffect(() => {
+    isFinishingRef.current = false;
+    sessionResultIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }, [params.classroomActivityId, params.competitionId, params.subjectId, grade, mode, selectedLevel]);
 
   useEffect(() => {
     if (typeof params.grade === "string" && grades.includes(params.grade)) {
@@ -432,8 +439,9 @@ export default function SessionScreen() {
             competitionOpponentTimeSeconds:
               response.opponentTimeTakenSeconds ?? pendingCompetitionResult.competitionOpponentTimeSeconds,
           };
-          await appendResult(profile.id, finalResult);
+          await upsertResult(profile.id, finalResult);
           setPendingCompetitionResult(null);
+          isFinishingRef.current = false;
           router.replace({
             pathname: "/results",
             params: {
@@ -759,6 +767,12 @@ export default function SessionScreen() {
       return;
     }
 
+    if (isFinishingRef.current) {
+      return;
+    }
+
+    isFinishingRef.current = true;
+
     const effectiveSubject =
       subject ??
       ({
@@ -813,7 +827,7 @@ export default function SessionScreen() {
     }
 
     const result: SessionResult = {
-        id: `${Date.now()}`,
+        id: sessionResultIdRef.current,
         date: new Date().toISOString(),
         subjectId: effectiveSubject.id,
         subjectName: effectiveSubject.name,
@@ -889,6 +903,7 @@ export default function SessionScreen() {
     result.aiStudyPlan = hasProAccess(subscriptionTier) ? studyPlan : studyPlan.slice(0, 2);
 
     await appendResult(profile.id, result);
+    isFinishingRef.current = false;
 
     if (isClassroomActivity && params.classroomActivityId) {
       router.replace({

@@ -89,6 +89,25 @@ function getSubscriptionProductIds() {
   return [productIds.monthly, productIds.yearly].filter(Boolean);
 }
 
+export function getFallbackSubscriptionPlans(): SubscriptionPlan[] {
+  return [
+    {
+      productId: productIds.monthly,
+      title: "Monthly Pro",
+      description: "",
+      displayPrice: "",
+      period: "monthly",
+    },
+    {
+      productId: productIds.yearly,
+      title: "Yearly Pro",
+      description: "",
+      displayPrice: "",
+      period: "yearly",
+    },
+  ];
+}
+
 function inferPeriod(aPackage: PurchasesPackage) {
   if (aPackage.packageType === PACKAGE_TYPE.ANNUAL) {
     return "yearly" as SubscriptionPeriod;

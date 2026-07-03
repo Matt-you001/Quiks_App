@@ -10,6 +10,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { calculateQuizTime, getLevelProgressForGrade } from "../lib/quiz";
+import { clearPendingCompetitionChallenge, trackPendingCompetitionChallenge } from "../lib/notifications";
 import { canJoinCompetitionToday, shouldShowUpgradePrompts } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getLocalizedSubjects, getSubjectById, getTopicById, grades } from "../lib/subjects";
@@ -167,6 +168,7 @@ export default function CompetitionScreen() {
         });
 
         if (response.status === "accepted" && response.competition) {
+          await clearPendingCompetitionChallenge();
           if (!notifiedAcceptedRef.current) {
             notifiedAcceptedRef.current = true;
             try {
@@ -227,6 +229,17 @@ export default function CompetitionScreen() {
       });
       notifiedAcceptedRef.current = false;
       setActiveChallenge(response.challenge);
+      await trackPendingCompetitionChallenge({
+        challengeId: response.challenge.challengeId,
+        playerId: profile.id,
+        playerLanguage: language,
+        subjectId: response.challenge.subjectId,
+        grade: response.challenge.grade,
+        level: String(response.challenge.level),
+        difficulty: response.challenge.difficulty,
+        focusMode: response.challenge.focusMode,
+        topicId: response.challenge.topicId,
+      });
       setScreenMode("waiting");
       Alert.alert(t(language, "challengeCreated"), t(language, "challengeCreatedHint"));
     } finally {

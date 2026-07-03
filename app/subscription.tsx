@@ -7,6 +7,7 @@ import { t } from "../lib/i18n";
 import { ensurePaddleConfigured, hasPaddleClientToken, openPaddleCheckout } from "../lib/paddle";
 import {
   endPurchaseConnection,
+  getFallbackSubscriptionPlans,
   loadSubscriptionStoreState,
   purchaseProSubscription,
   purchaseRuntimeAvailable,
@@ -14,11 +15,13 @@ import {
   type SubscriptionPlan,
 } from "../lib/purchases";
 import { readAppState } from "../lib/storage";
+import { areSubscriptionPurchasesEnabled } from "../lib/subscription";
 import { palette, shadows } from "../lib/theme";
 import { normalizeSubscriptionPlanPeriod } from "../lib/web-checkout";
 import type { AppLanguage, SubscriptionTier } from "../types/app";
 
 export default function SubscriptionScreen() {
+  const purchasesEnabled = areSubscriptionPurchasesEnabled();
   const params = useLocalSearchParams<{ plan?: string }>();
   const [subscriptionTier, setSubscriptionTierState] = useState<SubscriptionTier>("free");
   const [language, setLanguage] = useState<AppLanguage>("en");
@@ -35,8 +38,16 @@ export default function SubscriptionScreen() {
     setLanguage(nextLanguage);
     setSubscriptionTierState(state.subscriptionTier);
 
-    if (hasPaddleClientToken()) {
+    if (purchasesEnabled && hasPaddleClientToken()) {
       void ensurePaddleConfigured().catch(() => undefined);
+    }
+
+    if (!purchasesEnabled) {
+      setPlans([]);
+      setStoreReady(false);
+      setStoreMessage(t(nextLanguage, "subscriptionTestingPaused"));
+      setLoadingStore(false);
+      return;
     }
 
     if (!purchaseRuntimeAvailable()) {
@@ -80,6 +91,11 @@ export default function SubscriptionScreen() {
   );
 
   const subscribeToPlan = async (productId: string) => {
+    if (!purchasesEnabled) {
+      Alert.alert(t(language, "manageSubscription"), t(language, "subscriptionTestingPaused"));
+      return;
+    }
+
     setActiveProductId(productId);
     try {
       if (Platform.OS === "web" && hasPaddleClientToken()) {
@@ -106,6 +122,11 @@ export default function SubscriptionScreen() {
   };
 
   const restorePurchases = async () => {
+    if (!purchasesEnabled) {
+      Alert.alert(t(language, "manageSubscription"), t(language, "subscriptionTestingPaused"));
+      return;
+    }
+
     setRestoring(true);
     try {
       const result = await restoreProSubscription();
@@ -137,7 +158,7 @@ export default function SubscriptionScreen() {
   };
 
   const selectedPlanPeriod = normalizeSubscriptionPlanPeriod(params.plan);
-  const visiblePlans =
+  const storePlans =
     selectedPlanPeriod === null
       ? plans
       : [...plans].sort((left, right) => {
@@ -145,6 +166,17 @@ export default function SubscriptionScreen() {
           const rightSelected = right.period === selectedPlanPeriod ? 0 : 1;
           return leftSelected - rightSelected;
         });
+  const fallbackPlans =
+    selectedPlanPeriod === null
+      ? getFallbackSubscriptionPlans()
+      : getFallbackSubscriptionPlans().sort((left, right) => {
+          const leftSelected = left.period === selectedPlanPeriod ? 0 : 1;
+          const rightSelected = right.period === selectedPlanPeriod ? 0 : 1;
+          return leftSelected - rightSelected;
+        });
+  const visiblePlans = storePlans.length > 0 ? storePlans : fallbackPlans;
+  const shouldShowFallbackPlans =
+    purchasesEnabled && !loadingStore && subscriptionTier !== "pro" && storePlans.length === 0;
 
   return (
     <AppBackground>
@@ -155,13 +187,17 @@ export default function SubscriptionScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "freePlan")}</Text>
         <Text style={styles.cardText}>{t(language, "subscriptionFreeFeatures")}</Text>
-        <Text style={styles.statusText}>{t(language, "freePlanStatus")}</Text>
+        <Text style={styles.statusText}>
+          {subscriptionTier === "free" ? t(language, "freePlanStatus") : "Available if you cancel Pro later."}
+        </Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "proPlan")}</Text>
         <Text style={styles.cardText}>{t(language, "subscriptionProFeatures")}</Text>
-        <Text style={styles.statusText}>{t(language, "proPlanStatus")}</Text>
+        <Text style={styles.statusText}>
+          {subscriptionTier === "pro" ? t(language, "proPlanStatus") : "Upgrade to unlock Pro features."}
+        </Text>
         <>
           {loadingStore ? <Text style={styles.storeMessage}>Loading store details...</Text> : null}
           {selectedPlanPeriod ? (
@@ -170,7 +206,7 @@ export default function SubscriptionScreen() {
             </Text>
           ) : null}
           {storeMessage ? <Text style={styles.storeMessage}>{storeMessage}</Text> : null}
-          {storeReady && visiblePlans.length > 0 ? (
+          {purchasesEnabled && ((storeReady && visiblePlans.length > 0) || shouldShowFallbackPlans) ? (
             <View style={styles.planList}>
               {visiblePlans.map((plan) => {
                 const isSelectedPlan = selectedPlanPeriod !== null && plan.period === selectedPlanPeriod;
@@ -190,9 +226,9 @@ export default function SubscriptionScreen() {
                       </View>
                     ) : null}
                     <Text style={[styles.planTitle, isSelectedPlan ? styles.selectedPlanTitle : null]}>{getPlanLabel(plan)}</Text>
-                    <Text style={[styles.planPrice, isSelectedPlan ? styles.selectedPlanPrice : null]}>
-                      {plan.displayPrice || plan.productId}
-                    </Text>
+                    {plan.displayPrice ? (
+                      <Text style={[styles.planPrice, isSelectedPlan ? styles.selectedPlanPrice : null]}>{plan.displayPrice}</Text>
+                    ) : null}
                     {plan.description ? <Text style={styles.planText}>{plan.description}</Text> : null}
                     <PrimaryButton
                       label={actionLabel}
@@ -206,19 +242,26 @@ export default function SubscriptionScreen() {
               })}
             </View>
           ) : null}
+          {shouldShowFallbackPlans ? (
+            <Text style={styles.storeMessage}>
+              Store pricing could not be loaded, but you can still retry an upgrade with the buttons above.
+            </Text>
+          ) : null}
         </>
       </View>
 
       <View style={styles.actionColumn}>
-        <>
-          <PrimaryButton
-            label={t(language, "restorePurchases")}
-            variant="secondary"
-            onPress={restorePurchases}
-            loading={restoring}
-          />
-          <PrimaryButton label={t(language, "refreshStatus")} variant="secondary" onPress={load} disabled={loadingStore} />
-        </>
+        {purchasesEnabled ? (
+          <>
+            <PrimaryButton
+              label={t(language, "restorePurchases")}
+              variant="secondary"
+              onPress={restorePurchases}
+              loading={restoring}
+            />
+            <PrimaryButton label={t(language, "refreshStatus")} variant="secondary" onPress={load} disabled={loadingStore} />
+          </>
+        ) : null}
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
       </View>
     </AppBackground>

@@ -440,7 +440,7 @@ export default function HomeScreen() {
           style={showWideActions ? styles.homeActionButtonDesktop : undefined}
         />
         <PrimaryButton
-          label={t(language, "enterCompetition")}
+          label={t(language, "competitionArena")}
           onPress={() =>
             activeProfile
               ? router.push("/competition" as never)

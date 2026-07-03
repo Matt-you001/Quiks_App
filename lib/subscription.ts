@@ -49,6 +49,13 @@ const subscriptionRestrictionsEnabled =
       "false"
   ) === "true";
 
+const subscriptionPurchasesEnabled =
+  normalizeEnvValue(
+    process.env.EXPO_PUBLIC_ENABLE_SUBSCRIPTION_PURCHASES ??
+      extra.EXPO_PUBLIC_ENABLE_SUBSCRIPTION_PURCHASES ??
+      "false"
+  ) === "true";
+
 function isSameLocalDay(dateIso: string) {
   const now = new Date();
   const value = new Date(dateIso);
@@ -62,6 +69,10 @@ function isSameLocalDay(dateIso: string) {
 
 export function areSubscriptionRestrictionsEnabled() {
   return subscriptionRestrictionsEnabled;
+}
+
+export function areSubscriptionPurchasesEnabled() {
+  return subscriptionPurchasesEnabled;
 }
 
 export function hasProAccess(subscriptionTier: SubscriptionTier) {

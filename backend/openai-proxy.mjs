@@ -574,8 +574,8 @@ async function createCompetitionMatch(waiter, challenger) {
     },
     submissions: {},
     createdAt: Date.now(),
-    startAt: Date.now(),
-    endAt: Date.now() + ((challenger.body.durationSeconds ?? body.durationSeconds ?? 120) * 1000),
+    startAt: Date.now() + 10000,
+    endAt: Date.now() + 10000 + ((challenger.body.durationSeconds ?? body.durationSeconds ?? 120) * 1000),
   };
 
   competitionMatches.set(match.id, match);
@@ -594,7 +594,7 @@ async function createChallengeCompetition(challenge, accepterProfile) {
     profile: challenge.body.profile ?? accepterProfile,
   };
   const questions = await generateQuestionSet(body);
-  const startAt = Date.now() + 5000;
+  const startAt = Date.now() + 10000;
   const endAt = startAt + (challenge.durationSeconds * 1000);
   const match = {
     id: randomUUID(),
@@ -649,7 +649,7 @@ async function createChallengeCompetition(challenge, accepterProfile) {
 
 async function createRematchCompetition(rematch) {
   const questions = await generateQuestionSet(rematch.body);
-  const startAt = Date.now() + 5000;
+  const startAt = Date.now() + 10000;
   const endAt = startAt + (rematch.durationSeconds * 1000);
   const match = {
     id: randomUUID(),
@@ -1020,22 +1020,27 @@ async function handleCompetitionSubmit(body, response) {
   if (!match.liveProgress) {
     match.liveProgress = {};
   }
-  match.liveProgress[body.playerId] = {
-    playerId: body.playerId,
-    playerName: match.players.find((player) => player.playerId === body.playerId)?.name ?? "Learner",
-    answeredCount: body.totalQuestions ?? match.questions.length,
-    correctAnswers: body.correctAnswers ?? 0,
-    score: body.score ?? 0,
-    finished: true,
-    submittedAt: Date.now(),
-  };
-  match.submissions[body.playerId] = {
-    score: body.score ?? 0,
-    correctAnswers: body.correctAnswers ?? 0,
-    totalQuestions: body.totalQuestions ?? 0,
-    timeTakenSeconds: body.timeTakenSeconds ?? 0,
-    submittedAt: Date.now(),
-  };
+
+  const existingSubmission = match.submissions[body.playerId];
+  if (!existingSubmission) {
+    const submittedAt = Date.now();
+    match.liveProgress[body.playerId] = {
+      playerId: body.playerId,
+      playerName: match.players.find((player) => player.playerId === body.playerId)?.name ?? "Learner",
+      answeredCount: body.totalQuestions ?? match.questions.length,
+      correctAnswers: body.correctAnswers ?? 0,
+      score: body.score ?? 0,
+      finished: true,
+      submittedAt,
+    };
+    match.submissions[body.playerId] = {
+      score: body.score ?? 0,
+      correctAnswers: body.correctAnswers ?? 0,
+      totalQuestions: body.totalQuestions ?? 0,
+      timeTakenSeconds: body.timeTakenSeconds ?? 0,
+      submittedAt,
+    };
+  }
 
   const payload = getCompetitionOutcome(match, body.playerId);
   sendJson(response, 200, payload);

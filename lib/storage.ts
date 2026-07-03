@@ -283,7 +283,35 @@ export async function setCurrentProfile(profileId: string | null) {
 export async function appendResult(profileId: string, result: SessionResult) {
   const state = await readMutableAppState();
   const existing = state.results[profileId] ?? [];
-  state.results[profileId] = [result, ...existing];
+  const deduped = existing.filter(
+    (item) =>
+      item.id !== result.id &&
+      !(item.competitionId && result.competitionId && item.competitionId === result.competitionId)
+  );
+  state.results[profileId] = [result, ...deduped];
+  await writeAppState(state);
+  return state;
+}
+
+export async function upsertResult(profileId: string, result: SessionResult) {
+  const state = await readMutableAppState();
+  const existing = state.results[profileId] ?? [];
+  const nextResults = [...existing];
+  const existingIndex = nextResults.findIndex(
+    (item) =>
+      item.id === result.id ||
+      Boolean(item.competitionId && result.competitionId && item.competitionId === result.competitionId)
+  );
+
+  if (existingIndex >= 0) {
+    nextResults[existingIndex] = result;
+  } else {
+    nextResults.unshift(result);
+  }
+
+  state.results[profileId] = nextResults.sort(
+    (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()
+  );
   await writeAppState(state);
   return state;
 }
