@@ -283,10 +283,35 @@ export async function setCurrentProfile(profileId: string | null) {
 export async function appendResult(profileId: string, result: SessionResult) {
   const state = await readMutableAppState();
   const existing = state.results[profileId] ?? [];
+  const resultTime = new Date(result.date).getTime();
   const deduped = existing.filter(
-    (item) =>
-      item.id !== result.id &&
-      !(item.competitionId && result.competitionId && item.competitionId === result.competitionId)
+    (item) => {
+      if (item.id === result.id) {
+        return false;
+      }
+
+      if (item.competitionId && result.competitionId && item.competitionId === result.competitionId) {
+        return false;
+      }
+
+      const itemTime = new Date(item.date).getTime();
+      const isLikelyDuplicateLocalSession =
+        !item.competitionId &&
+        !result.competitionId &&
+        item.subjectId === result.subjectId &&
+        item.grade === result.grade &&
+        item.level === result.level &&
+        item.mode === result.mode &&
+        item.focusMode === result.focusMode &&
+        item.topicId === result.topicId &&
+        item.score === result.score &&
+        item.correctAnswers === result.correctAnswers &&
+        item.totalQuestions === result.totalQuestions &&
+        Math.abs(item.timeTakenSeconds - result.timeTakenSeconds) <= 3 &&
+        Math.abs(itemTime - resultTime) <= 15_000;
+
+      return !isLikelyDuplicateLocalSession;
+    }
   );
   state.results[profileId] = [result, ...deduped];
   await writeAppState(state);

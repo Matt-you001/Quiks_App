@@ -29,6 +29,7 @@ const competitionMatches = new Map();
 const competitionMatchByPlayer = new Map();
 const competitionChallenges = new Map();
 const competitionRematches = new Map();
+const pushTokensByPlayer = new Map();
 
 function isSameUtcDay(leftTimestamp, rightTimestamp) {
   const left = new Date(leftTimestamp);
@@ -145,6 +146,51 @@ function sendJson(response, statusCode, payload) {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   });
   response.end(JSON.stringify(payload));
+}
+
+async function sendExpoPushNotification({ to, title, body, data }) {
+  const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      to,
+      title,
+      body,
+      data,
+      sound: "default",
+      priority: "high",
+      channelId: "competition-reminders",
+      ttl: 120,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Expo push failed with status ${response.status}: ${errorText}`);
+  }
+
+  const payload = await response.json();
+  const ticket = Array.isArray(payload?.data) ? payload.data[0] : payload?.data;
+
+  if (!ticket) {
+    throw new Error("Expo push did not return a delivery ticket.");
+  }
+
+  if (ticket.status === "error") {
+    const message = ticket.message || "Expo push rejected the notification.";
+    const details =
+      ticket.details && typeof ticket.details === "object" ? ` ${JSON.stringify(ticket.details)}` : "";
+    throw new Error(`${message}${details}`);
+  }
+
+  if (ticket.status !== "ok") {
+    throw new Error(`Unexpected Expo push ticket status: ${String(ticket.status ?? "unknown")}`);
+  }
+
+  return payload;
 }
 
 async function readJsonBody(request) {
@@ -306,6 +352,7 @@ function buildCompetitionPayload(match, playerId) {
 function buildChallengeSummary(challenge) {
   return {
     challengeId: challenge.id,
+    status: challenge.status ?? "open",
     subjectId: challenge.subjectId,
     subjectName: challenge.subjectName,
     grade: challenge.grade,
@@ -317,7 +364,166 @@ function buildChallengeSummary(challenge) {
     creatorId: challenge.creatorId,
     creatorName: challenge.creatorName,
     createdAt: challenge.createdAt,
+    acceptedById: challenge.acceptedById,
+    acceptedByName: challenge.acceptedByName,
+    creatorNotification: challenge.creatorNotification,
+    accepterNotification: challenge.accepterNotification,
   };
+}
+
+function getPushRegistrationSnapshot(playerId) {
+  const registration = pushTokensByPlayer.get(playerId);
+  return {
+    registration,
+    registrationPresent: Boolean(registration?.token),
+    tokenUpdatedAt: registration?.updatedAt,
+  };
+}
+
+function trimPushError(error) {
+  const message = error instanceof Error ? error.message : String(error ?? "Unknown push error");
+  return message.length > 220 ? `${message.slice(0, 217)}...` : message;
+}
+
+async function notifyChallengeCreatorAccepted(challenge, accepterProfile) {
+  const { registration, registrationPresent, tokenUpdatedAt } = getPushRegistrationSnapshot(challenge.creatorId);
+  challenge.creatorNotification = {
+    registrationPresent,
+    tokenUpdatedAt,
+    lastAttemptAt: Date.now(),
+    lastStatus: registration?.token ? "sending" : "not_registered",
+  };
+
+  if (!registration?.token) {
+    return false;
+  }
+
+  try {
+    await sendExpoPushNotification({
+      to: registration.token,
+      title: "Challenge accepted",
+      body: `${accepterProfile?.name ?? "Another learner"} accepted your ${challenge.subjectName} challenge.`,
+      data: {
+        route: "/competition",
+        challengeId: challenge.id,
+        subjectId: challenge.subjectId,
+        grade: String(challenge.grade),
+        level: String(challenge.level),
+        difficulty: String(challenge.difficulty ?? "Beginner"),
+        focusMode: String(challenge.focusMode ?? "general"),
+        topicId: challenge.topicId ?? "",
+        opponentName: accepterProfile?.name ?? "Opponent",
+        notificationType: "challenge_accepted_needs_creator_confirmation",
+      },
+    });
+    challenge.creatorNotification = {
+      ...challenge.creatorNotification,
+      lastSuccessAt: Date.now(),
+      lastStatus: "sent",
+      lastError: undefined,
+    };
+  } catch (error) {
+    challenge.creatorNotification = {
+      ...challenge.creatorNotification,
+      lastStatus: "failed",
+      lastError: trimPushError(error),
+    };
+    throw error;
+  }
+
+  return true;
+}
+
+async function notifyChallengeAccepterConfirmed(challenge, match) {
+  const { registration, registrationPresent, tokenUpdatedAt } = getPushRegistrationSnapshot(challenge.acceptedById);
+  challenge.accepterNotification = {
+    registrationPresent,
+    tokenUpdatedAt,
+    lastAttemptAt: Date.now(),
+    lastStatus: registration?.token ? "sending" : "not_registered",
+  };
+
+  if (!registration?.token) {
+    return false;
+  }
+
+  try {
+    await sendExpoPushNotification({
+      to: registration.token,
+      title: "Competition ready",
+      body: `${challenge.creatorName} accepted the challenge. Your ${challenge.subjectName} competition is starting soon.`,
+      data: {
+        route: "/session",
+        subjectId: challenge.subjectId,
+        grade: String(challenge.grade),
+        level: String(challenge.level),
+        difficulty: String(challenge.difficulty ?? "Beginner"),
+        focusMode: String(challenge.focusMode ?? "general"),
+        topicId: challenge.topicId ?? "",
+        competitionId: match.id,
+        competitionOpponentName: challenge.creatorName,
+        autoStart: "1",
+        mode: "quiz",
+      },
+    });
+    challenge.accepterNotification = {
+      ...challenge.accepterNotification,
+      lastSuccessAt: Date.now(),
+      lastStatus: "sent",
+      lastError: undefined,
+    };
+  } catch (error) {
+    challenge.accepterNotification = {
+      ...challenge.accepterNotification,
+      lastStatus: "failed",
+      lastError: trimPushError(error),
+    };
+    throw error;
+  }
+
+  return true;
+}
+
+async function notifyChallengeAccepterDeclined(challenge) {
+  const { registration, registrationPresent, tokenUpdatedAt } = getPushRegistrationSnapshot(challenge.acceptedById);
+  challenge.accepterNotification = {
+    registrationPresent,
+    tokenUpdatedAt,
+    lastAttemptAt: Date.now(),
+    lastStatus: registration?.token ? "sending" : "not_registered",
+  };
+
+  if (!registration?.token) {
+    return false;
+  }
+
+  try {
+    await sendExpoPushNotification({
+      to: registration.token,
+      title: "Challenge declined",
+      body: `${challenge.creatorName} declined the ${challenge.subjectName} challenge.`,
+      data: {
+        route: "/competition",
+        challengeId: challenge.id,
+        notificationType: "challenge_declined",
+      },
+    });
+    challenge.accepterNotification = {
+      ...challenge.accepterNotification,
+      lastSuccessAt: Date.now(),
+      lastStatus: "sent",
+      lastError: undefined,
+    };
+  } catch (error) {
+    challenge.accepterNotification = {
+      ...challenge.accepterNotification,
+      lastStatus: "failed",
+      lastError: trimPushError(error),
+    };
+    throw error;
+  }
+
+  return true;
 }
 
 function resolveSubmissionFromSnapshot(match, playerId) {
@@ -863,7 +1069,10 @@ async function handleBreather(body, response) {
     instructions: [
       "You create short educational breather content for a mobile learning app.",
       "The content should feel like a rewarding mini-lesson, not a quiz.",
-      "Keep it engaging, age-appropriate, academically accurate, and encouraging.",
+      "Keep it entertaining, engaging, informative, age-appropriate, academically accurate, and encouraging.",
+      "Blend relief, curiosity, and enjoyment so the breather feels refreshing after tests, not dry or heavy.",
+      "Where it fits naturally, include interesting history, background stories, discoveries, notable people, or memorable real-world context inside the subject or course.",
+      "The content should still stay clearly connected to the learner's subject, topic focus, level, and academic stage.",
       "For children use simple, vivid wording and short reading pieces.",
       "For teens use revision-friendly school-level mini lessons or reading passages.",
       "For university learners use concise concept reflections, course-linked notes, or brief applied academic readings.",
@@ -892,8 +1101,9 @@ async function handleBreather(body, response) {
               `Subject guidance: ${body.subject?.aiPromptHint ?? ""}`,
               `Variant guidance: ${body.appGuidance ?? ""}`,
               `Academic stage guidance: ${describeAcademicStage(body)}`,
-              "Create a short breather that teaches something real inside this subject or course.",
-              "The content may be a poem, reading passage, concept note, applied reflection, or mini lesson depending on the learner stage.",
+              "Create a short breather that teaches something real inside this subject or course while also being enjoyable and mentally refreshing.",
+              "The content may be a poem, light story, reading passage, concept note, applied reflection, mini lesson, historical spotlight, or discovery-based subject nugget depending on the learner stage.",
+              "Prefer memorable, entertaining, and informative subject-linked content over dry textbook explanation.",
               "Do not return quiz questions, multiple-choice options, or assessment instructions.",
               "The story field should be a readable educational passage of moderate length.",
               "The facts array should contain 2 to 4 concise takeaways.",
@@ -1101,6 +1311,17 @@ async function handleChallengeCreate(body, response) {
     createdAt: Date.now(),
   };
 
+  const creatorRegistration = getPushRegistrationSnapshot(profile.id);
+  challenge.creatorNotification = {
+    registrationPresent: creatorRegistration.registrationPresent,
+    tokenUpdatedAt: creatorRegistration.tokenUpdatedAt,
+    lastStatus: creatorRegistration.registrationPresent ? "pending" : "not_registered",
+  };
+  challenge.accepterNotification = {
+    registrationPresent: false,
+    lastStatus: "pending",
+  };
+
   competitionChallenges.set(challenge.id, challenge);
   sendJson(response, 200, { status: "open", challenge: buildChallengeSummary(challenge) });
 }
@@ -1133,8 +1354,33 @@ async function handleChallengeAccept(body, response) {
     return;
   }
 
-  const match = await createChallengeCompetition(challenge, body.profile);
-  sendJson(response, 200, { status: "accepted", competition: buildCompetitionPayload(match, body.playerId) });
+  challenge.status = "awaiting_creator_confirmation";
+  challenge.acceptedAt = Date.now();
+  challenge.acceptedById = body.profile.id;
+  challenge.acceptedByName = body.profile.name ?? "Learner";
+  challenge.competitionId = undefined;
+  void notifyChallengeCreatorAccepted(challenge, body.profile).catch(() => undefined);
+  sendJson(response, 200, {
+    status: "awaiting_creator_confirmation",
+    challenge: buildChallengeSummary(challenge),
+  });
+}
+
+async function handlePushTokenRegister(body, response) {
+  if (!body.playerId || !body.token) {
+    sendJson(response, 400, { error: "Missing playerId or token." });
+    return;
+  }
+
+  const registeredAt = Date.now();
+  pushTokensByPlayer.set(body.playerId, {
+    token: body.token,
+    language: body.language ?? "en",
+    profileName: body.profileName ?? "Learner",
+    updatedAt: registeredAt,
+  });
+
+  sendJson(response, 200, { ok: true, registeredAt });
 }
 
 async function handleChallengeStatus(body, response) {
@@ -1154,7 +1400,52 @@ async function handleChallengeStatus(body, response) {
     return;
   }
 
-  sendJson(response, 200, { status: "open", challenge: buildChallengeSummary(challenge) });
+  sendJson(response, 200, { status: challenge.status ?? "open", challenge: buildChallengeSummary(challenge) });
+}
+
+async function handleChallengeCreatorDecision(body, response) {
+  const challenge = competitionChallenges.get(body.challengeId);
+  if (!challenge) {
+    sendJson(response, 404, { error: "Challenge not found." });
+    return;
+  }
+
+  if (challenge.creatorId !== body.playerId) {
+    sendJson(response, 403, { error: "Only the challenge creator can make this decision." });
+    return;
+  }
+
+  if (challenge.status !== "awaiting_creator_confirmation") {
+    sendJson(response, 400, {
+      error: "Challenge is no longer waiting for creator confirmation.",
+      status: challenge.status ?? "open",
+      challenge: buildChallengeSummary(challenge),
+    });
+    return;
+  }
+
+  if (body.decision === "decline") {
+    challenge.status = "declined";
+    challenge.declinedAt = Date.now();
+    void notifyChallengeAccepterDeclined(challenge).catch(() => undefined);
+    sendJson(response, 200, {
+      status: "declined",
+      challenge: buildChallengeSummary(challenge),
+    });
+    return;
+  }
+
+  const accepterProfile = {
+    id: challenge.acceptedById,
+    name: challenge.acceptedByName ?? "Learner",
+  };
+  const match = await createChallengeCompetition(challenge, accepterProfile);
+  void notifyChallengeAccepterConfirmed(challenge, match).catch(() => undefined);
+  sendJson(response, 200, {
+    status: "accepted",
+    challenge: buildChallengeSummary(challenge),
+    competition: buildCompetitionPayload(match, body.playerId),
+  });
 }
 
 async function handleCompetitionChat(body, response) {
@@ -1537,8 +1828,18 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/competition/challenge/creator-decision") {
+      await handleChallengeCreatorDecision(body, response);
+      return;
+    }
+
     if (url.pathname === "/competition/challenge/status") {
       await handleChallengeStatus(body, response);
+      return;
+    }
+
+    if (url.pathname === "/notifications/register-push-token") {
+      await handlePushTokenRegister(body, response);
       return;
     }
 

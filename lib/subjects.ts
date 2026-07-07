@@ -1666,7 +1666,7 @@ export function validateTopicInput(
   }
 
   return {
-    status: "unknown",
+    status: "custom",
     input: trimmed,
     matchedTopicId: bestCurrentMatch?.topic.id,
     matchedTopicLabel:

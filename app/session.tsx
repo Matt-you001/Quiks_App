@@ -199,10 +199,26 @@ export default function SessionScreen() {
 
     return selectedTopic;
   }, [customTopicValidation, isCustomTopic, selectedTopic, subject]);
+  const resolvedTopicLabel = useMemo(() => {
+    if (focusMode !== "topic") {
+      return undefined;
+    }
+
+    if (isCustomTopic) {
+      if (customTopicValidation?.status === "valid") {
+        return customTopicValidation.matchedTopicLabel ?? customTopicValidation.input;
+      }
+
+      const trimmedCustomTopic = customTopicInput.trim();
+      return trimmedCustomTopic || undefined;
+    }
+
+    return selectedTopic?.label;
+  }, [customTopicInput, customTopicValidation, focusMode, isCustomTopic, selectedTopic]);
   const resolvedSubjectName = activitySubjectName ?? subject?.name ?? "Session";
   const resolvedFocusLabel =
     focusMode === "topic"
-      ? activityTopicLabel ?? resolvedTopic?.label ?? null
+      ? activityTopicLabel ?? resolvedTopicLabel ?? resolvedTopic?.label ?? null
       : null;
   const sourceBadgeLabel =
     questionSource === "remote" ? "TS1" : questionSource === "local" ? "TS2" : questionSource === "demo" ? "TS3" : null;
@@ -537,16 +553,6 @@ export default function SessionScreen() {
           return;
         }
 
-        if (customTopicValidation.status === "unknown") {
-          Alert.alert(
-            t(language, "chooseTopic"),
-            t(language, "customTopicUnknown", {
-              topic: customTopicValidation.input,
-              subject: resolvedSubjectName,
-            })
-          );
-          return;
-        }
       } else if (!selectedTopic) {
         Alert.alert(t(language, "chooseTopic"), t(language, "customTopicRequired"));
         return;
@@ -638,7 +644,7 @@ export default function SessionScreen() {
         questionCount: QUESTIONS_PER_LEVEL,
         focusMode,
         topicId: resolvedTopic?.id,
-        topicLabel: resolvedTopic?.label,
+        topicLabel: resolvedTopicLabel,
         profile,
         recentQuestionIds,
       };
@@ -1073,6 +1079,10 @@ export default function SessionScreen() {
                             topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
                             subject: subject.name,
                           })
+                        : customTopicValidation?.status === "custom"
+                          ? t(language, "customTopicAccepted", {
+                              topic: customTopicValidation.input,
+                            })
                       : customTopicValidation?.status === "wrong-subject"
                         ? t(language, "customTopicWrongSubject", {
                             topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,

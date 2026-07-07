@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { getLanguageLabel, t } from "../lib/i18n";
+import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile } from "../lib/subscription";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getSubjectById } from "../lib/subjects";
@@ -34,6 +35,7 @@ export default function SelectProfileScreen() {
 
   const continueWithProfile = async (profileId: string) => {
     await setCurrentProfile(profileId);
+    await syncRemotePushRegistration();
     if (subject) {
       router.replace({ pathname: "/subject/[slug]", params: { slug: subject } });
     }

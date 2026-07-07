@@ -9,6 +9,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
 import { appVariant } from "../lib/app-variant";
 import { getLanguageLabel, t } from "../lib/i18n";
+import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile, shouldShowUpgradePrompts } from "../lib/subscription";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getLocalizedSubjects, SCORE_THRESHOLD } from "../lib/subjects";
@@ -253,6 +254,7 @@ export default function HomeScreen() {
   const selectProfile = async (profileId: string) => {
     setCurrentProfileIdState(profileId);
     await setCurrentProfile(profileId);
+    await syncRemotePushRegistration();
   };
 
   const openSubject = (subjectId: string) => {
@@ -314,6 +316,7 @@ export default function HomeScreen() {
               if (activeProfile) {
                 await setCurrentProfile(activeProfile.id);
                 setCurrentProfileIdState(activeProfile.id);
+                await syncRemotePushRegistration();
                 router.push("/profile");
                 return;
               }

@@ -42,7 +42,7 @@ export interface Subject {
 }
 
 export interface TopicValidationResult {
-  status: "empty" | "valid" | "wrong-subject" | "unknown";
+  status: "empty" | "valid" | "wrong-subject" | "unknown" | "custom";
   input: string;
   matchedTopicId?: string;
   matchedTopicLabel?: string;
@@ -439,8 +439,25 @@ export interface CompetitionQuestionPayload {
   liveProgress?: CompetitionLiveProgress[];
 }
 
+export type CompetitionChallengeStatus =
+  | "open"
+  | "awaiting_creator_confirmation"
+  | "accepted"
+  | "declined"
+  | "cancelled";
+
+export interface CompetitionChallengeNotificationDiagnostics {
+  registrationPresent: boolean;
+  tokenUpdatedAt?: number;
+  lastAttemptAt?: number;
+  lastSuccessAt?: number;
+  lastStatus: "pending" | "sending" | "sent" | "failed" | "not_registered";
+  lastError?: string;
+}
+
 export interface CompetitionChallengeSummary {
   challengeId: string;
+  status: CompetitionChallengeStatus;
   subjectId: string;
   subjectName: string;
   grade: string;
@@ -452,6 +469,10 @@ export interface CompetitionChallengeSummary {
   creatorId: string;
   creatorName: string;
   createdAt: number;
+  acceptedById?: string;
+  acceptedByName?: string;
+  creatorNotification?: CompetitionChallengeNotificationDiagnostics;
+  accepterNotification?: CompetitionChallengeNotificationDiagnostics;
 }
 
 export interface CompetitionJoinResponse {
@@ -537,8 +558,8 @@ export interface CompetitionChallengeAcceptRequest {
 }
 
 export interface CompetitionChallengeAcceptResponse {
-  status: "accepted";
-  competition: CompetitionQuestionPayload;
+  status: "awaiting_creator_confirmation";
+  challenge: CompetitionChallengeSummary;
 }
 
 export interface CompetitionChallengeStatusRequest {
@@ -547,8 +568,20 @@ export interface CompetitionChallengeStatusRequest {
 }
 
 export interface CompetitionChallengeStatusResponse {
-  status: "open" | "accepted" | "not_found";
+  status: CompetitionChallengeStatus | "not_found";
   challenge?: CompetitionChallengeSummary;
+  competition?: CompetitionQuestionPayload;
+}
+
+export interface CompetitionChallengeCreatorDecisionRequest {
+  challengeId: string;
+  playerId: string;
+  decision: "accept" | "decline";
+}
+
+export interface CompetitionChallengeCreatorDecisionResponse {
+  status: "accepted" | "declined" | "cancelled";
+  challenge: CompetitionChallengeSummary;
   competition?: CompetitionQuestionPayload;
 }
 
@@ -613,4 +646,16 @@ export interface CompetitionRematchResponse {
   targetName?: string;
   nextLevel?: number;
   competition?: CompetitionQuestionPayload;
+}
+
+export interface PushTokenRegisterRequest {
+  playerId: string;
+  token: string;
+  language?: AppLanguage;
+  profileName?: string;
+}
+
+export interface PushTokenRegisterResponse {
+  ok: true;
+  registeredAt: number;
 }

@@ -84,6 +84,7 @@ type TranslationKey =
   | "profileNoSelection"
   | "profileCreateOrChoose"
   | "todaysStudyTime"
+  | "historyDaySummary"
   | "targetExceeded"
   | "targetReached"
   | "targetNotReached"
@@ -122,6 +123,7 @@ type TranslationKey =
   | "customTopicSuggestion"
   | "customTopicWrongSubject"
   | "customTopicUnknown"
+  | "customTopicAccepted"
   | "customTopicRequired"
   | "classroomRole"
   | "studentRole"
@@ -520,6 +522,7 @@ const english: TranslationMap = {
   profileNoSelection: "No student selected",
   profileCreateOrChoose: "Create a profile first or return home and choose a learner.",
   todaysStudyTime: "Today's study time",
+  historyDaySummary: "{count} session(s) recorded on {date}.",
   targetExceeded: "Daily target exceeded. Excellent consistency today.",
   targetReached: "Daily target reached. Well done.",
   targetNotReached: "Daily target not reached yet. {minutes} minute(s) to go.",
@@ -558,6 +561,7 @@ const english: TranslationMap = {
   customTopicSuggestion: "Do you mean {topic} instead of {input}? We'll use {topic} for this session.",
   customTopicWrongSubject: "{topic} is not a topic in {subject}. It belongs under {matchedSubject}.",
   customTopicUnknown: "We couldn't match {topic} to a topic in {subject}. Try another wording.",
+  customTopicAccepted: "We'll use {topic} as a custom topic for this session.",
   customTopicRequired: "Enter a topic before starting this session.",
   classroomRole: "Classroom role",
   studentRole: "Student",
@@ -632,7 +636,7 @@ const english: TranslationMap = {
   waitingForAcceptance: "Waiting for another learner to accept your challenge.",
   challengeAccepted: "Your challenge has been accepted.",
   competitionReminderSoonTitle: "Competition starts soon",
-  competitionReminderSoonBody: "{subject} vs {opponent} starts in 5 minutes.",
+  competitionReminderSoonBody: "{subject} vs {opponent} starts in a few seconds.",
   competitionReminderNowTitle: "Competition starting now",
   competitionReminderNowBody: "{subject} vs {opponent} is ready. Tap to continue.",
   countdownToStart: "Contest starts in {count}...",
@@ -903,6 +907,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     profileNoSelection: "Kein Schuler ausgewahlt",
     profileCreateOrChoose: "Erstelle zuerst ein Profil oder kehre zur Startseite zuruck und wahle einen Lernenden aus.",
     todaysStudyTime: "Heutige Lernzeit",
+    historyDaySummary: "{count} Sitzung(en) aufgezeichnet am {date}.",
     targetExceeded: "Tagesziel ubertroffen. Tolle Konsequenz heute.",
     targetReached: "Tagesziel erreicht. Gut gemacht.",
     targetNotReached: "Tagesziel noch nicht erreicht. Noch {minutes} Minute(n).",
@@ -1156,6 +1161,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     studentsList: "Liste des eleves",
     currentLearner: "Apprenant actuel",
     todaysStudyTime: "Temps d'etude aujourd'hui",
+    historyDaySummary: "{count} session(s) enregistree(s) le {date}.",
     learningRecord: "Historique d'apprentissage",
     profileDetails: "Details du profil",
     bestScore: "Meilleur score",
@@ -1212,6 +1218,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     studentsList: "Lista de estudiantes",
     currentLearner: "Estudiante actual",
     todaysStudyTime: "Tiempo de estudio de hoy",
+    historyDaySummary: "{count} sesion(es) registradas el {date}.",
     learningRecord: "Registro de aprendizaje",
     profileDetails: "Detalles del perfil",
     chooseMode: "Elegir modo",
@@ -1258,6 +1265,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     studentsList: "Lista de estudantes",
     currentLearner: "Estudante atual",
     todaysStudyTime: "Tempo de estudo de hoje",
+    historyDaySummary: "{count} sessao(oes) registada(s) em {date}.",
     learningRecord: "Registro de aprendizagem",
     profileDetails: "Detalhes do perfil",
     chooseMode: "Escolher modo",
@@ -1552,6 +1560,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     studentsList: "Orodha ya wanafunzi",
     currentLearner: "Mwanafunzi wa sasa",
     todaysStudyTime: "Muda wa masomo wa leo",
+    historyDaySummary: "Vipindi {count} vimerekodiwa tarehe {date}.",
     learningRecord: "Rekodi ya kujifunza",
     profileDetails: "Maelezo ya wasifu",
     chooseMode: "Chagua hali",

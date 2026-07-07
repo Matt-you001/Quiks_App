@@ -34,6 +34,8 @@ import type {
   CompetitionJoinResponse,
   CompetitionChallengeAcceptRequest,
   CompetitionChallengeAcceptResponse,
+  CompetitionChallengeCreatorDecisionRequest,
+  CompetitionChallengeCreatorDecisionResponse,
   CompetitionChatSendRequest,
   CompetitionChatSendResponse,
   CompetitionChallengeCreateRequest,
@@ -55,6 +57,8 @@ import type {
   CompetitionSubmitRequest,
   CompetitionSubmitResponse,
   CoachPlanRequest,
+  PushTokenRegisterRequest,
+  PushTokenRegisterResponse,
   FeedbackRequest,
   Question,
   QuestionRequest,
@@ -487,6 +491,12 @@ export async function acceptCompetitionChallenge(
   return postJson("/competition/challenge/accept", withVariantMeta(request));
 }
 
+export async function decideCompetitionChallengeAsCreator(
+  request: CompetitionChallengeCreatorDecisionRequest
+): Promise<CompetitionChallengeCreatorDecisionResponse> {
+  return postJson("/competition/challenge/creator-decision", withVariantMeta(request));
+}
+
 export async function getCompetitionLeaderboard(
   request: CompetitionLeaderboardRequest
 ): Promise<CompetitionLeaderboardResponse> {
@@ -533,6 +543,12 @@ export async function submitCompetitionResult(request: CompetitionSubmitRequest)
 
 export async function sendCompetitionChat(request: CompetitionChatSendRequest): Promise<CompetitionChatSendResponse> {
   return postJson("/competition/chat", withVariantMeta(request));
+}
+
+export async function registerPushToken(
+  request: PushTokenRegisterRequest
+): Promise<PushTokenRegisterResponse> {
+  return postJson("/notifications/register-push-token", withVariantMeta(request));
 }
 
 export async function syncClassroomProfile(request: ClassroomProfileSyncRequest) {

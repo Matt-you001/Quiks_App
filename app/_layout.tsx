@@ -3,12 +3,17 @@ import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
 import { appVariant } from "../lib/app-variant";
-import { useNotificationNavigation, usePendingChallengeWatcher } from "../lib/notifications";
+import {
+  useNotificationNavigation,
+  usePendingChallengeWatcher,
+  useRemotePushRegistration,
+} from "../lib/notifications";
 import { palette } from "../lib/theme";
 
 export default function RootLayout() {
   useNotificationNavigation();
   usePendingChallengeWatcher();
+  useRemotePushRegistration();
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(palette.navy).catch(() => undefined);

@@ -4,7 +4,7 @@
     "slug": "quiks",
     "scheme": "quiks-children",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "light",
     "icon": "./assets/images/quiks-children-icon-1024.png",
     "splash": {

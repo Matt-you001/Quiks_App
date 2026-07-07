@@ -1,28 +1,32 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { t } from "./i18n";
 import { readAppState } from "./storage";
-import { getCompetitionChallengeStatus } from "../services/ai";
+import { getCompetitionChallengeStatus, registerPushToken } from "../services/ai";
+import type { AppLanguage } from "../types/app";
 
 const COMPETITION_REMINDER_STORAGE_KEY = "quiks_competition_reminders_v1";
 const COMPETITION_REMINDER_CHANNEL_ID = "competition-reminders";
 const PENDING_CHALLENGE_STORAGE_KEY = "quiks_pending_challenge_v1";
+const REMOTE_PUSH_REGISTRATION_STORAGE_KEY = "quiks_remote_push_registration_v1";
 
 type CompetitionReminderMap = Record<string, string[]>;
 
 interface PendingCompetitionChallenge {
   challengeId: string;
   playerId: string;
-  playerLanguage: string;
+  playerLanguage: AppLanguage;
   subjectId: string;
   grade: string;
   level: string;
   difficulty: string;
   focusMode: string;
   topicId?: string;
+  acceptedNotificationShownAt?: number;
 }
 
 interface CompetitionReminderScheduleRequest {
@@ -40,6 +44,13 @@ interface CompetitionReminderScheduleRequest {
   startTitle: string;
   startBody: string;
 }
+
+interface RegisteredPushState {
+  profileId: string;
+  token: string;
+}
+
+const COMPETITION_SOON_REMINDER_OFFSET_MS = 3_000;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -78,6 +89,32 @@ async function readPendingChallenge(): Promise<PendingCompetitionChallenge | nul
   } catch {
     return null;
   }
+}
+
+async function readRegisteredPushState(): Promise<RegisteredPushState | null> {
+  const raw = await AsyncStorage.getItem(REMOTE_PUSH_REGISTRATION_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return (JSON.parse(raw) as RegisteredPushState) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeRegisteredPushState(nextState: RegisteredPushState | null) {
+  if (!nextState) {
+    await AsyncStorage.removeItem(REMOTE_PUSH_REGISTRATION_STORAGE_KEY);
+    return;
+  }
+
+  await AsyncStorage.setItem(REMOTE_PUSH_REGISTRATION_STORAGE_KEY, JSON.stringify(nextState));
+}
+
+export async function getPendingCompetitionChallenge() {
+  return readPendingChallenge();
 }
 
 async function writePendingChallenge(nextState: PendingCompetitionChallenge | null) {
@@ -129,6 +166,100 @@ async function ensureNotificationPermission() {
   return requested.granted || requested.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
 }
 
+function getExpoProjectId() {
+  return (
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId ??
+    (
+      Constants as {
+        manifest2?: {
+          extra?: {
+            eas?: {
+              projectId?: string;
+            };
+          };
+        };
+      }
+    ).manifest2?.extra?.eas?.projectId ??
+    (
+      Constants as {
+        manifest?: {
+          extra?: {
+            eas?: {
+              projectId?: string;
+            };
+          };
+        };
+      }
+    ).manifest?.extra?.eas?.projectId ??
+    null
+  );
+}
+
+async function registerRemotePushTokenForActiveProfile() {
+  if (Platform.OS === "web") {
+    return;
+  }
+
+  const state = await readAppState();
+  if (!state.isAuthenticated) {
+    await writeRegisteredPushState(null);
+    return;
+  }
+
+  const activeProfile =
+    state.profiles.find((profile) => profile.id === state.currentProfileId) ??
+    state.profiles[0] ??
+    null;
+
+  if (!activeProfile) {
+    await writeRegisteredPushState(null);
+    return;
+  }
+
+  const hasPermission = await ensureNotificationPermission();
+  if (!hasPermission) {
+    return;
+  }
+
+  const projectId = getExpoProjectId();
+  if (!projectId) {
+    return;
+  }
+
+  const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
+  const token = tokenResponse.data;
+  if (!token) {
+    return;
+  }
+
+  const existingRegistration = await readRegisteredPushState();
+  if (existingRegistration?.profileId === activeProfile.id && existingRegistration.token === token) {
+    return;
+  }
+
+  await registerPushToken({
+    playerId: activeProfile.id,
+    token,
+    language: activeProfile.language,
+    profileName: activeProfile.name,
+  });
+
+  await writeRegisteredPushState({
+    profileId: activeProfile.id,
+    token,
+  });
+}
+
+export async function syncRemotePushRegistration() {
+  try {
+    await registerRemotePushTokenForActiveProfile();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function cancelCompetitionReminderNotifications(competitionId: string) {
   if (Platform.OS === "web") {
     return;
@@ -155,6 +286,18 @@ export async function clearPendingCompetitionChallenge() {
   await writePendingChallenge(null);
 }
 
+export async function markPendingCompetitionChallengeAcceptedNotificationShown() {
+  const pending = await readPendingChallenge();
+  if (!pending) {
+    return;
+  }
+
+  await writePendingChallenge({
+    ...pending,
+    acceptedNotificationShownAt: Date.now(),
+  });
+}
+
 export async function scheduleCompetitionReminderNotifications(
   request: CompetitionReminderScheduleRequest
 ) {
@@ -173,7 +316,9 @@ export async function scheduleCompetitionReminderNotifications(
   const identifiers: string[] = [];
   const data = buildSessionNotificationData(request);
 
-  if (request.startAt - 5 * 60 * 1000 > now + 5_000) {
+  const soonReminderAt = request.startAt - COMPETITION_SOON_REMINDER_OFFSET_MS;
+
+  if (soonReminderAt > now + 500) {
     const soonIdentifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: request.soonTitle,
@@ -184,7 +329,7 @@ export async function scheduleCompetitionReminderNotifications(
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: new Date(request.startAt - 5 * 60 * 1000),
+        date: new Date(soonReminderAt),
         channelId: COMPETITION_REMINDER_CHANNEL_ID,
       },
     });
@@ -217,7 +362,6 @@ export async function scheduleCompetitionReminderNotifications(
 
 async function presentCompetitionAcceptedNotification(params: {
   challenge: PendingCompetitionChallenge;
-  competitionId: string;
   opponentName?: string;
 }) {
   const hasPermission = await ensureNotificationPermission();
@@ -235,17 +379,16 @@ async function presentCompetitionAcceptedNotification(params: {
       sound: "default",
       priority: Notifications.AndroidNotificationPriority.MAX,
       data: {
-        route: "/session",
+        route: "/competition",
+        challengeId: params.challenge.challengeId,
         subjectId: params.challenge.subjectId,
         grade: params.challenge.grade,
         level: params.challenge.level,
         difficulty: params.challenge.difficulty,
         focusMode: params.challenge.focusMode,
         topicId: params.challenge.topicId ?? "",
-        competitionId: params.competitionId,
-        competitionOpponentName: params.opponentName ?? "",
-        autoStart: "1",
-        mode: "quiz",
+        opponentName: params.opponentName ?? "",
+        notificationType: "challenge_accepted_needs_creator_confirmation",
       },
     },
     trigger: null,
@@ -255,7 +398,22 @@ async function presentCompetitionAcceptedNotification(params: {
 }
 
 function routeFromNotificationData(data: Record<string, unknown> | undefined) {
-  if (!data || data.route !== "/session") {
+  if (!data) {
+    return null;
+  }
+
+  if (data.route === "/competition") {
+    return {
+      pathname: "/competition" as const,
+      params: {
+        challengeId: typeof data.challengeId === "string" ? data.challengeId : "",
+        subjectId: typeof data.subjectId === "string" ? data.subjectId : "",
+        grade: typeof data.grade === "string" ? data.grade : "",
+      },
+    };
+  }
+
+  if (data.route !== "/session") {
     return null;
   }
 
@@ -316,6 +474,38 @@ export function useNotificationNavigation() {
   }, []);
 }
 
+export function useRemotePushRegistration() {
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncRegistration = async () => {
+      try {
+        if (!cancelled) {
+          await syncRemotePushRegistration();
+        }
+      } catch {
+        // Leave existing local notifications working even if remote registration fails.
+      }
+    };
+
+    void syncRegistration();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void syncRegistration();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, []);
+}
+
 export function usePendingChallengeWatcher() {
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -349,12 +539,30 @@ export function usePendingChallengeWatcher() {
           playerId: pending.playerId,
         });
 
+        if (response.status === "awaiting_creator_confirmation") {
+          if (!pending.acceptedNotificationShownAt) {
+            await presentCompetitionAcceptedNotification({
+              challenge: pending,
+              opponentName: response.challenge?.acceptedByName,
+            });
+            await writePendingChallenge({
+              ...pending,
+              acceptedNotificationShownAt: Date.now(),
+            });
+          }
+          return;
+        }
+
         if (response.status === "accepted" && response.competition) {
-          await presentCompetitionAcceptedNotification({
-            challenge: pending,
-            competitionId: response.competition.competitionId,
-            opponentName: response.competition.opponentName,
-          });
+          await clearPendingCompetitionChallenge();
+          return;
+        }
+
+        if (
+          response.status === "declined" ||
+          response.status === "cancelled" ||
+          response.status === "not_found"
+        ) {
           await clearPendingCompetitionChallenge();
         }
       } catch {

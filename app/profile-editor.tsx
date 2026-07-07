@@ -5,6 +5,7 @@ import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, t } from "../lib/i18n";
+import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile } from "../lib/subscription";
 import { readAppState, upsertProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
@@ -111,6 +112,7 @@ export default function ProfileEditorScreen() {
     };
 
     await upsertProfile(profile);
+    await syncRemotePushRegistration();
     setSaving(false);
     router.replace(isEditMode ? "/profile" : "/");
   };

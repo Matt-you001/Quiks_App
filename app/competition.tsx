@@ -10,7 +10,12 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { calculateQuizTime, getLevelProgressForGrade } from "../lib/quiz";
-import { clearPendingCompetitionChallenge, trackPendingCompetitionChallenge } from "../lib/notifications";
+import {
+  clearPendingCompetitionChallenge,
+  getPendingCompetitionChallenge,
+  syncRemotePushRegistration,
+  trackPendingCompetitionChallenge,
+} from "../lib/notifications";
 import { canJoinCompetitionToday, shouldShowUpgradePrompts } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getLocalizedSubjects, getSubjectById, getTopicById, grades } from "../lib/subjects";
@@ -18,11 +23,15 @@ import { palette, shadows } from "../lib/theme";
 import {
   acceptCompetitionChallenge,
   createCompetitionChallenge,
+  decideCompetitionChallengeAsCreator,
+  getCompetitionStatus,
   getCompetitionChallengeStatus,
   getCompetitionLeaderboard,
   listCompetitionChallenges,
 } from "../services/ai";
 import type {
+  CompetitionChallengeNotificationDiagnostics,
+  CompetitionChallengeStatus,
   CompetitionChallengeSummary,
   CompetitionTopPerformer,
   Difficulty,
@@ -33,9 +42,10 @@ import type {
 } from "../types/app";
 
 type CompetitionScreenMode = "create" | "accept" | "waiting";
+type WaitingRole = "creator" | "accepter";
 
 export default function CompetitionScreen() {
-  const params = useLocalSearchParams<{ subjectId?: string; grade?: string }>();
+  const params = useLocalSearchParams<{ subjectId?: string; grade?: string; challengeId?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
@@ -45,6 +55,7 @@ export default function CompetitionScreen() {
   const [challenges, setChallenges] = useState<CompetitionChallengeSummary[]>([]);
   const [topPerformers, setTopPerformers] = useState<CompetitionTopPerformer[]>([]);
   const [activeChallenge, setActiveChallenge] = useState<CompetitionChallengeSummary | null>(null);
+  const [waitingRole, setWaitingRole] = useState<WaitingRole | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(params.subjectId ?? null);
   const [grade, setGrade] = useState(() =>
     typeof params.grade === "string" && grades.includes(params.grade) ? params.grade : grades[0]
@@ -55,6 +66,7 @@ export default function CompetitionScreen() {
   const [selectedLevel, setSelectedLevel] = useState(1);
   const [levelTouched, setLevelTouched] = useState(false);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
+  const [isDecidingChallenge, setIsDecidingChallenge] = useState(false);
   const notifiedAcceptedRef = useRef(false);
   const acceptedSoundPlayer = useAudioPlayer(require("../assets/audio/challenge-accepted.wav"));
   const language = profile?.language ?? "en";
@@ -71,6 +83,82 @@ export default function CompetitionScreen() {
       setSubscriptionTier(state.subscriptionTier);
     });
   }, []);
+
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPendingChallenge = async () => {
+      try {
+        const pendingChallenge =
+          typeof params.challengeId === "string" && params.challengeId
+            ? { challengeId: params.challengeId, source: "notification" as const }
+            : await getPendingCompetitionChallenge().then((pending) =>
+                pending && pending.playerId === profile.id
+                  ? { challengeId: pending.challengeId, source: "storage" as const }
+                  : null
+              );
+
+        if (!pendingChallenge) {
+          return;
+        }
+
+        const response = await getCompetitionChallengeStatus({
+          challengeId: pendingChallenge.challengeId,
+          playerId: profile.id,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        if (
+          response.status === "not_found" ||
+          response.status === "declined" ||
+          response.status === "cancelled"
+        ) {
+          await clearPendingCompetitionChallenge();
+          return;
+        }
+
+        if (response.challenge) {
+          setActiveChallenge(response.challenge);
+          setWaitingRole(response.challenge.creatorId === profile.id ? "creator" : "accepter");
+          setScreenMode("waiting");
+        }
+
+        if (response.status === "accepted" && response.competition) {
+          router.replace({
+            pathname: "/session",
+            params: {
+              subjectId: response.challenge?.subjectId ?? params.subjectId ?? "",
+              grade: response.challenge?.grade ?? params.grade ?? "",
+              level: String(response.challenge?.level ?? 1),
+              difficulty: response.challenge?.difficulty ?? appVariant.defaultDifficulty,
+              focusMode: response.challenge?.focusMode ?? "general",
+              topicId: response.challenge?.topicId,
+              competitionId: response.competition.competitionId,
+              competitionOpponentName: response.competition.opponentName,
+              autoStart: "1",
+              mode: "quiz",
+            },
+          });
+          return;
+        }
+      } catch {
+        // Leave the screen available for manual refresh from the competition board.
+      }
+    };
+
+    void loadPendingChallenge();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.challengeId, params.grade, params.subjectId, profile]);
 
   const levelProgress = useMemo(() => {
     if (!setupSubject) {
@@ -156,6 +244,53 @@ export default function CompetitionScreen() {
   }, [profile, screenMode, subject?.id]);
 
   useEffect(() => {
+    if (!profile || screenMode === "waiting") {
+      return;
+    }
+
+    let cancelled = false;
+
+    const recoverMatchedCompetition = async () => {
+      try {
+        const response = await getCompetitionStatus({ playerId: profile.id });
+        if (cancelled || response.status !== "matched" || !response.competition) {
+          return;
+        }
+
+        const pendingChallenge = await getPendingCompetitionChallenge();
+        if (cancelled || !pendingChallenge) {
+          return;
+        }
+
+        await clearPendingCompetitionChallenge();
+        router.replace({
+          pathname: "/session",
+          params: {
+            subjectId: pendingChallenge.subjectId,
+            grade: pendingChallenge.grade,
+            level: pendingChallenge.level,
+            difficulty: pendingChallenge.difficulty,
+            focusMode: pendingChallenge.focusMode,
+            topicId: pendingChallenge.topicId,
+            competitionId: response.competition.competitionId,
+            competitionOpponentName: response.competition.opponentName,
+            autoStart: "1",
+            mode: "quiz",
+          },
+        });
+      } catch {
+        // If recovery fails, the normal competition screen stays available.
+      }
+    };
+
+    void recoverMatchedCompetition();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, screenMode]);
+
+  useEffect(() => {
     if (screenMode !== "waiting" || !profile || !activeChallenge) {
       return;
     }
@@ -166,6 +301,14 @@ export default function CompetitionScreen() {
           challengeId: activeChallenge.challengeId,
           playerId: profile.id,
         });
+
+        if (response.challenge) {
+          setActiveChallenge(response.challenge);
+        }
+
+        if (response.status === "awaiting_creator_confirmation") {
+          return;
+        }
 
         if (response.status === "accepted" && response.competition) {
           await clearPendingCompetitionChallenge();
@@ -195,6 +338,15 @@ export default function CompetitionScreen() {
               mode: "quiz",
             },
           });
+          return;
+        }
+
+        if (response.status === "declined" || response.status === "cancelled" || response.status === "not_found") {
+          await clearPendingCompetitionChallenge();
+          setActiveChallenge(null);
+          setWaitingRole(null);
+          setScreenMode("accept");
+          Alert.alert("Challenge cancelled", "This challenge will not continue.");
         }
       } catch {
         // Stay on the waiting page.
@@ -216,6 +368,7 @@ export default function CompetitionScreen() {
 
     setIsCreatingChallenge(true);
     try {
+      await syncRemotePushRegistration();
       const response = await createCompetitionChallenge({
         subject: setupSubject,
         grade,
@@ -229,6 +382,7 @@ export default function CompetitionScreen() {
       });
       notifiedAcceptedRef.current = false;
       setActiveChallenge(response.challenge);
+      setWaitingRole("creator");
       await trackPendingCompetitionChallenge({
         challengeId: response.challenge.challengeId,
         playerId: profile.id,
@@ -264,23 +418,111 @@ export default function CompetitionScreen() {
         playerId: profile.id,
         profile,
       });
-      router.replace({
-        pathname: "/session",
-        params: {
-          subjectId: challenge.subjectId,
-          grade: challenge.grade,
-          level: String(challenge.level),
-          difficulty: challenge.difficulty,
-          focusMode: challenge.focusMode,
-          topicId: challenge.topicId,
-          competitionId: response.competition.competitionId,
-          competitionOpponentName: response.competition.opponentName,
-          autoStart: "1",
-          mode: "quiz",
-        },
-      });
+      setActiveChallenge(response.challenge);
+      setWaitingRole("accepter");
+      setScreenMode("waiting");
+      Alert.alert("Challenge accepted", `Waiting for ${challenge.creatorName} to confirm and start the competition.`);
     } finally {
       setAcceptingChallengeId(null);
+    }
+  };
+
+  const decideAsCreator = async (decision: "accept" | "decline") => {
+    if (!profile || !activeChallenge) {
+      return;
+    }
+
+    setIsDecidingChallenge(true);
+    try {
+      const response = await decideCompetitionChallengeAsCreator({
+        challengeId: activeChallenge.challengeId,
+        playerId: profile.id,
+        decision,
+      });
+
+      if (decision === "decline" || response.status === "declined" || response.status === "cancelled") {
+        await clearPendingCompetitionChallenge();
+        setActiveChallenge(null);
+        setWaitingRole(null);
+        setScreenMode("accept");
+        Alert.alert("Challenge cancelled", "You declined the challenge, so the competition has been cancelled.");
+        return;
+      }
+
+      if (response.competition) {
+        await clearPendingCompetitionChallenge();
+        router.replace({
+          pathname: "/session",
+          params: {
+            subjectId: activeChallenge.subjectId,
+            grade: activeChallenge.grade,
+            level: String(activeChallenge.level),
+            difficulty: activeChallenge.difficulty,
+            focusMode: activeChallenge.focusMode,
+            topicId: activeChallenge.topicId,
+            competitionId: response.competition.competitionId,
+            competitionOpponentName: response.competition.opponentName,
+            autoStart: "1",
+            mode: "quiz",
+          },
+        });
+      }
+    } finally {
+      setIsDecidingChallenge(false);
+    }
+  };
+
+  const getWaitingBody = (challenge: CompetitionChallengeSummary, status: CompetitionChallengeStatus, role: WaitingRole | null) => {
+    if (status === "awaiting_creator_confirmation" && role === "creator") {
+      return `${challenge.acceptedByName ?? "Another learner"} accepted your challenge. Accept to start the competition in 10 seconds, or decline to cancel it.`;
+    }
+
+    if (status === "awaiting_creator_confirmation" && role === "accepter") {
+      return `Waiting for ${challenge.creatorName} to confirm your challenge before the competition begins.`;
+    }
+
+    return t(language, "waitingForAcceptance");
+  };
+
+  const getPushDiagnostics = (
+    challenge: CompetitionChallengeSummary,
+    role: WaitingRole | null
+  ): CompetitionChallengeNotificationDiagnostics | null => {
+    if (role === "creator") {
+      return challenge.creatorNotification ?? null;
+    }
+
+    if (role === "accepter") {
+      return challenge.accepterNotification ?? null;
+    }
+
+    return null;
+  };
+
+  const formatPushDiagnosticText = (
+    diagnostics: CompetitionChallengeNotificationDiagnostics | null,
+    role: WaitingRole | null
+  ) => {
+    if (!diagnostics) {
+      return null;
+    }
+
+    const target = role === "creator" ? "creator" : "accepter";
+
+    switch (diagnostics.lastStatus) {
+      case "sent":
+        return `Push alert sent to the ${target} device.`;
+      case "sending":
+        return `Sending push alert to the ${target} device...`;
+      case "not_registered":
+        return `No registered push device was found for the ${target}. Open the app on that learner and allow notifications.`;
+      case "failed":
+        return diagnostics.lastError
+          ? `Push delivery failed: ${diagnostics.lastError}`
+          : `Push delivery failed for the ${target} device.`;
+      case "pending":
+      default:
+        return "Push diagnostics are waiting for the next competition update.";
     }
   };
 
@@ -323,17 +565,45 @@ export default function CompetitionScreen() {
   );
 
   if (screenMode === "waiting" && activeChallenge) {
+    const waitingStatus = activeChallenge.status ?? "open";
+    const creatorMustConfirm = waitingStatus === "awaiting_creator_confirmation" && waitingRole === "creator";
+    const pushDiagnostics = getPushDiagnostics(activeChallenge, waitingRole);
+    const pushDiagnosticText = formatPushDiagnosticText(pushDiagnostics, waitingRole);
+
     return (
       <AppBackground>
         <View style={styles.heroCard}>
-          <Text style={styles.eyebrow}>{t(language, "challengeCreated")}</Text>
+          <Text style={styles.eyebrow}>{creatorMustConfirm ? t(language, "challengeAccepted") : t(language, "challengeCreated")}</Text>
           <Text style={styles.title}>{activeChallenge.subjectName}</Text>
-          <Text style={styles.heroText}>{t(language, "waitingForAcceptance")}</Text>
+          <Text style={styles.heroText}>{getWaitingBody(activeChallenge, waitingStatus, waitingRole)}</Text>
           <Text style={styles.heroText}>
             {activeChallenge.grade} | {t(language, "levelLabel")} {activeChallenge.level} | {getDifficultyLabel(language, activeChallenge.difficulty)}
           </Text>
+          {pushDiagnosticText ? (
+            <View style={styles.diagnosticsCard}>
+              <Text style={styles.diagnosticsTitle}>Push diagnostics</Text>
+              <Text
+                style={[
+                  styles.diagnosticsText,
+                  pushDiagnostics?.lastStatus === "failed" || pushDiagnostics?.lastStatus === "not_registered"
+                    ? styles.diagnosticsTextWarning
+                    : null,
+                ]}
+              >
+                {pushDiagnosticText}
+              </Text>
+            </View>
+          ) : null}
         </View>
-        <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
+        <View style={styles.actionColumn}>
+          {creatorMustConfirm ? (
+            <>
+              <PrimaryButton label="Start Competition" onPress={() => decideAsCreator("accept")} loading={isDecidingChallenge} />
+              <PrimaryButton label="Decline Challenge" variant="secondary" onPress={() => decideAsCreator("decline")} disabled={isDecidingChallenge} />
+            </>
+          ) : null}
+          <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} disabled={isDecidingChallenge} />
+        </View>
       </AppBackground>
     );
   }
@@ -583,6 +853,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: "#EAF6FC",
     lineHeight: 22,
+  },
+  diagnosticsCard: {
+    marginTop: 14,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    gap: 6,
+  },
+  diagnosticsTitle: {
+    color: palette.white,
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  diagnosticsText: {
+    color: "#EAF6FC",
+    lineHeight: 20,
+  },
+  diagnosticsTextWarning: {
+    color: "#FFE3A8",
   },
   card: {
     marginTop: 18,

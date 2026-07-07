@@ -201,7 +201,7 @@ const config: ExpoConfig = {
   slug: current.slug,
   scheme: current.scheme,
   version: "1.0.0",
-  orientation: "portrait",
+  orientation: "default",
   userInterfaceStyle: "light",
   icon: `./assets/images/quiks-${variant}-icon-1024.png`,
   splash: {

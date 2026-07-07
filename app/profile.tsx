@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { Alert, Linking, Platform, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -31,15 +31,48 @@ function getGradeRank(grade: string) {
   return 0;
 }
 
-function isSameLocalDay(dateIso: string) {
-  const now = new Date();
-  const value = new Date(dateIso);
+function getLocalDateKey(dateValue: string | Date) {
+  const value = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-  return (
-    value.getFullYear() === now.getFullYear() &&
-    value.getMonth() === now.getMonth() &&
-    value.getDate() === now.getDate()
-  );
+function isSameLocalDay(dateIso: string, targetDateKey?: string) {
+  const comparisonDateKey = targetDateKey ?? getLocalDateKey(new Date());
+  return getLocalDateKey(dateIso) === comparisonDateKey;
+}
+
+function getHistoryLocale(language: string) {
+  switch (language) {
+    case "fr":
+      return "fr-FR";
+    case "de":
+      return "de-DE";
+    case "es":
+      return "es-ES";
+    case "pt":
+      return "pt-PT";
+    case "zh":
+      return "zh-CN";
+    case "ar":
+      return "ar-EG";
+    case "sw":
+      return "sw-KE";
+    default:
+      return "en-GB";
+  }
+}
+
+function formatHistoryDayLabel(dateKey: string, language: string) {
+  const value = new Date(`${dateKey}T00:00:00`);
+  return value.toLocaleDateString(getHistoryLocale(language), {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatResultDuration(totalSeconds: number) {
@@ -102,6 +135,8 @@ export default function ProfileScreen() {
   const bestScore = results.length > 0 ? `${Math.max(...results.map((result) => result.score))}%` : "0%";
   const language = activeProfile?.language ?? "en";
   const latestPerformance = results[0] ? `${results[0].score}% in ${results[0].subjectName}` : t(language, "noSessionsYet");
+  const [selectedHistoryDay, setSelectedHistoryDay] = useState<string | null>(null);
+  const [isHistoryDropdownOpen, setIsHistoryDropdownOpen] = useState(false);
 
   const highestAttainment = useMemo(() => {
     const passedResults = results.filter((result) => result.score >= SCORE_THRESHOLD);
@@ -132,8 +167,55 @@ export default function ProfileScreen() {
     };
   }, [language, results]);
 
-  const todaySeconds = results.filter((result) => isSameLocalDay(result.date)).reduce((sum, result) => sum + result.timeTakenSeconds, 0);
-  const todayResults = results.filter((result) => isSameLocalDay(result.date));
+  const resultsByDay = useMemo(() => {
+    const grouped = new Map<string, SessionResult[]>();
+
+    for (const result of results) {
+      const dayKey = getLocalDateKey(result.date);
+      const bucket = grouped.get(dayKey) ?? [];
+      bucket.push(result);
+      grouped.set(dayKey, bucket);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([dateKey, dayResults]) => ({
+        dateKey,
+        results: dayResults.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()),
+        totalSeconds: dayResults.reduce((sum, result) => sum + result.timeTakenSeconds, 0),
+      }))
+      .sort((left, right) => right.dateKey.localeCompare(left.dateKey));
+  }, [results]);
+
+  const todayDateKey = getLocalDateKey(new Date());
+  const availableHistoryDays = useMemo(() => {
+    const allDays = new Set(resultsByDay.map((entry) => entry.dateKey));
+    allDays.add(todayDateKey);
+
+    return Array.from(allDays).sort((left, right) => right.localeCompare(left));
+  }, [resultsByDay, todayDateKey]);
+
+  useEffect(() => {
+    const fallbackDay = availableHistoryDays[0] ?? null;
+
+    setSelectedHistoryDay((current) => {
+      if (current && availableHistoryDays.includes(current)) {
+        return current;
+      }
+
+      return fallbackDay;
+    });
+  }, [availableHistoryDays]);
+
+  const selectedHistory = resultsByDay.find((entry) => entry.dateKey === selectedHistoryDay) ?? null;
+  const selectedHistoryLabel = selectedHistoryDay
+    ? formatHistoryDayLabel(selectedHistoryDay, language)
+    : null;
+  const isTodaySelected = !selectedHistoryDay || selectedHistoryDay === todayDateKey;
+  const todaySeconds = results
+    .filter((result) => isSameLocalDay(result.date, todayDateKey))
+    .reduce((sum, result) => sum + result.timeTakenSeconds, 0);
+  const displayedResults = selectedHistory?.results ?? [];
+  const displayedSeconds = selectedHistory?.totalSeconds ?? 0;
   const goalMinutes = activeProfile?.dailyGoalMinutes ?? 0;
   const goalSeconds = goalMinutes * 60;
   const competitionResults = results.filter((result) => Boolean(result.competitionId));
@@ -221,13 +303,67 @@ export default function ProfileScreen() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "todaysStudyTime")}</Text>
+        <View style={styles.historyControls}>
+          <Pressable
+            onPress={() => setIsHistoryDropdownOpen((current) => !current)}
+            style={({ pressed }) => [
+              styles.historyDropdown,
+              pressed && styles.historyDropdownPressed,
+            ]}
+          >
+            <Text style={styles.historyDropdownLabel}>
+              {selectedHistoryLabel ?? t(language, "noSessionsYet")}
+            </Text>
+            <Text style={styles.historyDropdownChevron}>
+              {isHistoryDropdownOpen ? "▲" : "▼"}
+            </Text>
+          </Pressable>
+
+          {isHistoryDropdownOpen && availableHistoryDays.length > 0 ? (
+            <View style={styles.historyDropdownMenu}>
+              {availableHistoryDays.map((dateKey) => {
+                const isActive = dateKey === selectedHistoryDay;
+                return (
+                  <Pressable
+                    key={dateKey}
+                    onPress={() => {
+                      setSelectedHistoryDay(dateKey);
+                      setIsHistoryDropdownOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.historyDropdownOption,
+                      isActive && styles.historyDropdownOptionActive,
+                      pressed && styles.historyDropdownOptionPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.historyDropdownOptionText,
+                        isActive && styles.historyDropdownOptionTextActive,
+                      ]}
+                    >
+                      {formatHistoryDayLabel(dateKey, language)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.metricHighlight}>
-          {formatGoalDuration(todaySeconds)} / {goalMinutes} min
+          {formatGoalDuration(displayedSeconds)}{isTodaySelected ? ` / ${goalMinutes} min` : ""}
         </Text>
-        <Text style={styles.metricText}>{goalFeedback}</Text>
-        {todayResults.length > 0 ? (
+        <Text style={styles.metricText}>
+          {isTodaySelected
+            ? goalFeedback
+            : t(language, "historyDaySummary", {
+                count: displayedResults.length,
+                date: selectedHistoryLabel ?? "-",
+              })}
+        </Text>
+        {displayedResults.length > 0 ? (
           <View style={styles.todayHistoryWrap}>
-            {todayResults.slice(0, 6).map((result) => (
+            {displayedResults.slice(0, 8).map((result) => (
               <View key={result.id} style={styles.todayHistoryItem}>
                 <Text style={styles.todayHistoryTitle}>
                   {result.subjectName} · {result.score}% · {result.grade}
@@ -401,6 +537,64 @@ const styles = StyleSheet.create({
     color: palette.slate,
     lineHeight: 24,
     marginTop: 6,
+  },
+  historyControls: {
+    marginTop: 12,
+    marginBottom: 10,
+    position: "relative",
+    zIndex: 5,
+  },
+  historyDropdown: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D7E5EF",
+    backgroundColor: "#F6FAFC",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  historyDropdownPressed: {
+    opacity: 0.9,
+  },
+  historyDropdownLabel: {
+    color: palette.ink,
+    fontSize: 14,
+    fontWeight: "700",
+    flex: 1,
+  },
+  historyDropdownChevron: {
+    color: palette.navy,
+    fontSize: 12,
+    fontWeight: "800",
+    marginLeft: 10,
+  },
+  historyDropdownMenu: {
+    marginTop: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D7E5EF",
+    backgroundColor: palette.white,
+    overflow: "hidden",
+  },
+  historyDropdownOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  historyDropdownOptionActive: {
+    backgroundColor: "#EAF5FB",
+  },
+  historyDropdownOptionPressed: {
+    opacity: 0.85,
+  },
+  historyDropdownOptionText: {
+    color: palette.ink,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  historyDropdownOptionTextActive: {
+    color: palette.navy,
   },
   todayHistoryWrap: {
     marginTop: 12,
