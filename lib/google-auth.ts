@@ -1,10 +1,11 @@
 import { Platform } from "react-native";
+import { appVariant } from "./app-variant";
 import { googleAuthConfig } from "./auth-config";
 
 type NativeGoogleSigninModule = typeof import("@react-native-google-signin/google-signin");
 
 let nativeConfigured = false;
-const GOOGLE_SIGN_IN_ENABLED = false;
+const GOOGLE_SIGN_IN_ENABLED = true;
 
 function getNativeGoogleModule(): NativeGoogleSigninModule {
   return require("@react-native-google-signin/google-signin") as NativeGoogleSigninModule;
@@ -84,7 +85,7 @@ export function formatGoogleSignInError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
 
   if (message.includes("non-recoverable sign in failure")) {
-    return "Google sign-in is still being rejected by the Android app configuration. For Quiks Children, check that the Firebase Android app uses package com.quiks.mobile, the SHA fingerprints are added there, and the current build includes the linked google-services.json file.";
+    return `Google sign-in is still being rejected by the Android app configuration. For ${appVariant.appName}, confirm the Firebase Android app uses package ${appVariant.androidPackage}, the SHA fingerprints are added there, and the current build includes the correct linked Firebase Android config file for that variant.`;
   }
 
   if (message.includes("cancel")) {

@@ -534,24 +534,36 @@ export default function SessionScreen() {
       return;
     }
 
+    let requestTopicId = resolvedTopic?.id;
+    let requestTopicLabel = resolvedTopicLabel;
+
     if (focusMode === "topic") {
       if (isCustomTopic) {
-        if (!customTopicValidation || customTopicValidation.status === "empty") {
+        const freshTopicValidation = validateTopicInput(subject, customTopicInput, language);
+
+        if (freshTopicValidation.status === "empty") {
           Alert.alert(t(language, "chooseTopic"), t(language, "customTopicRequired"));
           return;
         }
 
-        if (customTopicValidation.status === "wrong-subject") {
+        if (freshTopicValidation.status === "wrong-subject") {
           Alert.alert(
             t(language, "chooseTopic"),
             t(language, "customTopicWrongSubject", {
-              topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
+              topic: freshTopicValidation.matchedTopicLabel ?? freshTopicValidation.input,
               subject: resolvedSubjectName,
-              matchedSubject: customTopicValidation.matchedSubjectName ?? resolvedSubjectName,
+              matchedSubject: freshTopicValidation.matchedSubjectName ?? resolvedSubjectName,
             })
           );
           return;
         }
+
+        requestTopicId =
+          freshTopicValidation.status === "valid" ? freshTopicValidation.matchedTopicId ?? undefined : undefined;
+        requestTopicLabel =
+          freshTopicValidation.status === "valid"
+            ? freshTopicValidation.matchedTopicLabel ?? freshTopicValidation.input
+            : freshTopicValidation.input;
 
       } else if (!selectedTopic) {
         Alert.alert(t(language, "chooseTopic"), t(language, "customTopicRequired"));
@@ -643,8 +655,8 @@ export default function SessionScreen() {
         level: selectedLevel,
         questionCount: QUESTIONS_PER_LEVEL,
         focusMode,
-        topicId: resolvedTopic?.id,
-        topicLabel: resolvedTopicLabel,
+        topicId: requestTopicId,
+        topicLabel: requestTopicLabel,
         profile,
         recentQuestionIds,
       };

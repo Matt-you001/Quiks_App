@@ -27,7 +27,7 @@ import {
   syncClassroomProfile,
   updateClassroomActivity,
 } from "../services/ai";
-import { getLocalizedSubjects } from "../lib/subjects";
+import { getLocalizedSubjects, validateTopicInput } from "../lib/subjects";
 import type {
   ClassroomActivitySummary,
   ClassroomActivityType,
@@ -115,6 +115,7 @@ export default function ClassroomScreen() {
   const [subjectId, setSubjectId] = useState(appVariant.allowedSubjectIds[0] ?? "");
   const [topicId, setTopicId] = useState<string | null>(null);
   const [useCustomSubject, setUseCustomSubject] = useState(false);
+  const [useCustomTopic, setUseCustomTopic] = useState(false);
   const [customSubjectName, setCustomSubjectName] = useState("");
   const [customTopicLabel, setCustomTopicLabel] = useState("");
   const [questionCount, setQuestionCount] = useState("5");
@@ -163,6 +164,7 @@ export default function ClassroomScreen() {
     () => localizedSubjects.find((subject) => subject.id === subjectId) ?? localizedSubjects[0] ?? null,
     [localizedSubjects, subjectId]
   );
+  const isUsingCustomTopic = focusMode === "topic" && (useCustomSubject || useCustomTopic);
   const resolvedActivitySubject = useMemo((): Subject | null => {
     if (useCustomSubject) {
       const name = customSubjectName.trim();
@@ -275,6 +277,13 @@ export default function ClassroomScreen() {
   }, [pickerMonth]);
   const minimumCalendarMonth = useMemo(() => getMonthStart(new Date()), []);
   const canGoToPreviousMonth = pickerMonth.getTime() > minimumCalendarMonth.getTime();
+  const visibleActivities = useMemo(() => {
+    if (profile?.role === "teacher" && selectedClass) {
+      return activities.filter((activity) => activity.classId === selectedClass.classId);
+    }
+
+    return activities;
+  }, [activities, profile?.role, selectedClass]);
 
   useEffect(() => {
     if (hydratingActivityRef.current) {
@@ -287,7 +296,7 @@ export default function ClassroomScreen() {
     setIsReviewingQuestions(false);
     setReviewPage(0);
     setHasStartedQuestionSelection(false);
-  }, [activityType, customSubjectName, customTopicLabel, difficulty, focusMode, grade, level, questionCount, questionOrderMode, resultVisibility, subjectId, topicId, useCustomSubject]);
+  }, [activityType, customSubjectName, customTopicLabel, difficulty, focusMode, grade, level, questionCount, questionOrderMode, resultVisibility, subjectId, topicId, useCustomSubject, useCustomTopic]);
 
   useEffect(() => {
     if (activityType !== "test") {
@@ -441,6 +450,7 @@ export default function ClassroomScreen() {
     setCustomSubjectName("");
     setCustomTopicLabel("");
     setUseCustomSubject(false);
+    setUseCustomTopic(false);
     setShowCustomQuestionForm(false);
     setHasStartedQuestionSelection(false);
     setOpenPicker(null);
@@ -456,6 +466,19 @@ export default function ClassroomScreen() {
       Alert.alert(t(language, "classroomTitle"), t(language, "copyClassCodeSuccess"));
     } catch {
       Alert.alert(t(language, "classroomTitle"), t(language, "copyClassCodeFailure"));
+    }
+  };
+
+  const copyQuiksId = async () => {
+    if (!profile?.quiksId) {
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(profile.quiksId);
+      Alert.alert(t(language, "classroomTitle"), `${t(language, "quiksIdLabel")} copied.`);
+    } catch {
+      Alert.alert(t(language, "classroomTitle"), `Unable to copy ${t(language, "quiksIdLabel")}.`);
     }
   };
 
@@ -593,9 +616,45 @@ export default function ClassroomScreen() {
       return;
     }
 
-    if (focusMode === "topic" && useCustomSubject && !customTopicLabel.trim()) {
-      Alert.alert(t(language, "questionSelectionTitle"), t(language, "enterCustomTopicFirst"));
-      return;
+    let requestTopicId: string | undefined;
+    let requestTopicLabel: string | undefined;
+
+    if (focusMode === "topic") {
+      if (useCustomSubject) {
+        if (!customTopicLabel.trim()) {
+          Alert.alert(t(language, "questionSelectionTitle"), t(language, "enterCustomTopicFirst"));
+          return;
+        }
+        requestTopicLabel = customTopicLabel.trim();
+      } else if (useCustomTopic) {
+        const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customTopicLabel, language);
+        if (freshTopicValidation.status === "empty") {
+          Alert.alert(t(language, "questionSelectionTitle"), t(language, "enterCustomTopicFirst"));
+          return;
+        }
+
+        if (freshTopicValidation.status === "wrong-subject") {
+          Alert.alert(
+            t(language, "questionSelectionTitle"),
+            t(language, "customTopicWrongSubject", {
+              topic: freshTopicValidation.input,
+              subject: resolvedActivitySubject.name,
+              matchedSubject: freshTopicValidation.matchedSubjectName ?? "another subject",
+            })
+          );
+          return;
+        }
+
+        if (freshTopicValidation.status === "valid") {
+          requestTopicId = freshTopicValidation.matchedTopicId;
+          requestTopicLabel = freshTopicValidation.matchedTopicLabel;
+        } else {
+          requestTopicLabel = customTopicLabel.trim();
+        }
+      } else {
+        requestTopicId = topicId ?? undefined;
+        requestTopicLabel = selectedSubject?.topics.find((topic) => topic.id === topicId)?.label;
+      }
     }
 
     setCandidateLoading(true);
@@ -610,18 +669,8 @@ export default function ClassroomScreen() {
         level: Math.max(1, Number(level) || 1),
         difficulty,
         focusMode,
-        topicId:
-          focusMode === "topic"
-            ? useCustomSubject
-              ? resolvedActivitySubject.topics[0]?.id
-              : topicId ?? undefined
-            : undefined,
-        topicLabel:
-          focusMode === "topic"
-            ? useCustomSubject
-              ? customTopicLabel.trim() || undefined
-              : selectedSubject?.topics.find((topic) => topic.id === topicId)?.label
-            : undefined,
+        topicId: focusMode === "topic" ? requestTopicId : undefined,
+        topicLabel: focusMode === "topic" ? requestTopicLabel : undefined,
         questionCount: desiredQuestionCount,
         batchCount: Math.min(10, remainingCount),
       });
@@ -719,9 +768,45 @@ export default function ClassroomScreen() {
       return;
     }
 
-    if (focusMode === "topic" && useCustomSubject && !customTopicLabel.trim()) {
-      Alert.alert(t(language, "publishAssignmentTitle"), t(language, "enterCustomTopicFirst"));
-      return;
+    let requestTopicId: string | undefined;
+    let requestTopicLabel: string | undefined;
+
+    if (focusMode === "topic") {
+      if (useCustomSubject) {
+        if (!customTopicLabel.trim()) {
+          Alert.alert(t(language, "publishAssignmentTitle"), t(language, "enterCustomTopicFirst"));
+          return;
+        }
+        requestTopicLabel = customTopicLabel.trim();
+      } else if (useCustomTopic) {
+        const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customTopicLabel, language);
+        if (freshTopicValidation.status === "empty") {
+          Alert.alert(t(language, "publishAssignmentTitle"), t(language, "enterCustomTopicFirst"));
+          return;
+        }
+
+        if (freshTopicValidation.status === "wrong-subject") {
+          Alert.alert(
+            t(language, "publishAssignmentTitle"),
+            t(language, "customTopicWrongSubject", {
+              topic: freshTopicValidation.input,
+              subject: resolvedActivitySubject.name,
+              matchedSubject: freshTopicValidation.matchedSubjectName ?? "another subject",
+            })
+          );
+          return;
+        }
+
+        if (freshTopicValidation.status === "valid") {
+          requestTopicId = freshTopicValidation.matchedTopicId;
+          requestTopicLabel = freshTopicValidation.matchedTopicLabel;
+        } else {
+          requestTopicLabel = customTopicLabel.trim();
+        }
+      } else {
+        requestTopicId = topicId ?? undefined;
+        requestTopicLabel = selectedSubject?.topics.find((topic) => topic.id === topicId)?.label;
+      }
     }
 
     const parsedStartAt = activityType === "test" ? parseDateTimeInput(startDate, startTime) : null;
@@ -771,23 +856,13 @@ export default function ClassroomScreen() {
         title: assignmentTitle.trim(),
         subject: resolvedActivitySubject,
         usesCustomSubject: useCustomSubject,
-        usesCustomTopic: Boolean(focusMode === "topic" && (useCustomSubject || customTopicLabel.trim())),
+        usesCustomTopic: Boolean(isUsingCustomTopic && customTopicLabel.trim()),
         grade,
         level: Math.max(1, Number(level) || 1),
         difficulty,
         focusMode,
-        topicId:
-          focusMode === "topic"
-            ? useCustomSubject
-              ? resolvedActivitySubject.topics[0]?.id
-              : topicId ?? undefined
-            : undefined,
-        topicLabel:
-          focusMode === "topic"
-            ? useCustomSubject
-              ? customTopicLabel.trim() || undefined
-              : selectedSubject?.topics.find((topic) => topic.id === topicId)?.label
-            : undefined,
+        topicId: focusMode === "topic" ? requestTopicId : undefined,
+        topicLabel: focusMode === "topic" ? requestTopicLabel : undefined,
         durationMinutes:
           activityType === "test"
             ? Math.max(1, computedTestDurationMinutes)
@@ -891,6 +966,7 @@ export default function ClassroomScreen() {
 
       if (activity.usesCustomSubject) {
         setUseCustomSubject(true);
+        setUseCustomTopic(false);
         setCustomSubjectName(activity.subjectName);
       } else {
         setUseCustomSubject(false);
@@ -899,12 +975,16 @@ export default function ClassroomScreen() {
 
       if (activity.focusMode === "topic") {
         if (activity.usesCustomTopic) {
+          setUseCustomTopic(!activity.usesCustomSubject);
+          setTopicId(activity.usesCustomSubject ? activity.topicId ?? null : null);
           setCustomTopicLabel(activity.topicLabel ?? "");
         } else {
+          setUseCustomTopic(false);
           setTopicId(activity.topicId ?? null);
           setCustomTopicLabel("");
         }
       } else {
+        setUseCustomTopic(false);
         setTopicId(activity.topicId ?? null);
         setCustomTopicLabel("");
       }
@@ -996,10 +1076,11 @@ export default function ClassroomScreen() {
             <Text style={styles.identityLabel}>{t(language, "roleLabel")}</Text>
             <Text style={styles.identityValue}>{profile.role === "teacher" ? t(language, "teacherRole") : t(language, "studentRole")}</Text>
           </View>
-          <View style={styles.identityChip}>
+          <Pressable style={styles.identityChip} onPress={copyQuiksId}>
             <Text style={styles.identityLabel}>{t(language, "quiksIdLabel")}</Text>
             <Text style={styles.identityValue}>{profile.quiksId}</Text>
-          </View>
+            <Text style={styles.identityCopyHint}>Tap to copy</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -1121,6 +1202,9 @@ export default function ClassroomScreen() {
                   </Pressable>
                   {activityExpanded ? (
                     <>
+                  <Text style={styles.helperText}>
+                    Selected class: {selectedClass.className}. Create as many tests and assignments as you want inside this class.
+                  </Text>
                   <Text style={styles.sectionLabel}>{t(language, "activityType")}</Text>
                   <View style={styles.inlineActions}>
                     <PrimaryButton label={t(language, "assignmentType")} onPress={() => setActivityType("assignment")} variant={activityType === "assignment" ? "primary" : "secondary"} style={styles.inlineButton} />
@@ -1131,8 +1215,24 @@ export default function ClassroomScreen() {
 
                   <Text style={styles.sectionLabel}>{t(language, "formLabel")}</Text>
                   <View style={styles.inlineActions}>
-                    <PrimaryButton label={t(language, "preset")} onPress={() => setUseCustomSubject(false)} variant={useCustomSubject ? "secondary" : "primary"} style={styles.inlineButton} />
-                    <PrimaryButton label={t(language, "custom")} onPress={() => setUseCustomSubject(true)} variant={useCustomSubject ? "primary" : "secondary"} style={styles.inlineButton} />
+                    <PrimaryButton
+                      label={t(language, "preset")}
+                      onPress={() => {
+                        setUseCustomSubject(false);
+                        setUseCustomTopic(false);
+                      }}
+                      variant={useCustomSubject ? "secondary" : "primary"}
+                      style={styles.inlineButton}
+                    />
+                    <PrimaryButton
+                      label={t(language, "custom")}
+                      onPress={() => {
+                        setUseCustomSubject(true);
+                        setUseCustomTopic(false);
+                      }}
+                      variant={useCustomSubject ? "primary" : "secondary"}
+                      style={styles.inlineButton}
+                    />
                   </View>
 
                   <Text style={styles.sectionLabel}>{t(language, "subjectLabel")}</Text>
@@ -1174,15 +1274,49 @@ export default function ClassroomScreen() {
                     <>
                       <Text style={styles.sectionLabel}>{t(language, "topicLabel")}</Text>
                       {useCustomSubject ? (
-                        <TextInput value={customTopicLabel} onChangeText={setCustomTopicLabel} placeholder="Custom topic" placeholderTextColor="#8092A7" style={styles.input} />
+                        <TextInput
+                          value={customTopicLabel}
+                          onChangeText={setCustomTopicLabel}
+                          placeholder={t(language, "enterCustomTopic")}
+                          placeholderTextColor="#8092A7"
+                          style={styles.input}
+                        />
                       ) : selectedSubject ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                          {selectedSubject.topics.map((entry) => (
-                            <Pressable key={entry.id} onPress={() => setTopicId(entry.id)} style={[styles.choiceChip, entry.id === topicId ? styles.choiceChipActive : null]}>
-                              <Text style={[styles.choiceChipText, entry.id === topicId ? styles.choiceChipTextActive : null]}>{entry.label}</Text>
+                        <>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                            {selectedSubject.topics.map((entry) => (
+                              <Pressable
+                                key={entry.id}
+                                onPress={() => {
+                                  setUseCustomTopic(false);
+                                  setCustomTopicLabel("");
+                                  setTopicId(entry.id);
+                                }}
+                                style={[styles.choiceChip, !useCustomTopic && entry.id === topicId ? styles.choiceChipActive : null]}
+                              >
+                                <Text style={[styles.choiceChipText, !useCustomTopic && entry.id === topicId ? styles.choiceChipTextActive : null]}>{entry.label}</Text>
+                              </Pressable>
+                            ))}
+                            <Pressable
+                              onPress={() => {
+                                setUseCustomTopic(true);
+                                setTopicId(null);
+                              }}
+                              style={[styles.choiceChip, useCustomTopic ? styles.choiceChipActive : null]}
+                            >
+                              <Text style={[styles.choiceChipText, useCustomTopic ? styles.choiceChipTextActive : null]}>{t(language, "otherTopic")}</Text>
                             </Pressable>
-                          ))}
-                        </ScrollView>
+                          </ScrollView>
+                          {useCustomTopic ? (
+                            <TextInput
+                              value={customTopicLabel}
+                              onChangeText={setCustomTopicLabel}
+                              placeholder={t(language, "enterCustomTopic")}
+                              placeholderTextColor="#8092A7"
+                              style={styles.input}
+                            />
+                          ) : null}
+                        </>
                       ) : null}
                     </>
                   ) : null}
@@ -1424,10 +1558,13 @@ export default function ClassroomScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{profile.role === "teacher" ? t(language, "publishedActivities") : t(language, "classActivities")}</Text>
-          {activities.length === 0 ? (
+          {profile.role === "teacher" && selectedClass ? (
+            <Text style={styles.helperText}>Showing activities for {selectedClass.className}.</Text>
+          ) : null}
+          {visibleActivities.length === 0 ? (
             <Text style={styles.helperText}>{t(language, "noActivitiesYet")}</Text>
           ) : (
-            activities.map((activity) => (
+            visibleActivities.map((activity) => (
               <View key={activity.activityId} style={styles.classCard}>
                 <Text style={styles.classTitle}>{activity.title}</Text>
                 <Text style={styles.classMeta}>
@@ -1653,6 +1790,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     marginTop: 6,
+  },
+  identityCopyHint: {
+    color: "#D6ECF9",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 8,
   },
   scrollContent: {
     paddingBottom: 36,

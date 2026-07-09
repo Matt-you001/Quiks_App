@@ -51,6 +51,26 @@ const variantPaddleClientTokenFallbacks: Record<AppVariant, string> = {
   teens: "live_58cf05e9abc2e3daa263e2d86b1",
   uni: "live_58cf05e9abc2e3daa263e2d86b1",
 };
+const variantAdMobAppIdFallbacks: Record<
+  AppVariant,
+  {
+    androidAppId: string;
+    iosAppId: string;
+  }
+> = {
+  children: {
+    androidAppId: "ca-app-pub-3940256099942544~3347511713",
+    iosAppId: "ca-app-pub-3940256099942544~1458002511",
+  },
+  teens: {
+    androidAppId: "ca-app-pub-8208154537756936~9297449247",
+    iosAppId: "ca-app-pub-3940256099942544~1458002511",
+  },
+  uni: {
+    androidAppId: "ca-app-pub-3940256099942544~3347511713",
+    iosAppId: "ca-app-pub-3940256099942544~1458002511",
+  },
+};
 const variantGoogleClientFallbacks: Record<
   AppVariant,
   {
@@ -68,9 +88,9 @@ const variantGoogleClientFallbacks: Record<
   },
   teens: {
     expoClientId: "",
-    androidClientId: "51562512706-j8drs7hvr53spqo5a99au3mfj0t1luuh.apps.googleusercontent.com",
+    androidClientId: "620960153485-gjk04n3i285iig3t3tu1c5lr76n70b1v.apps.googleusercontent.com",
     iosClientId: "",
-    webClientId: "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+    webClientId: "620960153485-d1rstle8l9ou8n9frfv4td102q81b5rj.apps.googleusercontent.com",
   },
   uni: {
     expoClientId: "",
@@ -138,6 +158,17 @@ function readVariantPaddleClientToken() {
   const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_PADDLE_CLIENT_TOKEN` as keyof NodeJS.ProcessEnv;
   const genericKey = "EXPO_PUBLIC_PADDLE_CLIENT_TOKEN" as keyof NodeJS.ProcessEnv;
   const value = process.env[variantKey] ?? process.env[genericKey] ?? variantPaddleClientTokenFallbacks[variant];
+  return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantAdMobAppId(kind: "androidAppId" | "iosAppId") {
+  const suffixMap = {
+    androidAppId: "ANDROID_APP_ID",
+    iosAppId: "IOS_APP_ID",
+  } as const;
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_ADMOB_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const genericKey = `EXPO_PUBLIC_ADMOB_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const value = process.env[variantKey] ?? process.env[genericKey] ?? variantAdMobAppIdFallbacks[variant][kind];
   return value ? value.replace(/^"(.*)"$/, "$1") : "";
 }
 
@@ -214,6 +245,8 @@ const config: ExpoConfig = {
     googleServicesFile:
       variant === "children"
         ? "./src/google-services-children.json"
+        : variant === "teens"
+          ? "./src/google-services-teens.json"
         : variant === "uni"
           ? "./src/google-services-uni.json"
           : undefined,
@@ -240,8 +273,8 @@ const config: ExpoConfig = {
     [
       "react-native-google-mobile-ads",
       {
-        androidAppId: readEnvValue("EXPO_PUBLIC_ADMOB_ANDROID_APP_ID"),
-        iosAppId: readEnvValue("EXPO_PUBLIC_ADMOB_IOS_APP_ID"),
+        androidAppId: readVariantAdMobAppId("androidAppId"),
+        iosAppId: readVariantAdMobAppId("iosAppId"),
         userTrackingUsageDescription: "This identifier will be used to deliver relevant ads to you.",
       },
     ] as const,
@@ -258,8 +291,8 @@ const config: ExpoConfig = {
     EXPO_PUBLIC_AI_API_URL: readEnvValue("EXPO_PUBLIC_AI_API_URL"),
     EXPO_PUBLIC_AI_MODE: readEnvValue("EXPO_PUBLIC_AI_MODE"),
     EXPO_PUBLIC_GEMINI_MODEL: readEnvValue("EXPO_PUBLIC_GEMINI_MODEL"),
-    EXPO_PUBLIC_ADMOB_ANDROID_APP_ID: readEnvValue("EXPO_PUBLIC_ADMOB_ANDROID_APP_ID"),
-    EXPO_PUBLIC_ADMOB_IOS_APP_ID: readEnvValue("EXPO_PUBLIC_ADMOB_IOS_APP_ID"),
+    EXPO_PUBLIC_ADMOB_ANDROID_APP_ID: readVariantAdMobAppId("androidAppId"),
+    EXPO_PUBLIC_ADMOB_IOS_APP_ID: readVariantAdMobAppId("iosAppId"),
     EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID: readEnvValue("EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID"),
     EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID: readEnvValue("EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID"),
     EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS: readEnvValue("EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS"),
@@ -282,8 +315,8 @@ const config: ExpoConfig = {
     EXPO_PUBLIC_PRO_MONTHLY_PRODUCT_ID: readVariantSubscriptionProductId("monthly"),
     EXPO_PUBLIC_PRO_YEARLY_PRODUCT_ID: readVariantSubscriptionProductId("yearly"),
     "react-native-google-mobile-ads": {
-      android_app_id: readEnvValue("EXPO_PUBLIC_ADMOB_ANDROID_APP_ID"),
-      ios_app_id: readEnvValue("EXPO_PUBLIC_ADMOB_IOS_APP_ID"),
+      android_app_id: readVariantAdMobAppId("androidAppId"),
+      ios_app_id: readVariantAdMobAppId("iosAppId"),
     },
     router: {
       root: "./app",

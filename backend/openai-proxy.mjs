@@ -21,7 +21,7 @@ import {
 
 const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
-const openAiModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const openAiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const competitionWaiters = new Map();
 const competitionWaitersById = new Map();
 const competitionWaiterByPlayer = new Map();
@@ -146,6 +146,39 @@ function sendJson(response, statusCode, payload) {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   });
   response.end(JSON.stringify(payload));
+}
+
+function getClientErrorStatus(error) {
+  const message = error instanceof Error ? error.message.trim().toLowerCase() : "";
+
+  if (!message) {
+    return null;
+  }
+
+  if (message.includes("not allowed") || message.includes("only students can request") || message.includes("only teachers can")) {
+    return 403;
+  }
+
+  if (message.includes("not found")) {
+    return 404;
+  }
+
+  if (
+    message.includes("already has a join request") ||
+    message.includes("already has an invite") ||
+    message.includes("already belongs") ||
+    message.includes("already in") ||
+    message.includes("not part of the class") ||
+    message.includes("teacher cannot be removed") ||
+    message.includes("invalid class") ||
+    message.includes("missing classroom") ||
+    message.includes("membership request") ||
+    message.includes("student id was not found")
+  ) {
+    return 400;
+  }
+
+  return null;
 }
 
 async function sendExpoPushNotification({ to, title, body, data }) {
@@ -294,6 +327,188 @@ function buildQuestionSchema() {
     },
     required: ["questions"],
   };
+}
+
+function normalizeForValidation(value) {
+  return String(value ?? "")
+    .replace(/[–—−]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeTopicLikeLabel(value) {
+  return normalizeForValidation(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b(pencils|erasers|books|pens|items|equations)\b/g, (match) => match.replace(/s$/, ""));
+}
+
+function extractOptionNumber(option) {
+  const match = String(option ?? "").replace(/,/g, "").match(/(?:₦|N)?\s*(-?\d+(?:\.\d+)?)/i);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildLinearEvaluator(expression, variableName) {
+  const base = normalizeForValidation(expression).replace(/\s+/g, "");
+  const canonical = base.replace(new RegExp(variableName, "gi"), "x");
+  const withMultiplication = canonical
+    .replace(/(\d)(x|\()/g, "$1*$2")
+    .replace(/x\(/g, "x*(")
+    .replace(/\)(\d|x)/g, ")*$1");
+
+  if (!/^[0-9x+\-*/().]+$/.test(withMultiplication)) {
+    return null;
+  }
+
+  const fn = new Function("x", `"use strict"; return (${withMultiplication});`);
+  return (x) => {
+    const result = fn(x);
+    return Number.isFinite(result) ? result : null;
+  };
+}
+
+function inferLinearEquationAnswer(prompt) {
+  const normalized = normalizeForValidation(prompt);
+  const equationMatch = normalized.match(/([0-9a-zA-Z+\-*/().\s]+)=([0-9a-zA-Z+\-*/().\s]+)/);
+  if (!equationMatch) {
+    return null;
+  }
+
+  const variableMatch = normalized.match(/\b([a-zA-Z])\b|(?<=[(*/+\-])([a-zA-Z])(?=[)*/+\-\s=])|(\d)([a-zA-Z])/);
+  const variableName = variableMatch?.[1] ?? variableMatch?.[2] ?? variableMatch?.[4];
+  if (!variableName) {
+    return null;
+  }
+
+  const leftEvaluator = buildLinearEvaluator(equationMatch[1], variableName);
+  const rightEvaluator = buildLinearEvaluator(equationMatch[2], variableName);
+  if (!leftEvaluator || !rightEvaluator) {
+    return null;
+  }
+
+  const left0 = leftEvaluator(0);
+  const left1 = leftEvaluator(1);
+  const left2 = leftEvaluator(2);
+  const right0 = rightEvaluator(0);
+  const right1 = rightEvaluator(1);
+  const right2 = rightEvaluator(2);
+
+  if ([left0, left1, left2, right0, right1, right2].some((value) => value === null)) {
+    return null;
+  }
+
+  const leftSlope = left1 - left0;
+  const rightSlope = right1 - right0;
+  const leftSecondDiff = left2 - 2 * left1 + left0;
+  const rightSecondDiff = right2 - 2 * right1 + right0;
+  if (Math.abs(leftSecondDiff) > 0.0001 || Math.abs(rightSecondDiff) > 0.0001) {
+    return null;
+  }
+
+  const coefficient = leftSlope - rightSlope;
+  if (Math.abs(coefficient) < 0.0001) {
+    return null;
+  }
+
+  const constant = right0 - left0;
+  const answer = constant / coefficient;
+  return Number.isFinite(answer) ? answer : null;
+}
+
+function inferMoneyWordProblemAnswer(prompt) {
+  const normalized = normalizeForValidation(prompt);
+  if (!/\b(how much|total cost|spend in total|altogether)\b/i.test(normalized)) {
+    return null;
+  }
+
+  const priceEntries = Array.from(normalized.matchAll(/\b(?:an?|each)\s+([a-zA-Z][a-zA-Z\s-]*?)\s+for\s+(?:₦|N)\s?(\d+(?:\.\d+)?)/gi));
+  const quantitySectionMatch = normalized.match(/\bbuys?\s+(.+?)(?:[.?!]|$)/i);
+  if (priceEntries.length === 0 || !quantitySectionMatch) {
+    return null;
+  }
+
+  const prices = new Map();
+  for (const entry of priceEntries) {
+    prices.set(normalizeTopicLikeLabel(entry[1]), Number(entry[2]));
+  }
+
+  const quantityEntries = Array.from(quantitySectionMatch[1].matchAll(/(\d+)\s+([a-zA-Z][a-zA-Z\s-]*)/g));
+  if (quantityEntries.length === 0) {
+    return null;
+  }
+
+  let total = 0;
+  let matchedAny = false;
+  for (const entry of quantityEntries) {
+    const itemKey = normalizeTopicLikeLabel(entry[2]);
+    const unitPrice = prices.get(itemKey);
+    if (typeof unitPrice !== "number") {
+      continue;
+    }
+
+    matchedAny = true;
+    total += Number(entry[1]) * unitPrice;
+  }
+
+  return matchedAny ? total : null;
+}
+
+function inferExpectedAnswer(question) {
+  return inferLinearEquationAnswer(question.prompt) ?? inferMoneyWordProblemAnswer(question.prompt);
+}
+
+function questionHasConsistentAnswer(question) {
+  const expectedAnswer = inferExpectedAnswer(question);
+  if (expectedAnswer === null) {
+    return true;
+  }
+
+  const selectedNumber = extractOptionNumber(question.answer);
+  if (selectedNumber === null) {
+    return true;
+  }
+
+  return Math.abs(selectedNumber - expectedAnswer) < 0.0001;
+}
+
+function validateGeneratedQuestions(questions, expectedCount) {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new Error("AI did not return any questions.");
+  }
+
+  const cleaned = questions
+    .filter((question) => {
+      return (
+        typeof question?.prompt === "string" &&
+        Array.isArray(question?.options) &&
+        question.options.length === 4 &&
+        typeof question?.answer === "string" &&
+        question.options.includes(question.answer) &&
+        typeof question?.explanation === "string" &&
+        questionHasConsistentAnswer(question)
+      );
+    })
+    .slice(0, expectedCount)
+    .map((question, index) => ({
+      id: question.id || `ai-${index + 1}-${Date.now()}`,
+      prompt: question.prompt.trim(),
+      options: question.options.map((option) => String(option).trim()),
+      answer: question.answer.trim(),
+      explanation: question.explanation.trim(),
+    }));
+
+  if (cleaned.length === 0) {
+    throw new Error("AI returned invalid or inconsistent question data.");
+  }
+
+  return cleaned;
 }
 
 function buildFeedbackSchema() {
@@ -710,6 +925,10 @@ async function generateQuestionSet(body) {
       "You generate multiple-choice educational quiz questions for a mobile learning app competition.",
       "Return only factual, age-appropriate questions.",
       "Each question must have exactly 4 options, one correct answer, and a short explanation.",
+      "Solve each question fully before writing the options.",
+      "Check that the marked answer, the reasoning, and the explanation agree exactly before returning the question.",
+      "If your explanation proves a different answer, rewrite the question and options so only one option remains correct.",
+      "Never return a question with more than one defensible correct option.",
       "Do not include unsafe content or trick questions.",
       "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
       "Take the selected difficulty seriously as a real rigor band inside that stage.",
@@ -957,6 +1176,10 @@ async function handleQuestions(body, response) {
       "You generate multiple-choice educational quiz questions for a mobile learning app.",
       "Return only factual, age-appropriate questions.",
       "Each question must have exactly 4 options, one correct answer, and a short explanation.",
+      "Solve each question fully before writing the options.",
+      "Check that the marked answer, the reasoning, and the explanation agree exactly before returning the question.",
+      "If your explanation proves a different answer, rewrite the question and options so only one option remains correct.",
+      "Never return a question with more than one defensible correct option.",
       "Do not include unsafe content or trick questions.",
       "Use Nigerian/West African-friendly school context when appropriate, but keep questions globally understandable.",
       "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
@@ -980,7 +1203,10 @@ async function handleQuestions(body, response) {
     ],
   });
 
-  sendJson(response, 200, { questions: data.questions, source: "remote" });
+  sendJson(response, 200, {
+    questions: validateGeneratedQuestions(data.questions, Number(body.questionCount ?? 10)),
+    source: "remote",
+  });
 }
 
 async function handleFeedback(body, response) {
@@ -1965,7 +2191,7 @@ const server = http.createServer(async (request, response) => {
 
     sendJson(response, 404, { error: "Not found" });
   } catch (error) {
-    sendJson(response, 500, {
+    sendJson(response, getClientErrorStatus(error) ?? 500, {
       error: error instanceof Error ? error.message : "Unknown server error",
     });
   }

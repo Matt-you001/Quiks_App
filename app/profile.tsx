@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -248,6 +249,19 @@ export default function ProfileScreen() {
     );
   };
 
+  const copyQuiksId = async () => {
+    if (!activeProfile?.quiksId) {
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(activeProfile.quiksId);
+      Alert.alert(t(language, "profileDetails"), `${t(language, "quiksIdLabel")} copied.`);
+    } catch {
+      Alert.alert(t(language, "profileDetails"), `Unable to copy ${t(language, "quiksIdLabel")}.`);
+    }
+  };
+
   let goalFeedback = t(language, "noTargetYet");
   if (activeProfile) {
     if (todaySeconds > goalSeconds) {
@@ -407,7 +421,10 @@ export default function ProfileScreen() {
         <Text style={styles.metricText}>
           {t(language, "roleLabel")}: {activeProfile.role === "teacher" ? t(language, "teacherRole") : t(language, "studentRole")}
         </Text>
-        <Text style={styles.metricText}>{t(language, "quiksIdLabel")}: {activeProfile.quiksId}</Text>
+        <Pressable onPress={copyQuiksId} style={styles.copyMetricRow}>
+          <Text style={styles.metricText}>{t(language, "quiksIdLabel")}: {activeProfile.quiksId}</Text>
+          <Text style={styles.copyMetricAction}>Copy</Text>
+        </Pressable>
       </View>
 
       <View style={styles.actionGrid}>
@@ -537,6 +554,18 @@ const styles = StyleSheet.create({
     color: palette.slate,
     lineHeight: 24,
     marginTop: 6,
+  },
+  copyMetricRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  copyMetricAction: {
+    color: palette.navy,
+    fontSize: 13,
+    fontWeight: "800",
   },
   historyControls: {
     marginTop: 12,

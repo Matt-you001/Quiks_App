@@ -199,7 +199,21 @@ async function postJson<TRequest, TResponse>(path: string, body: TRequest): Prom
   });
 
   if (!response.ok) {
-    throw new Error(`AI request failed with status ${response.status}`);
+    let backendMessage = "";
+
+    try {
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const payload = (await response.json()) as { error?: string; message?: string };
+        backendMessage = payload.error ?? payload.message ?? "";
+      } else {
+        backendMessage = (await response.text()).trim();
+      }
+    } catch {
+      backendMessage = "";
+    }
+
+    throw new Error(backendMessage || `Request failed with status ${response.status}`);
   }
 
   return (await response.json()) as TResponse;
@@ -274,6 +288,155 @@ function buildFallbackQuestionResponse(request: QuestionRequest): QuestionRespon
   };
 }
 
+function normalizeForValidation(value: string) {
+  return value
+    .replace(/[–—−]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeTopicLikeLabel(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b(pencils|erasers|books|pens|items|equations)\b/g, (match) => match.replace(/s$/, ""));
+}
+
+function extractOptionNumber(option: string) {
+  const match = option.replace(/,/g, "").match(/(?:₦|N)?\s*(-?\d+(?:\.\d+)?)/i);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildLinearEvaluator(expression: string, variableName: string) {
+  const base = normalizeForValidation(expression).replace(/\s+/g, "");
+  const canonical = base.replace(new RegExp(variableName, "gi"), "x");
+  const withMultiplication = canonical
+    .replace(/(\d)(x|\()/g, "$1*$2")
+    .replace(/x\(/g, "x*(")
+    .replace(/\)(\d|x)/g, ")*$1");
+
+  if (!/^[0-9x+\-*/().]+$/.test(withMultiplication)) {
+    return null;
+  }
+
+  const fn = new Function("x", `"use strict"; return (${withMultiplication});`) as (x: number) => number;
+  return (x: number) => {
+    const result = fn(x);
+    return Number.isFinite(result) ? result : null;
+  };
+}
+
+function inferLinearEquationAnswer(prompt: string) {
+  const normalized = normalizeForValidation(prompt);
+  const equationMatch = normalized.match(/([0-9a-zA-Z+\-*/().\s]+)=([0-9a-zA-Z+\-*/().\s]+)/);
+  if (!equationMatch) {
+    return null;
+  }
+
+  const variableMatch = normalized.match(/\b([a-zA-Z])\b|(?<=[(*/+\-])([a-zA-Z])(?=[)*/+\-\s=])|(\d)([a-zA-Z])/);
+  const variableName = variableMatch?.[1] ?? variableMatch?.[2] ?? variableMatch?.[4];
+  if (!variableName) {
+    return null;
+  }
+
+  const leftEvaluator = buildLinearEvaluator(equationMatch[1], variableName);
+  const rightEvaluator = buildLinearEvaluator(equationMatch[2], variableName);
+  if (!leftEvaluator || !rightEvaluator) {
+    return null;
+  }
+
+  const left0 = leftEvaluator(0);
+  const left1 = leftEvaluator(1);
+  const left2 = leftEvaluator(2);
+  const right0 = rightEvaluator(0);
+  const right1 = rightEvaluator(1);
+  const right2 = rightEvaluator(2);
+
+  if ([left0, left1, left2, right0, right1, right2].some((value) => value === null)) {
+    return null;
+  }
+
+  const leftSlope = (left1 as number) - (left0 as number);
+  const rightSlope = (right1 as number) - (right0 as number);
+  const leftSecondDiff = (left2 as number) - 2 * (left1 as number) + (left0 as number);
+  const rightSecondDiff = (right2 as number) - 2 * (right1 as number) + (right0 as number);
+  if (Math.abs(leftSecondDiff) > 0.0001 || Math.abs(rightSecondDiff) > 0.0001) {
+    return null;
+  }
+
+  const coefficient = leftSlope - rightSlope;
+  if (Math.abs(coefficient) < 0.0001) {
+    return null;
+  }
+
+  const constant = (right0 as number) - (left0 as number);
+  const answer = constant / coefficient;
+  return Number.isFinite(answer) ? answer : null;
+}
+
+function inferMoneyWordProblemAnswer(prompt: string) {
+  const normalized = normalizeForValidation(prompt);
+  if (!/\b(how much|total cost|spend in total|altogether)\b/i.test(normalized)) {
+    return null;
+  }
+
+  const priceEntries = Array.from(normalized.matchAll(/\b(?:an?|each)\s+([a-zA-Z][a-zA-Z\s-]*?)\s+for\s+(?:₦|N)\s?(\d+(?:\.\d+)?)/gi));
+  const quantitySectionMatch = normalized.match(/\bbuys?\s+(.+?)(?:[.?!]|$)/i);
+  if (priceEntries.length === 0 || !quantitySectionMatch) {
+    return null;
+  }
+
+  const prices = new Map<string, number>();
+  for (const entry of priceEntries) {
+    prices.set(normalizeTopicLikeLabel(entry[1]), Number(entry[2]));
+  }
+
+  const quantityEntries = Array.from(quantitySectionMatch[1].matchAll(/(\d+)\s+([a-zA-Z][a-zA-Z\s-]*)/g));
+  if (quantityEntries.length === 0) {
+    return null;
+  }
+
+  let total = 0;
+  let matchedAny = false;
+  for (const entry of quantityEntries) {
+    const itemKey = normalizeTopicLikeLabel(entry[2]);
+    const unitPrice = prices.get(itemKey);
+    if (typeof unitPrice !== "number") {
+      continue;
+    }
+
+    matchedAny = true;
+    total += Number(entry[1]) * unitPrice;
+  }
+
+  return matchedAny ? total : null;
+}
+
+function inferExpectedAnswer(question: Question) {
+  return inferLinearEquationAnswer(question.prompt) ?? inferMoneyWordProblemAnswer(question.prompt);
+}
+
+function hasConsistentGeneratedAnswer(question: Question) {
+  const expectedAnswer = inferExpectedAnswer(question);
+  if (expectedAnswer === null) {
+    return true;
+  }
+
+  const selectedNumber = extractOptionNumber(question.answer);
+  if (selectedNumber === null) {
+    return true;
+  }
+
+  return Math.abs(selectedNumber - expectedAnswer) < 0.0001;
+}
+
 function validateQuestions(questions: Question[], expectedCount: number) {
   if (!Array.isArray(questions) || questions.length === 0) {
     throw new Error("AI did not return any questions.");
@@ -287,7 +450,8 @@ function validateQuestions(questions: Question[], expectedCount: number) {
         question.options.length === 4 &&
         typeof question.answer === "string" &&
         question.options.includes(question.answer) &&
-        typeof question.explanation === "string"
+        typeof question.explanation === "string" &&
+        hasConsistentGeneratedAnswer(question)
       );
     })
     .slice(0, expectedCount)
@@ -317,6 +481,10 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
     "Return only valid JSON.",
     "Each question must include: id, prompt, options, answer, explanation.",
     "Each question must have exactly 4 options and one correct answer that matches one option exactly.",
+    "Solve each question fully before writing the options.",
+    "Check that the marked answer, the working, and the explanation all agree exactly before you return the question.",
+    "If your explanation proves a different answer, rewrite the question and options so only one option remains correct.",
+    "Never return a question with more than one defensible correct option.",
     "Keep the content age-appropriate and factually correct.",
   ].join("\n");
 

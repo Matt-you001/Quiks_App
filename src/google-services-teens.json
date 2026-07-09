@@ -1,0 +1,38 @@
+{
+  "project_info": {
+    "project_number": "620960153485",
+    "project_id": "quiks-teens",
+    "storage_bucket": "quiks-teens.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620960153485:android:d62374f03ea6e243f847c4",
+        "android_client_info": {
+          "package_name": "com.quiks.teens"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "620960153485-gjk04n3i285iig3t3tu1c5lr76n70b1v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quiks.teens",
+            "certificate_hash": "35473921f167dea11ef5b1c5f5a0528903307784"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaIDjm7Hn-zeGhwcJJgfOed4XbX_w-Wy0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

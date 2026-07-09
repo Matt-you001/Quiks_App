@@ -10,9 +10,9 @@ const fallbackGoogleConfig = {
   },
   teens: {
     expoClientId: "",
-    androidClientId: "51562512706-j8drs7hvr53spqo5a99au3mfj0t1luuh.apps.googleusercontent.com",
+    androidClientId: "620960153485-gjk04n3i285iig3t3tu1c5lr76n70b1v.apps.googleusercontent.com",
     iosClientId: "",
-    webClientId: "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
+    webClientId: "620960153485-d1rstle8l9ou8n9frfv4td102q81b5rj.apps.googleusercontent.com",
   },
   uni: {
     expoClientId: "",
