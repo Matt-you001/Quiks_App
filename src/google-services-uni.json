@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "656940564357-hlb4122nmiuch9fctse7fm37o0bbdbou.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quiks.uni",
+            "certificate_hash": "82754dc37f4b78af026480abf1f642d7eaf24610"
+          }
+        },
+        {
           "client_id": "656940564357-of0e62ugcgdnb4jt98q7qm80cn2mnr5v.apps.googleusercontent.com",
           "client_type": 3
         }

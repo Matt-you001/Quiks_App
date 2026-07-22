@@ -8,6 +8,8 @@ type MobileAdsModule = {
   TestIds: {
     ADAPTIVE_BANNER: string;
     INTERSTITIAL: string;
+    NATIVE: string;
+    APP_OPEN: string;
   };
   BannerAd: ComponentType<{
     unitId: string;
@@ -29,6 +31,22 @@ type MobileAdsModule = {
       load: () => void;
     };
   };
+  AppOpenAd: {
+    createForAdRequest: (
+      unitId: string,
+      options?: { requestNonPersonalizedAdsOnly?: boolean }
+    ) => {
+      addAdEventListener: (event: string, listener: () => void) => () => void;
+      show: () => void;
+      load: () => void;
+    };
+  };
+  NativeAd: {
+    createForAdRequest: (
+      unitId: string,
+      options?: { requestNonPersonalizedAdsOnly?: boolean }
+    ) => Promise<unknown>;
+  };
   AdEventType: {
     LOADED: string;
     CLOSED: string;
@@ -44,6 +62,29 @@ const fallbackAdsConfig = {
   EXPO_PUBLIC_ADMOB_IOS_APP_ID: "ca-app-pub-3940256099942544~1458002511",
   EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID: "",
   EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID: "",
+  EXPO_PUBLIC_ADMOB_NATIVE_UNIT_ID: "",
+  EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID: "",
+} as const;
+
+const variantAdUnitFallbacks = {
+  children: {
+    bannerUnitId: "",
+    interstitialUnitId: "",
+    nativeUnitId: "",
+    appOpenUnitId: "",
+  },
+  teens: {
+    bannerUnitId: "ca-app-pub-8208154537756936/6053620064",
+    interstitialUnitId: "ca-app-pub-8208154537756936/1933612894",
+    nativeUnitId: "ca-app-pub-8208154537756936/8641244637",
+    appOpenUnitId: "ca-app-pub-8208154537756936/9717532902",
+  },
+  uni: {
+    bannerUnitId: "",
+    interstitialUnitId: "",
+    nativeUnitId: "",
+    appOpenUnitId: "",
+  },
 } as const;
 
 const extra = {
@@ -73,16 +114,18 @@ function normalizeEnvValue(value?: string) {
 }
 
 const adsConfig = {
-  bannerUnitId: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID ??
-      extra.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID ??
-      fallbackAdsConfig.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID
-  ),
-  interstitialUnitId: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID ??
-      extra.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID ??
-      fallbackAdsConfig.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID
-  ),
+  bannerUnitId:
+    variantAdUnitFallbacks[appVariant.id].bannerUnitId ||
+    normalizeEnvValue(extra.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID ?? process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID),
+  interstitialUnitId:
+    variantAdUnitFallbacks[appVariant.id].interstitialUnitId ||
+    normalizeEnvValue(extra.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID ?? process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID),
+  nativeUnitId:
+    variantAdUnitFallbacks[appVariant.id].nativeUnitId ||
+    normalizeEnvValue(extra.EXPO_PUBLIC_ADMOB_NATIVE_UNIT_ID ?? process.env.EXPO_PUBLIC_ADMOB_NATIVE_UNIT_ID),
+  appOpenUnitId:
+    variantAdUnitFallbacks[appVariant.id].appOpenUnitId ||
+    normalizeEnvValue(extra.EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID ?? process.env.EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID),
   interstitialEnabled:
     normalizeEnvValue(
       process.env.EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS ??
@@ -92,6 +135,16 @@ const adsConfig = {
 };
 
 let mobileAdsInitPromise: Promise<boolean> | null = null;
+let appOpenAdLoaded = false;
+let appOpenAdLoading = false;
+let appOpenAdInstance: {
+  show: () => void;
+  load: () => void;
+  addAdEventListener: (event: string, listener: () => void) => () => void;
+} | null = null;
+let lastAppOpenShownAt = 0;
+
+const APP_OPEN_COOLDOWN_MS = 3 * 60 * 1000;
 
 export function canShowAds(subscriptionTier: SubscriptionTier) {
   return appVariant.id !== "children" && subscriptionTier === "free";
@@ -115,6 +168,14 @@ export function getBannerAdUnitId(module: MobileAdsModule) {
 
 export function getInterstitialAdUnitId(module: MobileAdsModule) {
   return adsConfig.interstitialUnitId || module.TestIds.INTERSTITIAL;
+}
+
+export function getNativeAdUnitId(module?: MobileAdsModule) {
+  return adsConfig.nativeUnitId || module?.TestIds.NATIVE || "";
+}
+
+export function getAppOpenAdUnitId(module?: MobileAdsModule) {
+  return adsConfig.appOpenUnitId || module?.TestIds.APP_OPEN || "";
 }
 
 export async function initializeMobileAds() {
@@ -196,4 +257,93 @@ export async function showInterstitialAd() {
     timeoutHandle = setTimeout(() => finish(false), 15000);
     interstitial.load();
   });
+}
+
+function ensureAppOpenAdLoaded(mobileAds: MobileAdsModule) {
+  if (appOpenAdLoaded || appOpenAdLoading) {
+    return;
+  }
+
+  appOpenAdLoading = true;
+  const appOpenAd = mobileAds.AppOpenAd.createForAdRequest(getAppOpenAdUnitId(mobileAds), {
+    requestNonPersonalizedAdsOnly: true,
+  });
+
+  appOpenAdInstance = appOpenAd;
+
+  appOpenAd.addAdEventListener(mobileAds.AdEventType.LOADED, () => {
+    appOpenAdLoaded = true;
+    appOpenAdLoading = false;
+  });
+
+  appOpenAd.addAdEventListener(mobileAds.AdEventType.ERROR, () => {
+    appOpenAdLoaded = false;
+    appOpenAdLoading = false;
+  });
+
+  appOpenAd.addAdEventListener(mobileAds.AdEventType.CLOSED, () => {
+    appOpenAdLoaded = false;
+    appOpenAdLoading = false;
+    lastAppOpenShownAt = Date.now();
+    ensureAppOpenAdLoaded(mobileAds);
+  });
+
+  appOpenAd.load();
+}
+
+export async function preloadAppOpenAd() {
+  if (appVariant.id === "children" || Platform.OS === "web") {
+    return false;
+  }
+
+  const mobileAds = getMobileAdsModule();
+  if (!mobileAds) {
+    return false;
+  }
+
+  const initialized = await initializeMobileAds();
+  if (!initialized) {
+    return false;
+  }
+
+  ensureAppOpenAdLoaded(mobileAds);
+  return true;
+}
+
+export async function showAppOpenAd() {
+  if (appVariant.id === "children" || Platform.OS === "web") {
+    return false;
+  }
+
+  const mobileAds = getMobileAdsModule();
+  if (!mobileAds) {
+    return false;
+  }
+
+  const initialized = await initializeMobileAds();
+  if (!initialized) {
+    return false;
+  }
+
+  if (Date.now() - lastAppOpenShownAt < APP_OPEN_COOLDOWN_MS) {
+    ensureAppOpenAdLoaded(mobileAds);
+    return false;
+  }
+
+  ensureAppOpenAdLoaded(mobileAds);
+
+  if (!appOpenAdLoaded || !appOpenAdInstance) {
+    return false;
+  }
+
+  try {
+    appOpenAdLoaded = false;
+    appOpenAdInstance.show();
+    return true;
+  } catch {
+    appOpenAdLoaded = false;
+    appOpenAdLoading = false;
+    ensureAppOpenAdLoaded(mobileAds);
+    return false;
+  }
 }

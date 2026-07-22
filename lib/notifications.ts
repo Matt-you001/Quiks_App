@@ -233,11 +233,8 @@ async function registerRemotePushTokenForActiveProfile() {
     return;
   }
 
-  const existingRegistration = await readRegisteredPushState();
-  if (existingRegistration?.profileId === activeProfile.id && existingRegistration.token === token) {
-    return;
-  }
-
+  // Re-register on every app activation. The backend may have restarted and lost an
+  // in-memory token registration even though the device's Expo token did not change.
   await registerPushToken({
     playerId: activeProfile.id,
     token,

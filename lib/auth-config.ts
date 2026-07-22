@@ -60,17 +60,27 @@ function resolveGoogleClientId(kind: "expoClientId" | "androidClientId" | "iosCl
   const genericKey = `EXPO_PUBLIC_GOOGLE_${suffixMap[kind]}` as const;
   const variantFallback = fallbackGoogleConfig[appVariant.id][kind];
 
-  if (kind === "androidClientId") {
-    return normalizeEnvValue(process.env[variantKey] ?? extra[variantKey] ?? variantFallback);
+  if ((kind === "androidClientId" || kind === "webClientId") && variantFallback) {
+    return variantFallback;
   }
 
-  return normalizeEnvValue(
-    process.env[variantKey] ??
-      extra[variantKey] ??
-      process.env[genericKey] ??
-      extra[genericKey] ??
-      variantFallback
-  );
+  const expectedProjectNumber = fallbackGoogleConfig[appVariant.id].webClientId.split("-")[0];
+  const candidates = [
+    process.env[variantKey],
+    extra[variantKey],
+    process.env[genericKey],
+    extra[genericKey],
+    variantFallback,
+  ];
+
+  for (const candidate of candidates) {
+    const value = normalizeEnvValue(candidate);
+    if (value?.startsWith(`${expectedProjectNumber}-`)) {
+      return value;
+    }
+  }
+
+  return normalizeEnvValue(variantFallback);
 }
 
 export const googleAuthConfig = {

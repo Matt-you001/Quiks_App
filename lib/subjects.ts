@@ -1588,6 +1588,18 @@ function isAcceptableFuzzyMatch(input: string, match: { contains: boolean; dista
   return match.distance <= maxDistance;
 }
 
+function getCrossSubjectLabelMatch(input: string, topic: SubjectTopic) {
+  const label = normalizeTopicLookupValue(topic.label);
+  const aliases = getTopicAliases(topic);
+  const distance = levenshteinDistance(input, label);
+  const maxDistance = input.length <= 5 ? 1 : input.length <= 10 ? 2 : 3;
+
+  return {
+    exact: aliases.includes(input),
+    closeTypo: distance <= maxDistance,
+  };
+}
+
 export function validateTopicInput(
   subject: Subject | undefined,
   input: string,
@@ -1651,8 +1663,8 @@ export function validateTopicInput(
     }
 
     for (const topic of otherSubject.topics) {
-      const score = getTopicMatchScore(normalizedInput, topic);
-      if (score.exact || isAcceptableFuzzyMatch(normalizedInput, score)) {
+      const labelMatch = getCrossSubjectLabelMatch(normalizedInput, topic);
+      if (labelMatch.exact || labelMatch.closeTypo) {
         return {
           status: "wrong-subject",
           input: trimmed,

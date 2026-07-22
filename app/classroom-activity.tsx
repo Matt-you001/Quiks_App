@@ -18,6 +18,18 @@ function formatDateTime(timestamp: number) {
   return new Date(timestamp).toLocaleString();
 }
 
+function formatSubmissionTime(timestamp?: number) {
+  if (!timestamp || !Number.isFinite(timestamp)) {
+    return "Time unavailable";
+  }
+
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).replace(/\s/g, "").toLowerCase();
+}
+
 function getAverageScore(submissions: ClassroomSubmissionSummary[]) {
   if (submissions.length === 0) {
     return 0;
@@ -185,7 +197,7 @@ export default function ClassroomActivityScreen() {
                   </View>
                   <View style={styles.resultBadge}>
                     <Text style={styles.resultBadgeValue}>{submission.score}%</Text>
-                    <Text style={styles.resultBadgeTime}>{submission.timeTakenSeconds}s</Text>
+                    <Text style={styles.resultBadgeTime}>{formatSubmissionTime(submission.submittedAt)}</Text>
                   </View>
                 </View>
               ))

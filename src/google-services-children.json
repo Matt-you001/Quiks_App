@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "51562512706-p9t6dqqd9a2vd3qupeohpbmqpjqq0a51.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quiks.mobile",
+            "certificate_hash": "09bf8225c040358f4b1f3b285a8bdf2620e27c2d"
+          }
+        },
+        {
           "client_id": "51562512706-nn2608mm73d6uritkf9363077bkt8o9g.apps.googleusercontent.com",
           "client_type": 3
         }

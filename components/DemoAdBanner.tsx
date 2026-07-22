@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { type ReactElement, useEffect, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { appVariant } from "../lib/app-variant";
-import { getBannerAdUnitId, getMobileAdsModule, initializeMobileAds } from "../lib/ads";
+import { getBannerAdUnitId, getMobileAdsModule, getNativeAdUnitId, initializeMobileAds } from "../lib/ads";
 import { t } from "../lib/i18n";
 import { palette, shadows } from "../lib/theme";
 import type { AppLanguage } from "../types/app";
@@ -11,7 +11,8 @@ type DemoAdBannerProps = {
 };
 
 export function DemoAdBanner({ language }: DemoAdBannerProps) {
-  const [nativeAdsReady, setNativeAdsReady] = useState(false);
+  const [adsReady, setAdsReady] = useState(false);
+  const [nativeAd, setNativeAd] = useState<unknown | null>(null);
   const isWeb = Platform.OS === "web";
 
   useEffect(() => {
@@ -23,14 +24,45 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
 
     initializeMobileAds().then((ready) => {
       if (!cancelled) {
-        setNativeAdsReady(ready);
+        setAdsReady(ready);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isWeb]);
+
+  useEffect(() => {
+    if (isWeb) {
+      return;
+    }
+
+    const mobileAds = getMobileAdsModule();
+    if (!mobileAds || !adsReady) {
+      return;
+    }
+
+    let cancelled = false;
+
+    mobileAds.NativeAd.createForAdRequest(getNativeAdUnitId(mobileAds), {
+      requestNonPersonalizedAdsOnly: true,
+    })
+      .then((loadedAd) => {
+        if (!cancelled) {
+          setNativeAd(loadedAd);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNativeAd(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adsReady, isWeb]);
 
   if (appVariant.id === "children") {
     return null;
@@ -57,13 +89,57 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
   }
 
   const mobileAds = getMobileAdsModule();
-  if (mobileAds && nativeAdsReady) {
+  if (mobileAds && adsReady) {
     const { BannerAd, BannerAdSize } = mobileAds;
+
+    let nativeAdCard: ReactElement | null = null;
+
+    if (nativeAd) {
+      try {
+        const adsPackage = require("react-native-google-mobile-ads") as any;
+
+        const { NativeAdView, NativeAsset, NativeAssetType, NativeMediaView } = adsPackage;
+        const adData = nativeAd as {
+          headline?: string;
+          body?: string;
+          callToAction?: string;
+          advertiser?: string;
+        };
+
+        nativeAdCard = (
+          <NativeAdView nativeAd={nativeAd} style={styles.nativeCard}>
+            <Text style={styles.nativeBadge}>Sponsored</Text>
+            <NativeMediaView style={styles.nativeMedia} />
+            <NativeAsset assetType={NativeAssetType.HEADLINE}>
+              <Text style={styles.nativeHeadline}>{adData.headline || t(language, "sponsoredLearningSpot")}</Text>
+            </NativeAsset>
+            {adData.body ? (
+              <NativeAsset assetType={NativeAssetType.BODY}>
+                <Text style={styles.nativeBody}>{adData.body}</Text>
+              </NativeAsset>
+            ) : null}
+            <View style={styles.nativeFooter}>
+              {adData.advertiser ? <Text style={styles.nativeAdvertiser}>{adData.advertiser}</Text> : <View />}
+              {adData.callToAction ? (
+                <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
+                  <View style={styles.nativeCtaWrap}>
+                    <Text style={styles.nativeCtaText}>{adData.callToAction}</Text>
+                  </View>
+                </NativeAsset>
+              ) : null}
+            </View>
+          </NativeAdView>
+        );
+      } catch {
+        nativeAdCard = null;
+      }
+    }
 
     return (
       <View style={styles.card}>
         <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text>
         <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text>
+        {nativeAdCard}
         <View style={styles.bannerWrap}>
           <BannerAd
             unitId={getBannerAdUnitId(mobileAds)}
@@ -117,6 +193,63 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     backgroundColor: "#FFFDF8",
+  },
+  nativeCard: {
+    marginTop: 14,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    gap: 10,
+  },
+  nativeBadge: {
+    color: "#8B5E00",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  nativeMedia: {
+    width: "100%",
+    minHeight: 160,
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+  },
+  nativeHeadline: {
+    color: palette.ink,
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  nativeBody: {
+    color: palette.slate,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  nativeFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  nativeAdvertiser: {
+    color: palette.slate,
+    fontSize: 12,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  nativeCtaWrap: {
+    borderRadius: 999,
+    backgroundColor: palette.navy,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  nativeCtaText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
   },
   webSlot: {
     marginTop: 14,

@@ -18,18 +18,38 @@ import { doc, getDoc, getFirestore, setDoc } from "firebase/firestore";
 import type { Persistence } from "firebase/auth";
 import type { AppAccount, StoredAppState } from "../types/app";
 import { clearNativeGoogleSession } from "./google-auth";
+import { appVariant } from "./app-variant";
 
 const rnAuth = require("@firebase/auth") as {
   getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
 };
-const fallbackFirebaseConfig = {
-  apiKey: "AIzaSyDSICe2NTtANURfwcQPYWlywx3OPiJ7kEA",
-  authDomain: "synapse-trainer-y0kk3.firebaseapp.com",
-  projectId: "synapse-trainer-y0kk3",
-  storageBucket: "synapse-trainer-y0kk3.firebasestorage.app",
-  messagingSenderId: "51562512706",
-  appId: "1:51562512706:web:6854bbc7b9d26a378a08db",
+const fallbackFirebaseConfigs = {
+  children: {
+    apiKey: "AIzaSyDSICe2NTtANURfwcQPYWlywx3OPiJ7kEA",
+    authDomain: "synapse-trainer-y0kk3.firebaseapp.com",
+    projectId: "synapse-trainer-y0kk3",
+    storageBucket: "synapse-trainer-y0kk3.firebasestorage.app",
+    messagingSenderId: "51562512706",
+    appId: "1:51562512706:web:6854bbc7b9d26a378a08db",
+  },
+  teens: {
+    apiKey: "AIzaSyCaIDjm7Hn-zeGhwcJJgfOed4XbX_w-Wy0",
+    authDomain: "quiks-teens.firebaseapp.com",
+    projectId: "quiks-teens",
+    storageBucket: "quiks-teens.firebasestorage.app",
+    messagingSenderId: "620960153485",
+    appId: "1:620960153485:android:d62374f03ea6e243f847c4",
+  },
+  uni: {
+    apiKey: "AIzaSyBXu6Z1yTF17N1RuUItGQmadpYIYG61zlA",
+    authDomain: "quiks-uni.firebaseapp.com",
+    projectId: "quiks-uni",
+    storageBucket: "quiks-uni.firebasestorage.app",
+    messagingSenderId: "656940564357",
+    appId: "1:656940564357:android:c5d7f9a7d55954f4438eec",
+  },
 } as const;
+const fallbackFirebaseConfig = fallbackFirebaseConfigs[appVariant.id];
 
 const extra = {
   ...(Constants.expoConfig?.extra ?? {}),
@@ -56,27 +76,24 @@ function normalizeEnvValue(value?: string) {
   return value.replace(/^"(.*)"$/, "$1");
 }
 
+function resolveFirebaseValue(
+  suffix: "API_KEY" | "AUTH_DOMAIN" | "PROJECT_ID" | "STORAGE_BUCKET" | "MESSAGING_SENDER_ID" | "APP_ID",
+  fallback: string
+) {
+  const variantKey = `EXPO_PUBLIC_${appVariant.id.toUpperCase()}_FIREBASE_${suffix}`;
+  const genericKey = `EXPO_PUBLIC_FIREBASE_${suffix}`;
+  return normalizeEnvValue(
+    process.env[variantKey] ?? extra[variantKey] ?? extra[genericKey] ?? process.env[genericKey] ?? fallback
+  );
+}
+
 const firebaseConfig = {
-  apiKey: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? extra.EXPO_PUBLIC_FIREBASE_API_KEY ?? fallbackFirebaseConfig.apiKey
-  ),
-  authDomain: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? extra.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? fallbackFirebaseConfig.authDomain
-  ),
-  projectId: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? extra.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? fallbackFirebaseConfig.projectId
-  ),
-  storageBucket: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ??
-      extra.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ??
-      fallbackFirebaseConfig.storageBucket
-  ),
-  messagingSenderId: normalizeEnvValue(
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??
-      extra.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??
-      fallbackFirebaseConfig.messagingSenderId
-  ),
-  appId: normalizeEnvValue(process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? extra.EXPO_PUBLIC_FIREBASE_APP_ID ?? fallbackFirebaseConfig.appId),
+  apiKey: resolveFirebaseValue("API_KEY", fallbackFirebaseConfig.apiKey),
+  authDomain: resolveFirebaseValue("AUTH_DOMAIN", fallbackFirebaseConfig.authDomain),
+  projectId: resolveFirebaseValue("PROJECT_ID", fallbackFirebaseConfig.projectId),
+  storageBucket: resolveFirebaseValue("STORAGE_BUCKET", fallbackFirebaseConfig.storageBucket),
+  messagingSenderId: resolveFirebaseValue("MESSAGING_SENDER_ID", fallbackFirebaseConfig.messagingSenderId),
+  appId: resolveFirebaseValue("APP_ID", fallbackFirebaseConfig.appId),
 };
 
 const isConfigured = Boolean(

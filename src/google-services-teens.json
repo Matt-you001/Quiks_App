@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "620960153485-aulpo56h9t0ttr1s4m7srcecopa0vtsq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quiks.teens",
+            "certificate_hash": "4f1849a74c0c1be81ad4a26ddcd90511e6e1c16d"
+          }
+        },
+        {
           "client_id": "620960153485-gjk04n3i285iig3t3tu1c5lr76n70b1v.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -29,7 +37,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "620960153485-d1rstle8l9ou8n9frfv4td102q81b5rj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

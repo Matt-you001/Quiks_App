@@ -71,6 +71,34 @@ const variantAdMobAppIdFallbacks: Record<
     iosAppId: "ca-app-pub-3940256099942544~1458002511",
   },
 };
+const variantAdMobUnitFallbacks: Record<
+  AppVariant,
+  {
+    bannerUnitId: string;
+    interstitialUnitId: string;
+    nativeUnitId: string;
+    appOpenUnitId: string;
+  }
+> = {
+  children: {
+    bannerUnitId: "",
+    interstitialUnitId: "",
+    nativeUnitId: "",
+    appOpenUnitId: "",
+  },
+  teens: {
+    bannerUnitId: "ca-app-pub-8208154537756936/6053620064",
+    interstitialUnitId: "ca-app-pub-8208154537756936/1933612894",
+    nativeUnitId: "ca-app-pub-8208154537756936/8641244637",
+    appOpenUnitId: "ca-app-pub-8208154537756936/9717532902",
+  },
+  uni: {
+    bannerUnitId: "",
+    interstitialUnitId: "",
+    nativeUnitId: "",
+    appOpenUnitId: "",
+  },
+};
 const variantGoogleClientFallbacks: Record<
   AppVariant,
   {
@@ -99,6 +127,42 @@ const variantGoogleClientFallbacks: Record<
     webClientId: "656940564357-of0e62ugcgdnb4jt98q7qm80cn2mnr5v.apps.googleusercontent.com",
   },
 };
+const variantFirebaseFallbacks: Record<
+  AppVariant,
+  {
+    apiKey: string;
+    authDomain: string;
+    projectId: string;
+    storageBucket: string;
+    messagingSenderId: string;
+    appId: string;
+  }
+> = {
+  children: {
+    apiKey: "AIzaSyDSICe2NTtANURfwcQPYWlywx3OPiJ7kEA",
+    authDomain: "synapse-trainer-y0kk3.firebaseapp.com",
+    projectId: "synapse-trainer-y0kk3",
+    storageBucket: "synapse-trainer-y0kk3.firebasestorage.app",
+    messagingSenderId: "51562512706",
+    appId: "1:51562512706:web:6854bbc7b9d26a378a08db",
+  },
+  teens: {
+    apiKey: "AIzaSyCaIDjm7Hn-zeGhwcJJgfOed4XbX_w-Wy0",
+    authDomain: "quiks-teens.firebaseapp.com",
+    projectId: "quiks-teens",
+    storageBucket: "quiks-teens.firebasestorage.app",
+    messagingSenderId: "620960153485",
+    appId: "1:620960153485:android:d62374f03ea6e243f847c4",
+  },
+  uni: {
+    apiKey: "AIzaSyBXu6Z1yTF17N1RuUItGQmadpYIYG61zlA",
+    authDomain: "quiks-uni.firebaseapp.com",
+    projectId: "quiks-uni",
+    storageBucket: "quiks-uni.firebasestorage.app",
+    messagingSenderId: "656940564357",
+    appId: "1:656940564357:android:c5d7f9a7d55954f4438eec",
+  },
+};
 const fallbackPublicEnv = {
   EXPO_PUBLIC_AI_API_URL: "https://quiks-app.onrender.com",
   EXPO_PUBLIC_AI_MODE: "live",
@@ -107,8 +171,10 @@ const fallbackPublicEnv = {
   EXPO_PUBLIC_ADMOB_IOS_APP_ID: "ca-app-pub-3940256099942544~1458002511",
   EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID: "",
   EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID: "",
+  EXPO_PUBLIC_ADMOB_NATIVE_UNIT_ID: "",
+  EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID: "",
   EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS: "false",
-  EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS: "false",
+      EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS: "true",
   EXPO_PUBLIC_FIREBASE_API_KEY: "AIzaSyDSICe2NTtANURfwcQPYWlywx3OPiJ7kEA",
   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: "synapse-trainer-y0kk3.firebaseapp.com",
   EXPO_PUBLIC_FIREBASE_PROJECT_ID: "synapse-trainer-y0kk3",
@@ -168,7 +234,24 @@ function readVariantAdMobAppId(kind: "androidAppId" | "iosAppId") {
   } as const;
   const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_ADMOB_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
   const genericKey = `EXPO_PUBLIC_ADMOB_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
-  const value = process.env[variantKey] ?? process.env[genericKey] ?? variantAdMobAppIdFallbacks[variant][kind];
+  const variantFallback = variantAdMobAppIdFallbacks[variant][kind];
+  const value = variantFallback || process.env[variantKey] || process.env[genericKey];
+  return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantAdMobUnitId(
+  kind: "bannerUnitId" | "interstitialUnitId" | "nativeUnitId" | "appOpenUnitId"
+) {
+  const suffixMap = {
+    bannerUnitId: "BANNER_UNIT_ID",
+    interstitialUnitId: "INTERSTITIAL_UNIT_ID",
+    nativeUnitId: "NATIVE_UNIT_ID",
+    appOpenUnitId: "APP_OPEN_UNIT_ID",
+  } as const;
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_ADMOB_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const genericKey = `EXPO_PUBLIC_ADMOB_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const variantFallback = variantAdMobUnitFallbacks[variant][kind];
+  const value = variantFallback || process.env[variantKey] || process.env[genericKey];
   return value ? value.replace(/^"(.*)"$/, "$1") : "";
 }
 
@@ -182,11 +265,38 @@ function readVariantGoogleClientId(kind: "expoClientId" | "androidClientId" | "i
   const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_GOOGLE_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
   const genericKey = `EXPO_PUBLIC_GOOGLE_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
   const variantFallback = variantGoogleClientFallbacks[variant][kind];
-  const value =
-    kind === "androidClientId"
-      ? process.env[variantKey] ?? variantFallback
-      : process.env[variantKey] ?? process.env[genericKey] ?? variantFallback;
-  return value ? value.replace(/^"(.*)"$/, "$1") : "";
+
+  // Android and web OAuth clients are part of each variant's native identity.
+  // Keep the checked-in values authoritative so stale EAS variables cannot revive a deleted client.
+  if ((kind === "androidClientId" || kind === "webClientId") && variantFallback) {
+    return variantFallback;
+  }
+
+  const expectedProjectNumber = variantGoogleClientFallbacks[variant].webClientId.split("-")[0];
+  const candidates = [process.env[variantKey], process.env[genericKey], variantFallback];
+
+  for (const candidate of candidates) {
+    const value = candidate?.replace(/^"(.*)"$/, "$1");
+    if (value?.startsWith(`${expectedProjectNumber}-`)) {
+      return value;
+    }
+  }
+
+  return variantFallback;
+}
+
+function readVariantFirebaseValue(kind: keyof (typeof variantFirebaseFallbacks)[AppVariant]) {
+  const suffixMap = {
+    apiKey: "API_KEY",
+    authDomain: "AUTH_DOMAIN",
+    projectId: "PROJECT_ID",
+    storageBucket: "STORAGE_BUCKET",
+    messagingSenderId: "MESSAGING_SENDER_ID",
+    appId: "APP_ID",
+  } as const;
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_FIREBASE_${suffixMap[kind]}` as keyof NodeJS.ProcessEnv;
+  const configured = process.env[variantKey]?.replace(/^"(.*)"$/, "$1");
+  return configured || variantFirebaseFallbacks[variant][kind];
 }
 
 const variantConfig: Record<AppVariant, { name: string; slug: string; scheme: string; androidPackage: string }> = {
@@ -293,16 +403,18 @@ const config: ExpoConfig = {
     EXPO_PUBLIC_GEMINI_MODEL: readEnvValue("EXPO_PUBLIC_GEMINI_MODEL"),
     EXPO_PUBLIC_ADMOB_ANDROID_APP_ID: readVariantAdMobAppId("androidAppId"),
     EXPO_PUBLIC_ADMOB_IOS_APP_ID: readVariantAdMobAppId("iosAppId"),
-    EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID: readEnvValue("EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID"),
-    EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID: readEnvValue("EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID"),
+    EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID: readVariantAdMobUnitId("bannerUnitId"),
+    EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID: readVariantAdMobUnitId("interstitialUnitId"),
+    EXPO_PUBLIC_ADMOB_NATIVE_UNIT_ID: readVariantAdMobUnitId("nativeUnitId"),
+    EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID: readVariantAdMobUnitId("appOpenUnitId"),
     EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS: readEnvValue("EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS"),
     EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS: readEnvValue("EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS"),
-    EXPO_PUBLIC_FIREBASE_API_KEY: readEnvValue("EXPO_PUBLIC_FIREBASE_API_KEY"),
-    EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: readEnvValue("EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-    EXPO_PUBLIC_FIREBASE_PROJECT_ID: readEnvValue("EXPO_PUBLIC_FIREBASE_PROJECT_ID"),
-    EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: readEnvValue("EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET"),
-    EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: readEnvValue("EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
-    EXPO_PUBLIC_FIREBASE_APP_ID: readEnvValue("EXPO_PUBLIC_FIREBASE_APP_ID"),
+    EXPO_PUBLIC_FIREBASE_API_KEY: readVariantFirebaseValue("apiKey"),
+    EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: readVariantFirebaseValue("authDomain"),
+    EXPO_PUBLIC_FIREBASE_PROJECT_ID: readVariantFirebaseValue("projectId"),
+    EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: readVariantFirebaseValue("storageBucket"),
+    EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: readVariantFirebaseValue("messagingSenderId"),
+    EXPO_PUBLIC_FIREBASE_APP_ID: readVariantFirebaseValue("appId"),
     EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID: readVariantGoogleClientId("expoClientId"),
     EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: readVariantGoogleClientId("androidClientId"),
     EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: readVariantGoogleClientId("iosClientId"),

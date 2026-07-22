@@ -17,10 +17,26 @@ export function getInterstitialAdUnitId() {
   return "";
 }
 
+export function getNativeAdUnitId() {
+  return "";
+}
+
+export function getAppOpenAdUnitId() {
+  return "";
+}
+
 export async function initializeMobileAds() {
   return false;
 }
 
 export async function showInterstitialAd() {
+  return false;
+}
+
+export async function preloadAppOpenAd() {
+  return false;
+}
+
+export async function showAppOpenAd() {
   return false;
 }
