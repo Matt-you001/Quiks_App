@@ -322,7 +322,7 @@ const managementStudiesTopics: SubjectTopic[] = [
 const allSubjects: Subject[] = [
   {
     id: "arithmetic",
-    name: "Arithmetic",
+    name: "Mathematics",
     tagline: "Speed, accuracy, and number sense",
     icon: "calculator-variant-outline",
     accent: ["#35B7D7", "#7AD7F0"],
@@ -332,7 +332,7 @@ const allSubjects: Subject[] = [
   },
   {
     id: "english",
-    name: "English",
+    name: "English Language",
     tagline: "Vocabulary, grammar, and reading",
     icon: "book-open-page-variant-outline",
     accent: ["#1F8A70", "#5DD39E"],
@@ -372,7 +372,7 @@ const allSubjects: Subject[] = [
   },
   {
     id: "computer",
-    name: "Computer",
+    name: "Computer Science",
     tagline: "Digital literacy and logic",
     icon: "laptop",
     accent: ["#2D6CDF", "#6FA8FF"],
@@ -422,7 +422,7 @@ const allSubjects: Subject[] = [
   },
   {
     id: "integrated-science",
-    name: "Integrated Science",
+    name: "Sciences",
     tagline: "Simple science for everyday life",
     icon: "beaker-outline",
     accent: ["#36A37C", "#99E0C5"],
