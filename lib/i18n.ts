@@ -282,6 +282,7 @@ type TranslationKey =
   | "roleLabel"
   | "quiksIdLabel"
   | "classroomTitle"
+  | "classroomProRequired"
   | "classManagement"
   | "className"
   | "createClassAction"
@@ -291,6 +292,12 @@ type TranslationKey =
   | "roster"
   | "noMembers"
   | "inviteStudentById"
+  | "inviteStudentsByLink"
+  | "shareClassInvite"
+  | "shareClassInviteHint"
+  | "copyInviteLink"
+  | "inviteLinkCopied"
+  | "moreShareApps"
   | "studentQuiksId"
   | "sendInvite"
   | "pendingStudentRequests"
@@ -720,6 +727,7 @@ const english: TranslationMap = {
   roleLabel: "Role",
   quiksIdLabel: "Quiks ID",
   classroomTitle: "Classroom",
+  classroomProRequired: "Classroom is available to paid Pro subscribers. Upgrade or restore your subscription to continue.",
   classManagement: "Class management",
   className: "Class name",
   createClassAction: "Create class",
@@ -729,6 +737,12 @@ const english: TranslationMap = {
   roster: "Roster",
   noMembers: "No members.",
   inviteStudentById: "Invite student by ID",
+  inviteStudentsByLink: "Invite students by link",
+  shareClassInvite: "Share class invitation",
+  shareClassInviteHint: "Choose how you want to send this class invitation.",
+  copyInviteLink: "Copy link",
+  inviteLinkCopied: "Invitation link copied.",
+  moreShareApps: "Messenger / More",
   studentQuiksId: "Student Quiks ID",
   sendInvite: "Send invite",
   pendingStudentRequests: "Pending student requests",
@@ -1013,6 +1027,12 @@ const translations: Record<AppLanguage, TranslationMap> = {
     roster: "Liste des membres",
     noMembers: "Aucun membre.",
     inviteStudentById: "Inviter un eleve par ID",
+    inviteStudentsByLink: "Inviter des eleves par lien",
+    shareClassInvite: "Partager l'invitation de classe",
+    shareClassInviteHint: "Choisissez comment envoyer cette invitation de classe.",
+    copyInviteLink: "Copier le lien",
+    inviteLinkCopied: "Lien d'invitation copie.",
+    moreShareApps: "Messenger / Autres",
     studentQuiksId: "ID Quiks de l'eleve",
     sendInvite: "Envoyer l'invitation",
     pendingStudentRequests: "Demandes d'eleves en attente",

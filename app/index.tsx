@@ -5,12 +5,15 @@ import { useCallback, useMemo, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
+import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
 import { appVariant } from "../lib/app-variant";
+import { canShowAds } from "../lib/ads";
+import { readClassroomInvitationCodeFromLocation } from "../lib/classroom-invite";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRemotePushRegistration } from "../lib/notifications";
-import { canCreateAnotherProfile, shouldShowUpgradePrompts } from "../lib/subscription";
+import { canCreateAnotherProfile, canUseClassroom } from "../lib/subscription";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getLocalizedSubjects, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -138,10 +141,12 @@ export default function HomeScreen() {
   const [currentProfileId, setCurrentProfileIdState] = useState<string | null>(null);
   const [resultsByProfile, setResultsByProfile] = useState<Record<string, SessionResult[]>>({});
   const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
+  const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
 
   const loadData = useCallback(async () => {
     const state = await readAppState();
     const webCheckout = readWebCheckoutIntentFromLocation();
+    const classroomJoinCode = readClassroomInvitationCodeFromLocation();
     if (!state.isAuthenticated) {
       setAuthChecked(true);
       router.replace(
@@ -178,6 +183,13 @@ export default function HomeScreen() {
     setResultsByProfile(state.results);
     setSubscriptionTier(state.subscriptionTier);
     setAuthChecked(true);
+    if (classroomJoinCode) {
+      if (canUseClassroom(state.subscriptionTier)) {
+        router.replace({ pathname: "/classroom", params: { joinCode: classroomJoinCode } } as never);
+      } else {
+        setPremiumPrompt("classroom");
+      }
+    }
   }, []);
 
   useFocusEffect(
@@ -302,11 +314,13 @@ export default function HomeScreen() {
         <View style={styles.ctaRow}>
           <PrimaryButton
             label={t(language, "homeCreateProfile")}
-            onPress={() =>
-              canCreateMoreProfiles
-                ? router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
-                : router.push({ pathname: "/subscription" } as never)
-            }
+            onPress={() => {
+              if (!canCreateMoreProfiles) {
+                setPremiumPrompt("profiles");
+                return;
+              }
+              router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never);
+            }}
             style={styles.flexButton}
           />
           <PrimaryButton
@@ -327,6 +341,8 @@ export default function HomeScreen() {
           />
         </View>
       </View>
+
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "studentsList")}</Text>
@@ -433,13 +449,18 @@ export default function HomeScreen() {
 
       <View style={[styles.homeActionColumn, showWideActions ? styles.homeActionRowDesktop : null]}>
         <PrimaryButton
-          label="Classroom"
+          label={canUseClassroom(subscriptionTier) ? "Classroom" : "Classroom"}
           variant="secondary"
-          onPress={() =>
+          onPress={() => {
+            if (!canUseClassroom(subscriptionTier)) {
+              setPremiumPrompt("classroom");
+              return;
+            }
+
             activeProfile
               ? router.push("/classroom" as never)
-              : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
-          }
+              : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never);
+          }}
           style={showWideActions ? styles.homeActionButtonDesktop : undefined}
         />
         <PrimaryButton
@@ -453,12 +474,10 @@ export default function HomeScreen() {
         />
       </View>
 
-      {shouldShowUpgradePrompts(subscriptionTier) ? (
+      {subscriptionTier === "free" ? (
         <View style={styles.subscriptionCard}>
           <Text style={styles.homeCompetitionTitle}>{t(language, "currentPlan")}</Text>
-          <Text style={styles.homeCompetitionText}>
-            {subscriptionTier === "pro" ? t(language, "proPlanStatus") : t(language, "freePlanStatus")}
-          </Text>
+          <Text style={styles.homeCompetitionText}>{t(language, "freePlanStatus")}</Text>
           <PrimaryButton
             label={t(language, "upgradeToPro")}
             variant="secondary"
@@ -467,7 +486,7 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {subscriptionTier === "free" && appVariant.id !== "children" ? <DemoAdBanner language={language} /> : null}
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{appVariant.curriculumPlural}</Text>
@@ -493,6 +512,19 @@ export default function HomeScreen() {
           </Pressable>
         ))}
       </View>
+      <PremiumFeatureDialog
+        visible={premiumPrompt !== null}
+        title={premiumPrompt === "profiles" ? t(language, "profileLimitReachedTitle") : t(language, "classroomTitle")}
+        message={premiumPrompt === "profiles" ? t(language, "profileLimitReachedMessage") : t(language, "classroomProRequired")}
+        upgradeLabel={t(language, "upgradeToPro")}
+        cancelLabel={t(language, "cancel")}
+        onClose={() => setPremiumPrompt(null)}
+        onUpgrade={() => {
+          const source = premiumPrompt === "classroom" ? "classroom" : "profiles";
+          setPremiumPrompt(null);
+          router.push({ pathname: "/subscription", params: { source } } as never);
+        }}
+      />
     </AppBackground>
   );
 }

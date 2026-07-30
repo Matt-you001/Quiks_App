@@ -2,15 +2,17 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
-import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
+import { t } from "../lib/i18n";
+import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
+import { getSubjectDisplayName } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import { getClassroomActivityDetails } from "../services/ai";
 import type {
   ClassroomActivityDetailsResponse,
   ClassroomSubmissionSummary,
-  SubscriptionTier,
   UserProfile,
 } from "../types/app";
 
@@ -43,9 +45,9 @@ function getAverageScore(submissions: ClassroomSubmissionSummary[]) {
 export default function ClassroomActivityScreen() {
   const params = useLocalSearchParams<{ activityId?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [details, setDetails] = useState<ClassroomActivityDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [premiumBlocked, setPremiumBlocked] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -63,7 +65,13 @@ export default function ClassroomActivityScreen() {
 
     const activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
     setProfile(activeProfile);
-    setSubscriptionTier(state.subscriptionTier);
+
+    if (!canUseClassroom(state.subscriptionTier)) {
+      setPremiumBlocked(true);
+      setLoading(false);
+      return;
+    }
+    setPremiumBlocked(false);
 
     if (!activeProfile || !params.activityId || Array.isArray(params.activityId)) {
       setLoading(false);
@@ -96,6 +104,22 @@ export default function ClassroomActivityScreen() {
   const averageScore = getAverageScore(submissions);
   const isTeacher = details?.activity.teacherProfileId === profile?.id;
 
+  if (premiumBlocked) {
+    return (
+      <AppBackground>
+        <PremiumFeatureDialog
+          visible
+          title={t(profile?.language, "classroomTitle")}
+          message={t(profile?.language, "classroomProRequired")}
+          upgradeLabel={t(profile?.language, "upgradeToPro")}
+          cancelLabel={t(profile?.language, "cancel")}
+          onClose={() => router.replace("/")}
+          onUpgrade={() => router.replace({ pathname: "/subscription", params: { source: "classroom" } } as never)}
+        />
+      </AppBackground>
+    );
+  }
+
   if (loading) {
     return (
       <AppBackground>
@@ -125,7 +149,7 @@ export default function ClassroomActivityScreen() {
           {details.activity.type === "test" ? "Test" : "Assignment"} | {details.className}
         </Text>
         <Text style={styles.heroMeta}>
-          {details.activity.subjectName} | {details.activity.grade} | Level {details.activity.level}
+          {getSubjectDisplayName(details.activity.subjectId, details.activity.subjectName, profile.language)} | {details.activity.grade} | Level {details.activity.level}
         </Text>
       </View>
 
@@ -231,7 +255,6 @@ export default function ClassroomActivityScreen() {
           <PrimaryButton label="Back to Classroom" onPress={() => router.replace("/classroom")} />
         </View>
 
-        {subscriptionTier === "free" ? <DemoAdBanner language={profile.language} /> : null}
       </ScrollView>
     </AppBackground>
   );

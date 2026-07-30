@@ -1,14 +1,16 @@
-import { useFocusEffect, router } from "expo-router";
+import { useFocusEffect, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
-import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { appVariant } from "../lib/app-variant";
+import { createClassroomInvitationLink, createClassroomInvitationMessage } from "../lib/classroom-invite";
 import { getDifficultyLabel, t } from "../lib/i18n";
+import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import {
@@ -27,7 +29,7 @@ import {
   syncClassroomProfile,
   updateClassroomActivity,
 } from "../services/ai";
-import { getLocalizedSubjects, validateTopicInput } from "../lib/subjects";
+import { getLocalizedSubjects, getSubjectDisplayName, validateTopicInput } from "../lib/subjects";
 import type {
   ClassroomActivitySummary,
   ClassroomActivityType,
@@ -39,7 +41,6 @@ import type {
   Difficulty,
   Question,
   QuestionFocusMode,
-  SubscriptionTier,
   Subject,
   UserProfile,
 } from "../types/app";
@@ -93,9 +94,9 @@ function canEditScheduledActivity(activity: ClassroomActivitySummary) {
 }
 
 export default function ClassroomScreen() {
+  const params = useLocalSearchParams<{ joinCode?: string }>();
   const hydratingActivityRef = useRef(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [classes, setClasses] = useState<ClassroomSummary[]>([]);
   const [activities, setActivities] = useState<ClassroomActivitySummary[]>([]);
   const [selectedClassDetails, setSelectedClassDetails] = useState<ClassroomClassDetailsResponse | null>(null);
@@ -146,6 +147,8 @@ export default function ClassroomScreen() {
   const [managementExpanded, setManagementExpanded] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(true);
   const [activityDetailsExpanded, setActivityDetailsExpanded] = useState(true);
+  const [premiumBlocked, setPremiumBlocked] = useState(false);
+  const [showInviteLinkOptions, setShowInviteLinkOptions] = useState(false);
 
   const language = profile?.language ?? "en";
   const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0")), []);
@@ -355,6 +358,12 @@ export default function ClassroomScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    if (typeof params.joinCode === "string" && params.joinCode.trim()) {
+      setJoinCode(params.joinCode.trim().toUpperCase());
+    }
+  }, [params.joinCode]);
+
   const loadData = async () => {
     setLoading(true);
     const state = await readAppState();
@@ -365,7 +374,13 @@ export default function ClassroomScreen() {
 
     const activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
     setProfile(activeProfile);
-    setSubscriptionTier(state.subscriptionTier);
+
+    if (!canUseClassroom(state.subscriptionTier)) {
+      setPremiumBlocked(true);
+      setLoading(false);
+      return;
+    }
+    setPremiumBlocked(false);
 
     if (!activeProfile) {
       setLoading(false);
@@ -466,6 +481,44 @@ export default function ClassroomScreen() {
       Alert.alert(t(language, "classroomTitle"), t(language, "copyClassCodeSuccess"));
     } catch {
       Alert.alert(t(language, "classroomTitle"), t(language, "copyClassCodeFailure"));
+    }
+  };
+
+  const shareClassInvitation = async (
+    channel: "whatsapp" | "email" | "telegram" | "sms" | "more" | "copy"
+  ) => {
+    if (!selectedClass) {
+      return;
+    }
+
+    const link = createClassroomInvitationLink(selectedClass.classCode, selectedClass.className);
+    const message = createClassroomInvitationMessage(selectedClass.className, selectedClass.classCode);
+
+    try {
+      if (channel === "copy") {
+        await Clipboard.setStringAsync(link);
+        Alert.alert(t(language, "classroomTitle"), t(language, "inviteLinkCopied"));
+        return;
+      }
+
+      if (channel === "more") {
+        await Share.share({ title: t(language, "shareClassInvite"), message, url: link });
+        return;
+      }
+
+      const encodedMessage = encodeURIComponent(message);
+      const encodedLink = encodeURIComponent(link);
+      const target =
+        channel === "whatsapp"
+          ? `https://wa.me/?text=${encodedMessage}`
+          : channel === "telegram"
+            ? `https://t.me/share/url?url=${encodedLink}&text=${encodeURIComponent(`Join ${selectedClass.className} on ${appVariant.appName}. Class code: ${selectedClass.classCode}`)}`
+            : channel === "email"
+              ? `mailto:?subject=${encodeURIComponent(`Join ${selectedClass.className} on ${appVariant.appName}`)}&body=${encodedMessage}`
+              : `${Platform.OS === "ios" ? "sms:&body=" : "sms:?body="}${encodedMessage}`;
+      await Linking.openURL(target);
+    } catch {
+      await Share.share({ title: t(language, "shareClassInvite"), message, url: link }).catch(() => undefined);
     }
   };
 
@@ -1056,6 +1109,22 @@ export default function ClassroomScreen() {
     );
   }
 
+  if (premiumBlocked) {
+    return (
+      <AppBackground>
+        <PremiumFeatureDialog
+          visible
+          title={t(language, "classroomTitle")}
+          message={t(language, "classroomProRequired")}
+          upgradeLabel={t(language, "upgradeToPro")}
+          cancelLabel={t(language, "cancel")}
+          onClose={() => router.replace("/")}
+          onUpgrade={() => router.replace({ pathname: "/subscription", params: { source: "classroom" } } as never)}
+        />
+      </AppBackground>
+    );
+  }
+
   if (!profile) {
     return (
       <AppBackground>
@@ -1160,6 +1229,11 @@ export default function ClassroomScreen() {
                         style={styles.input}
                       />
                       <PrimaryButton label={t(language, "sendInvite")} onPress={inviteStudent} loading={saving} />
+                      <PrimaryButton
+                        label={t(language, "inviteStudentsByLink")}
+                        variant="secondary"
+                        onPress={() => setShowInviteLinkOptions(true)}
+                      />
                     </>
                   ) : null}
                 </>
@@ -1568,7 +1642,7 @@ export default function ClassroomScreen() {
               <View key={activity.activityId} style={styles.classCard}>
                 <Text style={styles.classTitle}>{activity.title}</Text>
                 <Text style={styles.classMeta}>
-                  {activity.type === "test" ? t(language, "testType") : t(language, "assignmentType")} | {activity.subjectName} | {activity.grade} | {t(language, "levelLabel")} {activity.level}
+                  {activity.type === "test" ? t(language, "testType") : t(language, "assignmentType")} | {getSubjectDisplayName(activity.subjectId, activity.subjectName, language)} | {activity.grade} | {t(language, "levelLabel")} {activity.level}
                 </Text>
                 <Text style={styles.classMeta}>
                   {activity.status === "closed"
@@ -1632,8 +1706,45 @@ export default function ClassroomScreen() {
           )}
         </View>
 
-        {subscriptionTier === "free" ? <DemoAdBanner language={language} /> : null}
       </ScrollView>
+      <Modal
+        visible={showInviteLinkOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowInviteLinkOptions(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowInviteLinkOptions(false)}>
+          <Pressable style={styles.shareModalCard} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.modalTitle}>{t(language, "shareClassInvite")}</Text>
+            <Text style={styles.helperText}>{t(language, "shareClassInviteHint")}</Text>
+            {selectedClass ? (
+              <Text style={styles.inviteLinkText}>
+                {createClassroomInvitationLink(selectedClass.classCode, selectedClass.className)}
+              </Text>
+            ) : null}
+            <View style={styles.shareGrid}>
+              {[
+                ["whatsapp", "WhatsApp", "chat"],
+                ["email", "Email", "email"],
+                ["telegram", "Telegram", "send"],
+                ["sms", "SMS", "sms"],
+                ["more", t(language, "moreShareApps"), "share"],
+                ["copy", t(language, "copyInviteLink"), "link"],
+              ].map(([channel, label, icon]) => (
+                <Pressable
+                  key={channel}
+                  style={styles.shareOption}
+                  onPress={() => void shareClassInvitation(channel as "whatsapp" | "email" | "telegram" | "sms" | "more" | "copy")}
+                >
+                  <MaterialIcons name={icon as never} size={24} color={palette.navy} />
+                  <Text style={styles.shareOptionText}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <PrimaryButton label={t(language, "cancel")} variant="ghost" onPress={() => setShowInviteLinkOptions(false)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal visible={openPicker !== null} transparent animationType="fade" onRequestClose={() => setOpenPicker(null)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setOpenPicker(null)}>
           <Pressable style={styles.modalCard} onPress={() => undefined}>
@@ -2092,6 +2203,42 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 14,
     ...shadows.card,
+  },
+  shareModalCard: {
+    width: "100%",
+    maxWidth: 560,
+    borderRadius: 24,
+    backgroundColor: palette.white,
+    padding: 20,
+    gap: 14,
+    ...shadows.card,
+  },
+  inviteLinkText: {
+    color: palette.navy,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  shareGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  shareOption: {
+    width: "47%",
+    minHeight: 82,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D8E3EC",
+    backgroundColor: "#F8FBFD",
+    padding: 12,
+  },
+  shareOptionText: {
+    color: palette.ink,
+    textAlign: "center",
+    fontWeight: "800",
   },
   modalHeader: {
     flexDirection: "row",

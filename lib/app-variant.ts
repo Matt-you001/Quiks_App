@@ -139,7 +139,7 @@ export const variantConfigs: Record<AppVariant, VariantConfig> = {
     curriculumSingular: "subject",
     curriculumPlural: "Subjects",
     allowedGrades: ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
-    allowedSubjectIds: ["arithmetic", "english", "computer", "history", "home-economics", "geography", "integrated-science", "civic-education", "phe"],
+    allowedSubjectIds: ["arithmetic", "english", "mental-mathematics", "computer", "global-perspectives", "history", "home-economics", "geography", "integrated-science", "civic-education", "phe", "brainteaser"],
     theme: childrenTheme,
   },
   teens: {
@@ -167,7 +167,7 @@ export const variantConfigs: Record<AppVariant, VariantConfig> = {
     curriculumSingular: "subject",
     curriculumPlural: "Subjects",
     allowedGrades: ["Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11", "Grade 12", "High School"],
-    allowedSubjectIds: ["arithmetic", "english", "computer", "history", "economics", "geography", "government", "civic-education", "biology", "physics", "chemistry", "further-mathematics", "commerce", "arts", "music", "agricultural-science", "literature-in-english", "phe"],
+    allowedSubjectIds: ["arithmetic", "english", "computer", "global-perspectives", "history", "economics", "geography", "government", "civic-education", "biology", "physics", "chemistry", "further-mathematics", "commerce", "arts", "music", "agricultural-science", "literature-in-english", "phe", "brainteaser"],
     subjectNameOverrides: {
       arithmetic: "Mathematics",
     },

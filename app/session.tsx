@@ -3,15 +3,24 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { cancelCompetitionReminderNotifications, scheduleCompetitionReminderNotifications } from "../lib/notifications";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
+import { canShowAds } from "../lib/ads";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState, upsertResult } from "../lib/storage";
-import { canUseAiToday, hasProAccess } from "../lib/subscription";
+import { canUseAiToday, canUseClassroom, hasProAccess } from "../lib/subscription";
 import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
-import { getSubjectById, getTopicById, grades, QUESTIONS_PER_LEVEL, validateTopicInput } from "../lib/subjects";
+import {
+  getSubjectById,
+  getSubjectDisplayName,
+  getTopicById,
+  grades,
+  QUESTIONS_PER_LEVEL,
+  validateTopicInput,
+} from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import {
   acceptCompetitionRematch,
@@ -136,6 +145,17 @@ export default function SessionScreen() {
 
   useEffect(() => {
     readAppState().then((state) => {
+      if (typeof params.classroomActivityId === "string" && !canUseClassroom(state.subscriptionTier)) {
+        Alert.alert(t("en", "classroomTitle"), t("en", "classroomProRequired"), [
+          { text: t("en", "cancel"), style: "cancel", onPress: () => router.replace("/") },
+          {
+            text: t("en", "upgradeToPro"),
+            onPress: () => router.replace({ pathname: "/subscription", params: { source: "classroom" } } as never),
+          },
+        ]);
+        return;
+      }
+
       const current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
       setProfile(current);
       setResults(current ? state.results[current.id] ?? [] : []);
@@ -591,7 +611,9 @@ export default function SessionScreen() {
         }
 
         const nextQuestions = normalizeQuestions(assignment.questions);
-        setActivitySubjectName(assignment.activity.subjectName);
+        setActivitySubjectName(
+          getSubjectDisplayName(assignment.activity.subjectId, assignment.activity.subjectName, language)
+        );
         setActivityTopicLabel(assignment.activity.topicLabel ?? null);
         setQuestionSource("remote");
         setCompetitionChats([]);
@@ -669,7 +691,10 @@ export default function SessionScreen() {
           };
 
       if (!allowAi) {
-        Alert.alert(t(language, "freeAiLimitReached"), t(language, "upgradeToPro"));
+        Alert.alert(t(language, "upgradeToPro"), t(language, "freeAiLimitReached"), [
+          { text: t(language, "cancel"), style: "cancel" },
+          { text: t(language, "upgradeToPro"), onPress: () => router.push({ pathname: "/subscription", params: { source: "ai-practice" } } as never) },
+        ]);
       }
 
       const nextQuestions = normalizeQuestions(response.questions);
@@ -1196,8 +1221,18 @@ export default function SessionScreen() {
   }
 
   return (
-    <AppBackground>
-      <View style={styles.panel}>
+    <AppBackground scroll={false}>
+      {canShowAds(subscriptionTier) ? (
+        <View style={styles.fixedQuestionBanner}>
+          <DemoAdBanner language={language} format="banner" compact />
+        </View>
+      ) : null}
+      <ScrollView
+        style={styles.questionScroll}
+        contentContainerStyle={styles.questionScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.panel}>
         <View style={styles.topRow}>
           <View>
             <Text style={styles.titleSmall}>{resolvedSubjectName}</Text>
@@ -1357,12 +1392,25 @@ export default function SessionScreen() {
             </View>
           </View>
         ) : null}
-      </View>
+        </View>
+      </ScrollView>
     </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  fixedQuestionBanner: {
+    zIndex: 10,
+    height: 58,
+    paddingVertical: 2,
+    backgroundColor: palette.paper,
+  },
+  questionScroll: {
+    flex: 1,
+  },
+  questionScrollContent: {
+    paddingBottom: 24,
+  },
   panel: {
     marginTop: 18,
     borderRadius: 26,

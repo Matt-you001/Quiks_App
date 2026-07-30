@@ -99,6 +99,11 @@ const variantAdMobUnitFallbacks: Record<
     appOpenUnitId: "",
   },
 };
+const variantInterstitialAdsEnabledFallbacks: Record<AppVariant, boolean> = {
+  children: false,
+  teens: true,
+  uni: false,
+};
 const variantGoogleClientFallbacks: Record<
   AppVariant,
   {
@@ -174,7 +179,8 @@ const fallbackPublicEnv = {
   EXPO_PUBLIC_ADMOB_NATIVE_UNIT_ID: "",
   EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID: "",
   EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS: "false",
-      EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS: "true",
+  EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS: "true",
+  EXPO_PUBLIC_ENABLE_SUBSCRIPTION_PURCHASES: "true",
   EXPO_PUBLIC_FIREBASE_API_KEY: "AIzaSyDSICe2NTtANURfwcQPYWlywx3OPiJ7kEA",
   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: "synapse-trainer-y0kk3.firebaseapp.com",
   EXPO_PUBLIC_FIREBASE_PROJECT_ID: "synapse-trainer-y0kk3",
@@ -253,6 +259,16 @@ function readVariantAdMobUnitId(
   const variantFallback = variantAdMobUnitFallbacks[variant][kind];
   const value = variantFallback || process.env[variantKey] || process.env[genericKey];
   return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantInterstitialAdsEnabled() {
+  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_ENABLE_INTERSTITIAL_ADS` as keyof NodeJS.ProcessEnv;
+  const genericKey = "EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS" as keyof NodeJS.ProcessEnv;
+  const value =
+    process.env[variantKey] ??
+    process.env[genericKey] ??
+    String(variantInterstitialAdsEnabledFallbacks[variant]);
+  return value.replace(/^"(.*)"$/, "$1");
 }
 
 function readVariantGoogleClientId(kind: "expoClientId" | "androidClientId" | "iosClientId" | "webClientId") {
@@ -352,6 +368,20 @@ const config: ExpoConfig = {
   assetBundlePatterns: ["**/*"],
   android: {
     package: current.androidPackage,
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        data: [
+          {
+            scheme: "https",
+            host: `${variant}.quiks.site`,
+            pathPrefix: "/classroom-invite.html",
+          },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
     googleServicesFile:
       variant === "children"
         ? "./src/google-services-children.json"
@@ -407,8 +437,9 @@ const config: ExpoConfig = {
     EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID: readVariantAdMobUnitId("interstitialUnitId"),
     EXPO_PUBLIC_ADMOB_NATIVE_UNIT_ID: readVariantAdMobUnitId("nativeUnitId"),
     EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID: readVariantAdMobUnitId("appOpenUnitId"),
-    EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS: readEnvValue("EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS"),
+    EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS: readVariantInterstitialAdsEnabled(),
     EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS: readEnvValue("EXPO_PUBLIC_ENABLE_SUBSCRIPTION_RESTRICTIONS"),
+    EXPO_PUBLIC_ENABLE_SUBSCRIPTION_PURCHASES: readEnvValue("EXPO_PUBLIC_ENABLE_SUBSCRIPTION_PURCHASES"),
     EXPO_PUBLIC_FIREBASE_API_KEY: readVariantFirebaseValue("apiKey"),
     EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: readVariantFirebaseValue("authDomain"),
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: readVariantFirebaseValue("projectId"),

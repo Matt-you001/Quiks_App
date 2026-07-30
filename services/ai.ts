@@ -24,6 +24,7 @@ import type {
   ClassroomClassMemberRemoveRequest,
   ClassroomClassUpdateRequest,
   ClassroomInviteStudentRequest,
+  ClassroomInviteLinkAcceptRequest,
   ClassroomJoinClassRequest,
   ClassroomMembershipDecisionRequest,
   ClassroomMembershipMutationResponse,
@@ -757,6 +758,12 @@ export async function requestJoinClassroom(
   request: ClassroomJoinClassRequest
 ): Promise<ClassroomMembershipMutationResponse> {
   return postJson("/classroom/classes/join", withVariantMeta(request));
+}
+
+export async function acceptClassroomInvitationLink(
+  request: ClassroomInviteLinkAcceptRequest
+): Promise<ClassroomMembershipMutationResponse> {
+  return postJson("/classroom/classes/invite-link/accept", withVariantMeta(request));
 }
 
 export async function inviteStudentToClassroom(

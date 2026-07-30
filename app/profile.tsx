@@ -4,6 +4,7 @@ import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "rea
 import * as Clipboard from "expo-clipboard";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
+import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { signOutAccount } from "../lib/firebase";
@@ -98,6 +99,7 @@ export default function ProfileScreen() {
   const [results, setResults] = useState<SessionResult[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
   const [profileCount, setProfileCount] = useState(0);
+  const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
 
   const load = useCallback(async () => {
     const state = await readAppState();
@@ -121,8 +123,8 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = async () => {
-    await signOutAccount().catch(() => undefined);
     await logoutAccount();
+    await signOutAccount().catch(() => undefined);
     await syncRevenueCatIdentity(null).catch(() => undefined);
     router.replace({ pathname: "/login" } as never);
   };
@@ -438,7 +440,13 @@ export default function ProfileScreen() {
           <PrimaryButton
             label={t(language, "classroomTitle")}
             variant="secondary"
-            onPress={() => router.push({ pathname: "/classroom" } as never)}
+            onPress={() => {
+              if (subscriptionTier !== "pro") {
+                setPremiumPrompt("classroom");
+                return;
+              }
+              router.push({ pathname: "/classroom" } as never);
+            }}
             style={styles.gridButton}
             compact
           />
@@ -453,11 +461,13 @@ export default function ProfileScreen() {
         <PrimaryButton
           label={t(language, "createProfile")}
           variant="secondary"
-          onPress={() =>
-            canCreateMoreProfiles
-              ? router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
-              : router.push({ pathname: "/subscription" } as never)
-          }
+          onPress={() => {
+            if (!canCreateMoreProfiles) {
+              setPremiumPrompt("profiles");
+              return;
+            }
+            router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never);
+          }}
           style={styles.gridButton}
           compact
         />
@@ -473,6 +483,19 @@ export default function ProfileScreen() {
         ) : null}
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} style={styles.gridButton} compact />
       </View>
+      <PremiumFeatureDialog
+        visible={premiumPrompt !== null}
+        title={premiumPrompt === "profiles" ? t(language, "profileLimitReachedTitle") : t(language, "classroomTitle")}
+        message={premiumPrompt === "profiles" ? t(language, "profileLimitReachedMessage") : t(language, "classroomProRequired")}
+        upgradeLabel={t(language, "upgradeToPro")}
+        cancelLabel={t(language, "cancel")}
+        onClose={() => setPremiumPrompt(null)}
+        onUpgrade={() => {
+          const source = premiumPrompt === "classroom" ? "classroom" : "profiles";
+          setPremiumPrompt(null);
+          router.push({ pathname: "/subscription", params: { source } } as never);
+        }}
+      />
     </AppBackground>
   );
 }

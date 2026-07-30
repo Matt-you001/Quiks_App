@@ -234,6 +234,11 @@ export interface ClassroomJoinClassRequest {
   classCode: string;
 }
 
+export interface ClassroomInviteLinkAcceptRequest {
+  studentProfile: UserProfile;
+  classCode: string;
+}
+
 export interface ClassroomInviteStudentRequest {
   teacherProfile: UserProfile;
   classId: string;

@@ -22,7 +22,7 @@ import type { AppLanguage, SubscriptionTier } from "../types/app";
 
 export default function SubscriptionScreen() {
   const purchasesEnabled = areSubscriptionPurchasesEnabled();
-  const params = useLocalSearchParams<{ plan?: string }>();
+  const params = useLocalSearchParams<{ plan?: string; source?: string }>();
   const [subscriptionTier, setSubscriptionTierState] = useState<SubscriptionTier>("free");
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -204,6 +204,9 @@ export default function SubscriptionScreen() {
             <Text style={styles.storeMessage}>
               {selectedPlanPeriod === "yearly" ? "Checkout preference: yearly plan" : "Checkout preference: monthly plan"}
             </Text>
+          ) : null}
+          {params.source === "classroom" ? (
+            <Text style={styles.storeMessage}>{t(language, "classroomProRequired")}</Text>
           ) : null}
           {storeMessage ? <Text style={styles.storeMessage}>{storeMessage}</Text> : null}
           {purchasesEnabled && ((storeReady && visiblePlans.length > 0) || shouldShowFallbackPlans) ? (

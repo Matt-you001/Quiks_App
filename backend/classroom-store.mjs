@@ -384,6 +384,52 @@ export async function requestJoinClass(studentProfile, classCode, appVariant) {
   });
 }
 
+export async function acceptClassInviteLink(studentProfile, classCode, appVariant) {
+  return mutateStore(async (store) => {
+    if (normalizeRole(studentProfile.role) !== "student") {
+      throw new Error("Only student profiles can accept a class invitation.");
+    }
+
+    store.profiles[studentProfile.id] = normalizeProfileRecord(studentProfile, appVariant);
+    const classroom = Object.values(store.classrooms).find(
+      (entry) => entry.classCode === classCode.trim().toUpperCase() && entry.appVariant === appVariant
+    );
+    if (!classroom) {
+      throw new Error("This class invitation is no longer valid.");
+    }
+
+    const existing = findMembershipByQuiksId(store, classroom.id, studentProfile.quiksId);
+    if (existing?.status === "active") {
+      return {
+        classroom: buildClassroomSummary(store, classroom),
+        message: `${studentProfile.name} is already part of ${classroom.className}.`,
+      };
+    }
+
+    const now = Date.now();
+    const membershipId = existing?.membershipId ?? randomUUID();
+    store.memberships[membershipId] = {
+      ...(existing ?? {}),
+      membershipId,
+      classId: classroom.id,
+      profileId: studentProfile.id,
+      quiksId: studentProfile.quiksId,
+      name: studentProfile.name,
+      role: "student",
+      status: "active",
+      requestedBy: "teacher_invite_link",
+      createdAt: existing?.createdAt ?? now,
+      joinedAt: now,
+      updatedAt: now,
+    };
+
+    return {
+      classroom: buildClassroomSummary(store, classroom),
+      message: `${studentProfile.name} is now part of ${classroom.className}.`,
+    };
+  });
+}
+
 export async function inviteStudentToClass(teacherProfile, classId, studentQuiksId, appVariant) {
   return mutateStore(async (store) => {
     store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);

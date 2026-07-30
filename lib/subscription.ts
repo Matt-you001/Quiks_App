@@ -83,6 +83,10 @@ export function isProTier(subscriptionTier: SubscriptionTier) {
   return subscriptionTier === "pro";
 }
 
+export function canUseClassroom(subscriptionTier: SubscriptionTier) {
+  return isProTier(subscriptionTier);
+}
+
 export function getProfileLimit(subscriptionTier: SubscriptionTier) {
   return hasProAccess(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_PROFILE_LIMIT;
 }

@@ -33,13 +33,31 @@ export function readWebCheckoutIntentFromLocation() {
 
 export function getPostAuthRoute(
   redirect?: string | string[] | null,
-  plan?: string | string[] | null
-): { pathname: "/" | "/subscription"; params?: { plan?: SubscriptionPlanPeriod } } {
-  if ((Array.isArray(redirect) ? redirect[0] : redirect) === "subscription") {
+  plan?: string | string[] | null,
+  joinCode?: string | string[] | null,
+  className?: string | string[] | null
+): {
+  pathname: "/" | "/subscription" | "/classroom-invite";
+  params?: { plan?: SubscriptionPlanPeriod; joinCode?: string; className?: string };
+} {
+  const normalizedRedirect = Array.isArray(redirect) ? redirect[0] : redirect;
+  if (normalizedRedirect === "subscription") {
     const normalizedPlan = normalizeSubscriptionPlanPeriod(plan);
     return normalizedPlan
       ? { pathname: "/subscription", params: { plan: normalizedPlan } }
       : { pathname: "/subscription" };
+  }
+
+  if (normalizedRedirect === "classroom-invite") {
+    const normalizedCode = (Array.isArray(joinCode) ? joinCode[0] : joinCode)?.trim().toUpperCase();
+    const normalizedClassName = (Array.isArray(className) ? className[0] : className)?.trim();
+    return {
+      pathname: "/classroom-invite",
+      params: {
+        ...(normalizedCode ? { joinCode: normalizedCode } : {}),
+        ...(normalizedClassName ? { className: normalizedClassName } : {}),
+      },
+    };
   }
 
   return { pathname: "/" };

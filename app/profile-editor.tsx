@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, t } from "../lib/i18n";
@@ -40,6 +41,7 @@ export default function ProfileEditorScreen() {
   const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
+  const [showProfileUpgrade, setShowProfileUpgrade] = useState(false);
 
   useEffect(() => {
     readAppState().then((state) => {
@@ -90,8 +92,7 @@ export default function ProfileEditorScreen() {
     if (!editingProfile) {
       const state = await readAppState();
       if (!canCreateAnotherProfile(state.subscriptionTier, state.profiles.length)) {
-        Alert.alert(t(form.language, "profileLimitReachedTitle"), t(form.language, "profileLimitReachedMessage"));
-        router.push({ pathname: "/subscription" } as never);
+        setShowProfileUpgrade(true);
         return;
       }
     }
@@ -245,6 +246,18 @@ export default function ProfileEditorScreen() {
           <PrimaryButton label={t(form.language, "cancel")} variant="ghost" onPress={() => router.back()} />
         </View>
       </View>
+      <PremiumFeatureDialog
+        visible={showProfileUpgrade}
+        title={t(form.language, "profileLimitReachedTitle")}
+        message={t(form.language, "profileLimitReachedMessage")}
+        upgradeLabel={t(form.language, "upgradeToPro")}
+        cancelLabel={t(form.language, "cancel")}
+        onClose={() => setShowProfileUpgrade(false)}
+        onUpgrade={() => {
+          setShowProfileUpgrade(false);
+          router.push({ pathname: "/subscription", params: { source: "profiles" } } as never);
+        }}
+      />
     </AppBackground>
   );
 }

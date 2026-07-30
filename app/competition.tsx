@@ -18,7 +18,7 @@ import {
 } from "../lib/notifications";
 import { canJoinCompetitionToday, shouldShowUpgradePrompts } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
-import { getLocalizedSubjects, getSubjectById, getTopicById, grades } from "../lib/subjects";
+import { getLocalizedSubjects, getSubjectById, getSubjectDisplayName, getTopicById, grades } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import {
   acceptCompetitionChallenge,
@@ -361,8 +361,10 @@ export default function CompetitionScreen() {
       return;
     }
     if (!canJoinMoreCompetitions) {
-      Alert.alert(t(language, "freeCompetitionLimitReached"), t(language, "upgradeToPro"));
-      router.push({ pathname: "/subscription" } as never);
+      Alert.alert(t(language, "competitionArena"), t(language, "freeCompetitionLimitReached"), [
+        { text: t(language, "cancel"), style: "cancel" },
+        { text: t(language, "upgradeToPro"), onPress: () => router.push({ pathname: "/subscription", params: { source: "competition" } } as never) },
+      ]);
       return;
     }
 
@@ -406,8 +408,10 @@ export default function CompetitionScreen() {
       return;
     }
     if (!canJoinMoreCompetitions) {
-      Alert.alert(t(language, "freeCompetitionLimitReached"), t(language, "upgradeToPro"));
-      router.push({ pathname: "/subscription" } as never);
+      Alert.alert(t(language, "competitionArena"), t(language, "freeCompetitionLimitReached"), [
+        { text: t(language, "cancel"), style: "cancel" },
+        { text: t(language, "upgradeToPro"), onPress: () => router.push({ pathname: "/subscription", params: { source: "competition" } } as never) },
+      ]);
       return;
     }
 
@@ -574,7 +578,7 @@ export default function CompetitionScreen() {
       <AppBackground>
         <View style={styles.heroCard}>
           <Text style={styles.eyebrow}>{creatorMustConfirm ? t(language, "challengeAccepted") : t(language, "challengeCreated")}</Text>
-          <Text style={styles.title}>{activeChallenge.subjectName}</Text>
+          <Text style={styles.title}>{getSubjectDisplayName(activeChallenge.subjectId, activeChallenge.subjectName, language)}</Text>
           <Text style={styles.heroText}>{getWaitingBody(activeChallenge, waitingStatus, waitingRole)}</Text>
           <Text style={styles.heroText}>
             {activeChallenge.grade} | {t(language, "levelLabel")} {activeChallenge.level} | {getDifficultyLabel(language, activeChallenge.difficulty)}
@@ -676,7 +680,7 @@ export default function CompetitionScreen() {
                 <View key={challenge.challengeId} style={styles.challengeCard}>
                   <Text style={styles.challengeTitle}>{challenge.creatorName}</Text>
                   <Text style={styles.challengeMeta}>
-                    {challenge.subjectName} | {challenge.grade} | {t(language, "levelLabel")} {challenge.level}
+                    {getSubjectDisplayName(challenge.subjectId, challenge.subjectName, language)} | {challenge.grade} | {t(language, "levelLabel")} {challenge.level}
                   </Text>
                   <Text style={styles.challengeMeta}>
                     {getDifficultyLabel(language, challenge.difficulty)} | {challenge.topicLabel ?? t(language, "generalMixedPractice")}

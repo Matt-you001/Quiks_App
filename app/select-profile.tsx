@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRemotePushRegistration } from "../lib/notifications";
@@ -15,6 +16,7 @@ export default function SelectProfileScreen() {
   const { subject } = useLocalSearchParams<{ subject?: string }>();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
+  const [showProfileUpgrade, setShowProfileUpgrade] = useState(false);
   const language = profiles[0]?.language ?? "en";
   const selectedSubject = getSubjectById(subject, language);
 
@@ -67,13 +69,27 @@ export default function SelectProfileScreen() {
         <PrimaryButton
           label={t(language, "createLearner")}
           variant="secondary"
-          onPress={() =>
-            canCreateMoreProfiles
-              ? router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
-              : router.push({ pathname: "/subscription" } as never)
-          }
+          onPress={() => {
+            if (!canCreateMoreProfiles) {
+              setShowProfileUpgrade(true);
+              return;
+            }
+            router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never);
+          }}
         />
       </View>
+      <PremiumFeatureDialog
+        visible={showProfileUpgrade}
+        title={t(language, "profileLimitReachedTitle")}
+        message={t(language, "profileLimitReachedMessage")}
+        upgradeLabel={t(language, "upgradeToPro")}
+        cancelLabel={t(language, "cancel")}
+        onClose={() => setShowProfileUpgrade(false)}
+        onUpgrade={() => {
+          setShowProfileUpgrade(false);
+          router.push({ pathname: "/subscription", params: { source: "profiles" } } as never);
+        }}
+      />
     </AppBackground>
   );
 }

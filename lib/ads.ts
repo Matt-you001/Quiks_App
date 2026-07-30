@@ -17,9 +17,21 @@ type MobileAdsModule = {
     requestOptions?: {
       requestNonPersonalizedAdsOnly?: boolean;
     };
+    onAdLoaded?: () => void;
+    onAdFailedToLoad?: (error: Error) => void;
   }>;
   BannerAdSize: {
+    BANNER: string;
+    ANCHORED_ADAPTIVE_BANNER: string;
     LARGE_ANCHORED_ADAPTIVE_BANNER: string;
+  };
+  NativeAdView?: ComponentType<any>;
+  NativeAsset?: ComponentType<any>;
+  NativeMediaView?: ComponentType<any>;
+  NativeAssetType?: {
+    HEADLINE: string;
+    BODY: string;
+    CALL_TO_ACTION: string;
   };
   InterstitialAd: {
     createForAdRequest: (
@@ -128,8 +140,9 @@ const adsConfig = {
     normalizeEnvValue(extra.EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID ?? process.env.EXPO_PUBLIC_ADMOB_APP_OPEN_UNIT_ID),
   interstitialEnabled:
     normalizeEnvValue(
-      process.env.EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS ??
+      process.env[`EXPO_PUBLIC_${appVariant.id.toUpperCase()}_ENABLE_INTERSTITIAL_ADS`] ??
         extra.EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS ??
+        process.env.EXPO_PUBLIC_ENABLE_INTERSTITIAL_ADS ??
         "false"
     ) === "true",
 };
@@ -291,8 +304,8 @@ function ensureAppOpenAdLoaded(mobileAds: MobileAdsModule) {
   appOpenAd.load();
 }
 
-export async function preloadAppOpenAd() {
-  if (appVariant.id === "children" || Platform.OS === "web") {
+export async function preloadAppOpenAd(subscriptionTier: SubscriptionTier) {
+  if (!canShowAds(subscriptionTier) || Platform.OS === "web") {
     return false;
   }
 
@@ -310,8 +323,8 @@ export async function preloadAppOpenAd() {
   return true;
 }
 
-export async function showAppOpenAd() {
-  if (appVariant.id === "children" || Platform.OS === "web") {
+export async function showAppOpenAd(subscriptionTier: SubscriptionTier) {
+  if (!canShowAds(subscriptionTier) || Platform.OS === "web") {
     return false;
   }
 

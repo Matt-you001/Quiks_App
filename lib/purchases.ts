@@ -84,6 +84,7 @@ const productIds = {
     fallbackProductIds[appVariant.id].yearly,
 };
 const packageCache = new Map<string, PurchasesPackage>();
+const CUSTOMER_INFO_RETRY_DELAYS_MS = [750, 1500, 3000] as const;
 
 function getSubscriptionProductIds() {
   return [productIds.monthly, productIds.yearly].filter(Boolean);
@@ -153,6 +154,35 @@ async function updateStoredTierFromActive(active: boolean) {
   return nextTier;
 }
 
+function wait(milliseconds: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+async function getFreshCustomerInfo() {
+  await Purchases.invalidateCustomerInfoCache();
+  return Purchases.getCustomerInfo();
+}
+
+async function resolvePostPurchaseCustomerInfo(initialCustomerInfo: Awaited<ReturnType<typeof Purchases.getCustomerInfo>>) {
+  if (hasActiveProEntitlement(initialCustomerInfo)) {
+    return initialCustomerInfo;
+  }
+
+  let latestCustomerInfo = initialCustomerInfo;
+
+  for (const delayMilliseconds of CUSTOMER_INFO_RETRY_DELAYS_MS) {
+    await wait(delayMilliseconds);
+    latestCustomerInfo = await getFreshCustomerInfo();
+    if (hasActiveProEntitlement(latestCustomerInfo)) {
+      break;
+    }
+  }
+
+  return latestCustomerInfo;
+}
+
 export async function endPurchaseConnection() {
   return;
 }
@@ -187,7 +217,7 @@ export async function loadSubscriptionStoreState(): Promise<SubscriptionStoreSta
     packageCache.set(item.identifier, item);
   }
 
-  const customerInfo = await Purchases.getCustomerInfo();
+  const customerInfo = await getFreshCustomerInfo();
   const plans = normalizePlans(availablePackages);
   const active = hasActiveProEntitlement(customerInfo);
   await updateStoredTierFromActive(active);
@@ -235,7 +265,8 @@ export async function purchaseProSubscription(productId: string): Promise<Subscr
     };
   }
 
-  const { customerInfo } = await Purchases.purchasePackage(selectedPackage);
+  const purchaseResult = await Purchases.purchasePackage(selectedPackage);
+  const customerInfo = await resolvePostPurchaseCustomerInfo(purchaseResult.customerInfo);
   const active = hasActiveProEntitlement(customerInfo);
   await updateStoredTierFromActive(active);
 
@@ -255,7 +286,8 @@ export async function restoreProSubscription(): Promise<SubscriptionPurchaseResu
   }
 
   await ensureRevenueCatConfigured(getAuthenticatedAccount());
-  const customerInfo = await Purchases.restorePurchases();
+  await Purchases.restorePurchases();
+  const customerInfo = await getFreshCustomerInfo();
   const active = hasActiveProEntitlement(customerInfo);
   await updateStoredTierFromActive(active);
 

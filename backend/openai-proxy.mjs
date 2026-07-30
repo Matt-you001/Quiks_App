@@ -2,6 +2,7 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
 import {
+  acceptClassInviteLink,
   createClassroomActivity,
   createClassroom,
   duplicateActivity,
@@ -1852,6 +1853,20 @@ async function handleClassroomJoin(body, response) {
   sendJson(response, 200, payload);
 }
 
+async function handleClassroomInviteLinkAccept(body, response) {
+  if (!body.studentProfile?.id || !body.classCode?.trim()) {
+    sendJson(response, 400, { error: "Student profile and invitation class code are required." });
+    return;
+  }
+
+  const payload = await acceptClassInviteLink(
+    body.studentProfile,
+    body.classCode,
+    body.appVariant ?? "children"
+  );
+  sendJson(response, 200, payload);
+}
+
 async function handleClassroomInvite(body, response) {
   if (!body.teacherProfile?.id || !body.classId || !body.studentQuiksId?.trim()) {
     sendJson(response, 400, { error: "Teacher profile, class, and student ID are required." });
@@ -2136,6 +2151,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/classes/join") {
       await handleClassroomJoin(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/classes/invite-link/accept") {
+      await handleClassroomInviteLinkAccept(body, response);
       return;
     }
 

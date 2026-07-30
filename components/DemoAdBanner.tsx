@@ -8,10 +8,15 @@ import type { AppLanguage } from "../types/app";
 
 type DemoAdBannerProps = {
   language: AppLanguage;
+  format?: "banner" | "native";
+  compact?: boolean;
 };
 
-export function DemoAdBanner({ language }: DemoAdBannerProps) {
+export function DemoAdBanner({ language, format = "native", compact = false }: DemoAdBannerProps) {
   const [adsReady, setAdsReady] = useState(false);
+  const [initializationFinished, setInitializationFinished] = useState(false);
+  const [bannerLoadFailed, setBannerLoadFailed] = useState(false);
+  const [bannerRetryKey, setBannerRetryKey] = useState(0);
   const [nativeAd, setNativeAd] = useState<unknown | null>(null);
   const isWeb = Platform.OS === "web";
 
@@ -22,11 +27,17 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
 
     let cancelled = false;
 
-    initializeMobileAds().then((ready) => {
-      if (!cancelled) {
-        setAdsReady(ready);
-      }
-    });
+    initializeMobileAds()
+      .then((ready) => {
+        if (!cancelled) {
+          setAdsReady(ready);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInitializationFinished(true);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -34,7 +45,7 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
   }, [isWeb]);
 
   useEffect(() => {
-    if (isWeb) {
+    if (isWeb || format !== "native") {
       return;
     }
 
@@ -62,7 +73,20 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
     return () => {
       cancelled = true;
     };
-  }, [adsReady, isWeb]);
+  }, [adsReady, format, isWeb]);
+
+  useEffect(() => {
+    if (!bannerLoadFailed || format !== "banner" || isWeb) {
+      return;
+    }
+
+    const retryTimer = setTimeout(() => {
+      setBannerLoadFailed(false);
+      setBannerRetryKey((currentKey) => currentKey + 1);
+    }, 30_000);
+
+    return () => clearTimeout(retryTimer);
+  }, [bannerLoadFailed, format, isWeb]);
 
   if (appVariant.id === "children") {
     return null;
@@ -72,13 +96,13 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
     const placeholderId = appVariant.id === "teens" ? "adsense-slot-teens-banner" : "adsense-slot-uni-banner";
 
     return (
-      <View style={styles.card}>
-        <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text>
-        <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text>
-        <Text style={styles.text}>
+      <View style={[styles.card, format === "banner" ? styles.bannerCard : null]}>
+        {format === "native" ? <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text> : null}
+        {format === "native" ? <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text> : null}
+        {format === "native" ? <Text style={styles.text}>
           This web slot is prepared for Google AdSense deployment on {appVariant.appName}. Replace the placeholder with
           your live script and slot ID when approval is complete.
-        </Text>
+        </Text> : null}
         <View nativeID={placeholderId} style={styles.webSlot}>
           <Text style={styles.webSlotLabel}>AdSense-ready banner</Text>
           <Text style={styles.webSlotMeta}>{placeholderId}</Text>
@@ -92,13 +116,15 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
   if (mobileAds && adsReady) {
     const { BannerAd, BannerAdSize } = mobileAds;
 
+    if (format === "banner" && bannerLoadFailed) {
+      return compact ? <View style={styles.compactLoadingSlot} /> : null;
+    }
+
     let nativeAdCard: ReactElement | null = null;
 
     if (nativeAd) {
-      try {
-        const adsPackage = require("react-native-google-mobile-ads") as any;
-
-        const { NativeAdView, NativeAsset, NativeAssetType, NativeMediaView } = adsPackage;
+      const { NativeAdView, NativeAsset, NativeAssetType, NativeMediaView } = mobileAds;
+      if (NativeAdView && NativeAsset && NativeAssetType && NativeMediaView) {
         const adData = nativeAd as {
           headline?: string;
           body?: string;
@@ -130,32 +156,61 @@ export function DemoAdBanner({ language }: DemoAdBannerProps) {
             </View>
           </NativeAdView>
         );
-      } catch {
-        nativeAdCard = null;
       }
     }
 
     return (
-      <View style={styles.card}>
-        <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text>
-        <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text>
-        {nativeAdCard}
-        <View style={styles.bannerWrap}>
-          <BannerAd
-            unitId={getBannerAdUnitId(mobileAds)}
-            size={BannerAdSize.LARGE_ANCHORED_ADAPTIVE_BANNER}
-            requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-          />
-        </View>
+      <View
+        style={[
+          styles.card,
+          format === "banner" ? styles.bannerCard : null,
+          compact ? styles.compactCard : null,
+        ]}
+      >
+        {format === "native" && !compact ? (
+          <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text>
+        ) : null}
+        {format === "native" && !compact ? (
+          <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text>
+        ) : null}
+        {format === "native" ? nativeAdCard : (
+          <View style={[styles.bannerWrap, compact ? styles.compactBannerWrap : null]}>
+            <BannerAd
+              key={bannerRetryKey}
+              unitId={getBannerAdUnitId(mobileAds)}
+              size={compact ? BannerAdSize.BANNER : BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+              requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+              onAdLoaded={() => setBannerLoadFailed(false)}
+              onAdFailedToLoad={(error) => {
+                console.warn("AdMob banner failed to load:", error.message);
+                setBannerLoadFailed(true);
+              }}
+            />
+          </View>
+        )}
       </View>
     );
   }
 
+  if (!initializationFinished || (format === "banner" && !bannerLoadFailed)) {
+    return compact ? <View style={styles.compactLoadingSlot} /> : null;
+  }
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text>
-      <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text>
-      <Text style={styles.text}>{t(language, "demoAdBannerHint")}</Text>
+    <View
+      style={[
+        styles.card,
+        format === "banner" ? styles.bannerCard : null,
+        compact ? styles.compactCard : null,
+      ]}
+    >
+      {format === "native" && !compact ? (
+        <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text>
+      ) : null}
+      {format === "native" && !compact ? (
+        <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text>
+      ) : null}
+      {format === "native" && !compact ? <Text style={styles.text}>{t(language, "demoAdBannerHint")}</Text> : null}
     </View>
   );
 }
@@ -169,6 +224,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF7E4",
     padding: 18,
     ...shadows.card,
+  },
+  bannerCard: {
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: "transparent",
+    padding: 0,
+    alignItems: "center",
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  compactCard: {
+    height: 54,
+    minHeight: 54,
+    marginTop: 0,
+    borderRadius: 8,
+    padding: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   eyebrow: {
     color: "#8B5E00",
@@ -189,10 +265,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bannerWrap: {
-    marginTop: 12,
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#FFFDF8",
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  compactBannerWrap: {
+    width: "100%",
+    height: 50,
+    marginTop: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  compactLoadingSlot: {
+    height: 54,
   },
   nativeCard: {
     marginTop: 14,
@@ -213,7 +301,7 @@ const styles = StyleSheet.create({
   },
   nativeMedia: {
     width: "100%",
-    minHeight: 160,
+    aspectRatio: 1.91,
     borderRadius: 14,
     backgroundColor: "#F8FAFC",
   },

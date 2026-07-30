@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import { appVariant } from "../lib/app-variant";
 import { preloadAppOpenAd, showAppOpenAd } from "../lib/ads";
+import { readAppState } from "../lib/storage";
 import {
   useNotificationNavigation,
   usePendingChallengeWatcher,
@@ -23,14 +24,14 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    void preloadAppOpenAd();
+    void readAppState().then((state) => preloadAppOpenAd(state.subscriptionTier));
 
     const subscription = AppState.addEventListener("change", (nextState) => {
       const previousState = appStateRef.current;
       appStateRef.current = nextState;
 
       if ((previousState === "background" || previousState === "inactive") && nextState === "active") {
-        void showAppOpenAd();
+        void readAppState().then((state) => showAppOpenAd(state.subscriptionTier));
       }
     });
 

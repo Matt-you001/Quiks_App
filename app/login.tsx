@@ -28,7 +28,7 @@ import {
   signInWithGoogleAccount,
 } from "../lib/firebase";
 import { t } from "../lib/i18n";
-import { syncRevenueCatIdentity } from "../lib/revenuecat";
+import { syncRevenueCatIdentityForAuthentication } from "../lib/revenuecat";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import { getPostAuthRoute } from "../lib/web-checkout";
@@ -113,7 +113,7 @@ function GoogleLoginButton({
 }
 
 export default function LoginScreen() {
-  const params = useLocalSearchParams<{ redirect?: string; plan?: string }>();
+  const params = useLocalSearchParams<{ redirect?: string; plan?: string; joinCode?: string; className?: string }>();
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -130,11 +130,11 @@ export default function LoginScreen() {
         setLanguage(preferredLanguage);
 
         if (state.isAuthenticated || getAuthenticatedAccount()) {
-          const nextRoute = getPostAuthRoute(params.redirect, params.plan);
+          const nextRoute = getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className);
           router.replace(nextRoute as never);
         }
       });
-    }, [params.plan, params.redirect])
+    }, [params.className, params.joinCode, params.plan, params.redirect])
   );
 
   const handleLogin = async () => {
@@ -150,8 +150,8 @@ export default function LoginScreen() {
     try {
       const account = await signInWithEmailAccount(email, password);
       await setAuthenticatedAccount(account, true);
-      await syncRevenueCatIdentity(account).catch(() => undefined);
-      router.replace(getPostAuthRoute(params.redirect, params.plan) as never);
+      await syncRevenueCatIdentityForAuthentication(account);
+      router.replace(getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className) as never);
     } catch (error) {
       Alert.alert(t(language, "invalidCredentialsTitle"), formatFirebaseError(error));
     } finally {
@@ -222,8 +222,10 @@ export default function LoginScreen() {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
                       await setAuthenticatedAccount(account, true);
-                      await syncRevenueCatIdentity(account).catch(() => undefined);
-                      router.replace(getPostAuthRoute(params.redirect, params.plan) as never);
+                      await syncRevenueCatIdentityForAuthentication(account);
+                      router.replace(
+                        getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className) as never
+                      );
                     } catch {
                       Alert.alert(t(language, "invalidCredentialsTitle"), t(language, "invalidCredentialsMessage"));
                     }
@@ -240,6 +242,8 @@ export default function LoginScreen() {
                     params: {
                       ...(params.redirect ? { redirect: params.redirect } : {}),
                       ...(params.plan ? { plan: params.plan } : {}),
+                      ...(params.joinCode ? { joinCode: params.joinCode } : {}),
+                      ...(params.className ? { className: params.className } : {}),
                     },
                   } as never)
                 }

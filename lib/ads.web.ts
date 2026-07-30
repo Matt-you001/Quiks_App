@@ -33,10 +33,10 @@ export async function showInterstitialAd() {
   return false;
 }
 
-export async function preloadAppOpenAd() {
+export async function preloadAppOpenAd(_subscriptionTier: SubscriptionTier) {
   return false;
 }
 
-export async function showAppOpenAd() {
+export async function showAppOpenAd(_subscriptionTier: SubscriptionTier) {
   return false;
 }

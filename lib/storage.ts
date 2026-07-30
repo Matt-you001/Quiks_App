@@ -2,11 +2,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getAuthenticatedAccount, isFirebaseConfigured, loadCloudState, saveCloudState } from "./firebase";
 import { DEFAULT_LANGUAGE, normalizeLanguage } from "./i18n";
 import { areSubscriptionRestrictionsEnabled } from "./subscription";
+import { getSubjectDisplayName } from "./subjects";
 import type { AppAccount, SessionResult, StoredAppState, SubscriptionTier, UserProfile, UserRole } from "../types/app";
 
 const STORAGE_KEY = "quiks_mobile_state_v1";
 const QUESTION_HISTORY_KEY = "quiks_question_history_v1";
-const CLOUD_READ_TIMEOUT_MS = 300;
+const CLOUD_READ_TIMEOUT_MS = 1500;
+const CLOUD_WRITE_WAIT_MS = 1000;
+const CLOUD_REFRESH_INTERVAL_MS = 30_000;
+const cloudRefreshInFlight = new Set<string>();
+const lastCloudRefreshAt = new Map<string, number>();
 
 const defaultState: StoredAppState = {
   account: null,
@@ -68,6 +73,18 @@ function normalizeQuiksId(quiksId: string | undefined, seed: string) {
 function normalizeState(state: Partial<StoredAppState>): StoredAppState {
   const profiles = (state.profiles ?? []).map(normalizeProfile);
   const preferredProfileId = state.currentProfileId ?? profiles[0]?.id ?? null;
+  const results = Object.fromEntries(
+    Object.entries(state.results ?? {}).map(([profileId, profileResults]) => {
+      const language = profiles.find((profile) => profile.id === profileId)?.language ?? DEFAULT_LANGUAGE;
+      return [
+        profileId,
+        profileResults.map((result) => ({
+          ...result,
+          subjectName: getSubjectDisplayName(result.subjectId, result.subjectName, language),
+        })),
+      ];
+    })
+  );
 
   return enforceProfileLimit({
     account: state.account ?? null,
@@ -76,7 +93,7 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
     currentProfileId: profiles.some((profile) => profile.id === preferredProfileId)
       ? preferredProfileId
       : profiles[0]?.id ?? null,
-    results: state.results ?? {},
+    results,
     subscriptionTier: state.subscriptionTier === "pro" ? "pro" : "free",
   });
 }
@@ -186,9 +203,9 @@ async function readMutableAppState(): Promise<StoredAppState> {
 
 async function loadCloudStateWithTimeout(uid: string) {
   return Promise.race([
-    loadCloudState(uid),
-    new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), CLOUD_READ_TIMEOUT_MS);
+    loadCloudState(uid).then((state) => ({ completed: true as const, state })),
+    new Promise<{ completed: false; state: null }>((resolve) => {
+      setTimeout(() => resolve({ completed: false, state: null }), CLOUD_READ_TIMEOUT_MS);
     }),
   ]);
 }
@@ -203,6 +220,58 @@ function syncCloudStateInBackground(accountUid: string, normalized: StoredAppSta
   });
 }
 
+async function saveCloudStateWithTimeout(accountUid: string, normalized: StoredAppState) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const savePromise = saveCloudState(accountUid, normalized).catch(() => {
+    // The local mutation remains available for a later cloud-sync retry.
+  });
+
+  await Promise.race([
+    savePromise,
+    new Promise<void>((resolve) => {
+      timeoutId = setTimeout(resolve, CLOUD_WRITE_WAIT_MS);
+    }),
+  ]);
+
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+  }
+}
+
+function refreshCloudStateInBackground(account: AppAccount) {
+  if (!isFirebaseConfigured() || cloudRefreshInFlight.has(account.uid)) {
+    return;
+  }
+
+  const lastRefresh = lastCloudRefreshAt.get(account.uid) ?? 0;
+  if (Date.now() - lastRefresh < CLOUD_REFRESH_INTERVAL_MS) {
+    return;
+  }
+
+  lastCloudRefreshAt.set(account.uid, Date.now());
+  cloudRefreshInFlight.add(account.uid);
+  void loadCloudState(account.uid)
+    .then(async (remoteState) => {
+      if (!remoteState) {
+        return;
+      }
+
+      const latestLocal = await readLocalAppState();
+      if (latestLocal.account?.uid !== account.uid) {
+        return;
+      }
+
+      const refreshed = mergeStoredStates(latestLocal, remoteState, account);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(refreshed));
+    })
+    .catch(() => {
+      // Keep local navigation responsive while cloud refresh retries later.
+    })
+    .finally(() => {
+      cloudRefreshInFlight.delete(account.uid);
+    });
+}
+
 export async function readAppState(): Promise<StoredAppState> {
   let localState = await readLocalAppState();
 
@@ -212,37 +281,37 @@ export async function readAppState(): Promise<StoredAppState> {
       return localState;
     }
 
+    const accountLocalState =
+      localState.account?.uid === remoteAccount.uid
+        ? localState
+        : normalizeState({
+            ...defaultState,
+            account: remoteAccount,
+            isAuthenticated: true,
+          });
     const merged = normalizeState({
-      ...localState,
+      ...accountLocalState,
       account: remoteAccount,
       isAuthenticated: true,
     } satisfies StoredAppState);
 
-    if (isFirebaseConfigured()) {
-      try {
-        const remoteState = await loadCloudStateWithTimeout(remoteAccount.uid);
-        if (remoteState) {
-          const refreshed = mergeStoredStates(merged, remoteState, remoteAccount);
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(refreshed));
-          return refreshed;
-        }
-      } catch {
-        // Keep local state if cloud hydration is unavailable.
-      }
-    }
-
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    refreshCloudStateInBackground(remoteAccount);
     return merged;
   } catch {
     return localState;
   }
 }
 
-export async function writeAppState(nextState: StoredAppState) {
+export async function writeAppState(nextState: StoredAppState, options?: { awaitCloudSync?: boolean }) {
   const normalized = normalizeState(nextState);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   if (normalized.account?.uid && normalized.isAuthenticated && isFirebaseConfigured()) {
-    syncCloudStateInBackground(normalized.account.uid, normalized);
+    if (options?.awaitCloudSync) {
+      await saveCloudStateWithTimeout(normalized.account.uid, normalized);
+    } else {
+      syncCloudStateInBackground(normalized.account.uid, normalized);
+    }
   }
 }
 
@@ -258,7 +327,7 @@ export async function upsertProfile(profile: UserProfile) {
   }
 
   state.currentProfileId = normalizedProfile.id;
-  await writeAppState(state);
+  await writeAppState(state, { awaitCloudSync: true });
   return state;
 }
 
@@ -350,20 +419,68 @@ export async function setSubscriptionTier(subscriptionTier: SubscriptionTier) {
 }
 
 export async function setAuthenticatedAccount(account: AppAccount | null, isAuthenticated: boolean) {
-  const state = account && isAuthenticated ? await readMutableAppState() : await readLocalAppState();
-  state.account = account;
-  state.isAuthenticated = isAuthenticated && Boolean(account);
-  await writeAppState(state);
-  return state;
+  const localState = await readLocalAppState();
+  if (!account || !isAuthenticated) {
+    const signedOutState = normalizeState({
+      ...localState,
+      account,
+      isAuthenticated: false,
+    });
+    await writeAppState(signedOutState);
+    return signedOutState;
+  }
+
+  const accountLocalState =
+    localState.account?.uid === account.uid
+      ? normalizeState({
+          ...localState,
+          account,
+          isAuthenticated: true,
+        })
+      : normalizeState({
+          ...defaultState,
+          account,
+          isAuthenticated: true,
+        });
+
+  let hydratedState = accountLocalState;
+  let cloudReadCompleted = !isFirebaseConfigured();
+
+  if (isFirebaseConfigured()) {
+    lastCloudRefreshAt.set(account.uid, Date.now());
+    try {
+      const cloudResult = await loadCloudStateWithTimeout(account.uid);
+      cloudReadCompleted = cloudResult.completed;
+      if (cloudResult.completed && cloudResult.state) {
+        hydratedState = mergeStoredStates(accountLocalState, cloudResult.state, account);
+      }
+    } catch {
+      // Authenticate locally without risking an overwrite of an unread cloud state.
+    }
+  }
+
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(hydratedState));
+  if (cloudReadCompleted && isFirebaseConfigured()) {
+    syncCloudStateInBackground(account.uid, hydratedState);
+  } else {
+    lastCloudRefreshAt.delete(account.uid);
+    refreshCloudStateInBackground(account);
+  }
+  return hydratedState;
 }
 
 export async function logoutAccount() {
   const state = await readLocalAppState();
+
+  if (state.account?.uid && state.isAuthenticated && isFirebaseConfigured()) {
+    await saveCloudStateWithTimeout(state.account.uid, state);
+  }
+
   state.isAuthenticated = false;
   state.currentProfileId = null;
-  state.account = isFirebaseConfigured() ? null : state.account;
-  await writeAppState(state);
-  return state;
+  const signedOutState = normalizeState(state);
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(signedOutState));
+  return signedOutState;
 }
 
 export async function getProfileResults(profileId: string) {

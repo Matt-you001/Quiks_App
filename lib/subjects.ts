@@ -46,6 +46,16 @@ const englishTopics: SubjectTopic[] = [
   { id: "summary-skills", label: "Summary Skills", description: "Condense ideas clearly while keeping the main meaning.", keywords: ["summary", "main point", "condense", "briefly", "paraphrase"] },
 ];
 
+const mentalMathematicsTopics: SubjectTopic[] = [
+  { id: "number-series", label: "Number Series", description: "Identify the rule connecting numbers and choose the missing or next value.", keywords: ["number series", "sequence", "missing number", "next number", "number pattern", "rule"] },
+  { id: "quantitative-analogies", label: "Quantitative Analogies", description: "Compare pairs of numbers and apply the same relationship to a new pair.", keywords: ["quantitative analogy", "number analogy", "relationship", "pair", "same rule"] },
+  { id: "number-matrices", label: "Number Matrices", description: "Use row, column, and grid relationships to find a missing value.", keywords: ["number matrix", "number grid", "missing value", "row", "column", "relationship"] },
+  { id: "quantitative-word-reasoning", label: "Quantitative Word Reasoning", description: "Translate short situations into numerical relationships and reason to the answer.", keywords: ["quantitative reasoning", "word problem", "numerical relationship", "comparison", "logical calculation"] },
+  { id: "data-interpretation", label: "Data Interpretation", description: "Reason from simple tables, charts, quantities, and comparisons.", keywords: ["data interpretation", "table", "chart", "quantity", "compare", "difference"] },
+  { id: "ratios-proportions", label: "Ratios and Proportions", description: "Recognize proportional relationships and compare quantities logically.", keywords: ["ratio", "proportion", "rate", "equivalent", "quantity", "comparison"] },
+  { id: "quantitative-logic", label: "Quantitative Logic", description: "Solve age-appropriate numerical puzzles using deduction rather than routine calculation.", keywords: ["quantitative logic", "numerical puzzle", "deduction", "constraint", "reasoning", "possible value"] },
+];
+
 const physicsTopics: SubjectTopic[] = [
   { id: "motion-forces", label: "Motion and Forces", description: "Study movement, pushes, pulls, speed, and gravity.", keywords: ["motion", "force", "gravity", "speed", "friction", "push", "pull", "move"] },
   { id: "energy-work-power", label: "Energy, Work and Power", description: "Understand forms of energy and how work is done.", keywords: ["energy", "work", "power", "heat", "chemical energy", "solar", "source of energy"] },
@@ -84,6 +94,16 @@ const computerTopics: SubjectTopic[] = [
   { id: "data-handling", label: "Data Handling", description: "Learn about information, storage, and simple data representation.", keywords: ["data", "information", "storage", "database", "spreadsheet", "chart"] },
   { id: "productivity-tools", label: "Productivity Tools", description: "Use word processing, spreadsheets, and presentation basics.", keywords: ["word processor", "spreadsheet", "presentation", "document", "typing"] },
   { id: "networking", label: "Computer Networking", description: "Understand connected devices, sharing, and communication.", keywords: ["network", "networking", "router", "server", "internet connection"] },
+];
+
+const globalPerspectivesTopics: SubjectTopic[] = [
+  { id: "local-global-issues", label: "Local and Global Issues", description: "Explore how important issues affect communities, countries, and the wider world.", keywords: ["global issue", "local issue", "community", "world", "international", "global perspective"] },
+  { id: "culture-identity-diversity", label: "Culture, Identity and Diversity", description: "Understand how culture and identity shape different viewpoints and experiences.", keywords: ["culture", "identity", "diversity", "tradition", "viewpoint", "perspective"] },
+  { id: "sustainability-environment", label: "Sustainability and the Environment", description: "Consider responsible ways to protect resources and support a sustainable future.", keywords: ["sustainability", "environment", "climate", "resources", "conservation", "future"] },
+  { id: "rights-equality-wellbeing", label: "Rights, Equality and Wellbeing", description: "Examine fairness, human rights, inclusion, health, and quality of life.", keywords: ["human rights", "equality", "inclusion", "fairness", "wellbeing", "quality of life"] },
+  { id: "research-source-evaluation", label: "Research and Source Evaluation", description: "Ask useful questions and judge whether information and evidence are reliable.", keywords: ["research", "source", "evidence", "reliability", "bias", "fact", "opinion"] },
+  { id: "communication-collaboration", label: "Communication and Collaboration", description: "Present ideas clearly, listen to others, and work together on shared problems.", keywords: ["communication", "collaboration", "teamwork", "discussion", "presentation", "shared solution"] },
+  { id: "perspectives-solutions", label: "Perspectives and Solutions", description: "Compare viewpoints and develop thoughtful responses to complex problems.", keywords: ["perspective", "viewpoint", "solution", "decision", "argument", "global challenge"] },
 ];
 
 const historyTopics: SubjectTopic[] = [
@@ -164,6 +184,16 @@ const pheTopics: SubjectTopic[] = [
   { id: "movement-rhythm", label: "Movement and Rhythm", description: "Use coordinated movement, posture, and simple routines.", keywords: ["movement", "rhythm", "posture", "dance", "coordination"] },
   { id: "nutrition-wellness", label: "Nutrition and Wellness", description: "Connect food choices with strength, growth, and wellbeing.", keywords: ["nutrition", "wellness", "healthy food", "energy", "growth"] },
   { id: "recreation-leisure", label: "Recreation and Leisure", description: "Enjoy healthy free-time activities that refresh the body and mind.", keywords: ["recreation", "leisure", "games", "relaxation", "activity"] },
+];
+
+const brainteaserTopics: SubjectTopic[] = [
+  { id: "word-analogies", label: "Word Analogies", description: "Identify relationships between words and apply the same relationship to another pair.", keywords: ["word analogy", "analogy", "word relationship", "is to", "pair of words"] },
+  { id: "classification-odd-one-out", label: "Classification and Odd One Out", description: "Group words by meaning and identify the item that does not belong.", keywords: ["classification", "odd one out", "does not belong", "word group", "category"] },
+  { id: "letter-series-codes", label: "Letter Series and Codes", description: "Recognize alphabetic patterns and decode simple word or letter rules.", keywords: ["letter series", "alphabet pattern", "code", "decode", "letter sequence"] },
+  { id: "vocabulary-relationships", label: "Vocabulary Relationships", description: "Reason with synonyms, antonyms, meanings, and word associations.", keywords: ["synonym", "antonym", "word meaning", "association", "vocabulary relationship"] },
+  { id: "verbal-inference", label: "Verbal Inference", description: "Read short statements and decide what must be true, may be true, or cannot be true.", keywords: ["verbal inference", "statement", "conclusion", "must be true", "cannot be true", "deduction"] },
+  { id: "sentence-completion", label: "Sentence Completion", description: "Choose the word or phrase that completes a sentence logically.", keywords: ["sentence completion", "complete the sentence", "best word", "context clue", "logical sentence"] },
+  { id: "word-riddles", label: "Word Riddles", description: "Interpret language clues, double meanings, and carefully worded riddles.", keywords: ["word riddle", "language clue", "wordplay", "double meaning", "what am i"] },
 ];
 
 const furtherMathematicsTopics: SubjectTopic[] = [
@@ -341,6 +371,16 @@ const allSubjects: Subject[] = [
     topics: englishTopics,
   },
   {
+    id: "mental-mathematics",
+    name: "Mental Mathematics",
+    tagline: "Quantitative patterns and numerical reasoning",
+    icon: "brain",
+    accent: ["#F59E0B", "#FCD34D"],
+    description: "Develop quantitative reasoning through number relationships, sequences, data interpretation, and logical word problems.",
+    aiPromptHint: "Treat this subject as Quantitative Reasoning or Quantitative Analysis, not ordinary Mathematics. Generate reasoning-led number series, quantitative analogies, number matrices, data interpretation, proportional reasoning, and numerical logic problems. Do not generate routine arithmetic drills, direct calculation exercises, standard equations, or ordinary mathematics questions.",
+    topics: mentalMathematicsTopics,
+  },
+  {
     id: "physics",
     name: "Physics",
     tagline: "Forces, energy, and motion",
@@ -379,6 +419,16 @@ const allSubjects: Subject[] = [
     description: "Build confidence in computing concepts, devices, and algorithms.",
     aiPromptHint: "Blend computer basics with problem-solving scenarios.",
     topics: computerTopics,
+  },
+  {
+    id: "global-perspectives",
+    name: "Global Perspectives",
+    tagline: "Viewpoints, evidence, and shared global challenges",
+    icon: "earth",
+    accent: ["#0F766E", "#5EEAD4"],
+    description: "Explore global issues, compare viewpoints, evaluate evidence, and develop thoughtful solutions.",
+    aiPromptHint: "Use age-appropriate global issues, multiple viewpoints, source evaluation, and collaborative problem solving.",
+    topics: globalPerspectivesTopics,
   },
   {
     id: "history",
@@ -461,8 +511,18 @@ const allSubjects: Subject[] = [
     topics: pheTopics,
   },
   {
+    id: "brainteaser",
+    name: "Brainteaser",
+    tagline: "Words, analogies, and verbal logic",
+    icon: "puzzle-outline",
+    accent: ["#7C3AED", "#C4B5FD"],
+    description: "Develop verbal reasoning through word relationships, analogies, classifications, letter codes, inference, and language puzzles.",
+    aiPromptHint: "Treat this subject as Verbal Reasoning. Generate word analogies, classifications, odd-one-out questions, letter series, verbal codes, vocabulary relationships, sentence completion, verbal inference, and word riddles. Do not generate arithmetic, number-series, mathematics, spatial, shape, or visual-rotation questions. Every question must test language-based reasoning and have one defensible answer.",
+    topics: brainteaserTopics,
+  },
+  {
     id: "further-mathematics",
-    name: "Further Mathematics",
+    name: "Advanced Mathematics",
     tagline: "Advanced problem solving and abstract reasoning",
     icon: "function-variant",
     accent: ["#274690", "#6D9EEB"],
@@ -630,8 +690,8 @@ type LocalizedSubjectCopy = {
 
 const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, LocalizedSubjectCopy>>> = {
   fr: {
-    arithmetic: { name: "Arithmetique", tagline: "Vitesse, precision et sens des nombres", description: "Travaille les operations, les fractions, les pourcentages et le calcul mental." },
-    english: { name: "Anglais", tagline: "Vocabulaire, grammaire et lecture", description: "Renforce la comprehension, la structure des phrases et la maitrise des mots." },
+    arithmetic: { name: "Mathematiques", tagline: "Vitesse, precision et sens des nombres", description: "Travaille les operations, les fractions, les pourcentages et le calcul mental." },
+    english: { name: "Langue anglaise", tagline: "Vocabulaire, grammaire et lecture", description: "Renforce la comprehension, la structure des phrases et la maitrise des mots." },
     physics: { name: "Physique", tagline: "Forces, energie et mouvement", description: "Explore les lois qui expliquent le mouvement, la lumiere et la matiere." },
     chemistry: { name: "Chimie", tagline: "Elements, reactions et formules", description: "Apprends les atomes, les composes, les melanges et les transformations chimiques." },
     biology: { name: "Biologie", tagline: "Systemes du vivant et etres vivants", description: "Etudie les organismes, les cellules, les ecosystemes et les systemes du corps." },
@@ -640,7 +700,7 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     economics: { name: "Economie", tagline: "Choix, marches et argent", description: "Apprends les besoins, les echanges, l'epargne, les prix et la production." },
     "home-economics": { name: "Economie domestique", tagline: "Maison saine, alimentation et vie quotidienne", description: "Apprends des competences pratiques, la nutrition, les soins et les bons choix a la maison." },
     geography: { name: "Geographie", tagline: "Cartes, lieux et environnements", description: "Explore les reliefs, le temps, les ressources, les regions et l'installation humaine." },
-    "integrated-science": { name: "Sciences integrees", tagline: "Science simple pour la vie quotidienne", description: "Explore la nature, les materiaux, la sante et le monde qui t'entoure grace a la science." },
+    "integrated-science": { name: "Sciences", tagline: "Science simple pour la vie quotidienne", description: "Explore la nature, les materiaux, la sante et le monde qui t'entoure grace a la science." },
     government: { name: "Gouvernement", tagline: "Direction, institutions et vie publique", description: "Comprends les pouvoirs publics, les constitutions, les elections et l'ordre civique." },
     "civic-education": { name: "Education civique", tagline: "Citoyennete, valeurs et communaute", description: "Developpe le caractere, la responsabilite sociale, les valeurs nationales et la paix." },
     phe: { name: "Education physique et sante", tagline: "Forme, securite et vie active", description: "Developpe de bonnes habitudes par le mouvement, le sport, la securite et le soin du corps." },
@@ -659,20 +719,23 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     law: { name: "Droit", tagline: "Regles, droits, recours et raisonnement", description: "Etudie les systemes juridiques, les droits, les obligations et le raisonnement fonde sur les cas dans les grandes branches du droit." },
     engineering: { name: "Ingenierie", tagline: "Conception, systemes et resolution appliquee", description: "Explore les grandes branches de l'ingenierie, la conception technique et le raisonnement scientifique applique." },
     medicine: { name: "Medecine", tagline: "Systemes humains, diagnostic et soins", description: "Apprends les sciences medicales fondamentales, les bases cliniques et le raisonnement centre sur le patient." },
+    "mental-mathematics": { name: "Mathematiques mentales", tagline: "Motifs quantitatifs et raisonnement numerique", description: "Developpe le raisonnement quantitatif avec les relations entre nombres, les suites, l'interpretation de donnees et les problemes logiques." },
+    "global-perspectives": { name: "Perspectives mondiales", tagline: "Points de vue, preuves et defis communs", description: "Explore les enjeux mondiaux, compare les points de vue, evalue les preuves et propose des solutions reflechies." },
+    brainteaser: { name: "Casse-tete", tagline: "Mots, analogies et logique verbale", description: "Developpe le raisonnement verbal avec les relations entre mots, les analogies, les classifications, les codes de lettres et les deductions." },
     "management-studies": { name: "Etudes de gestion", tagline: "Leadership, strategie et performance organisationnelle", description: "Etudie les principes de gestion, les personnes, les operations, la strategie et l'entrepreneuriat." },
   },
   es: {
-    arithmetic: { name: "Aritmetica", tagline: "Velocidad, precision y sentido numerico", description: "Practica operaciones, fracciones, porcentajes y calculo mental." },
-    english: { name: "Ingles", tagline: "Vocabulario, gramatica y lectura", description: "Mejora la comprension, la estructura de oraciones y el dominio de palabras." },
+    arithmetic: { name: "Matematicas", tagline: "Velocidad, precision y sentido numerico", description: "Practica operaciones, fracciones, porcentajes y calculo mental." },
+    english: { name: "Lengua inglesa", tagline: "Vocabulario, gramatica y lectura", description: "Mejora la comprension, la estructura de oraciones y el dominio de palabras." },
     physics: { name: "Fisica", tagline: "Fuerzas, energia y movimiento", description: "Explora las leyes que explican el movimiento, la luz y la materia." },
     chemistry: { name: "Quimica", tagline: "Elementos, reacciones y formulas", description: "Aprende atomos, compuestos, mezclas y cambios quimicos." },
     biology: { name: "Biologia", tagline: "Sistemas de vida y seres vivos", description: "Estudia organismos, celulas, ecosistemas y sistemas del cuerpo." },
-    computer: { name: "Computacion", tagline: "Alfabetizacion digital y logica", description: "Desarrolla confianza en conceptos informaticos, dispositivos y algoritmos." },
+    computer: { name: "Ciencias de la computacion", tagline: "Alfabetizacion digital y logica", description: "Desarrolla confianza en conceptos informaticos, dispositivos y algoritmos." },
     history: { name: "Historia", tagline: "Personas, cronologias y momentos decisivos", description: "Estudia acontecimientos clave, lideres, imperios y lecciones del pasado." },
     economics: { name: "Economia", tagline: "Decisiones, mercados y dinero", description: "Aprende sobre necesidades, comercio, ahorro, precios y produccion." },
     "home-economics": { name: "Economia domestica", tagline: "Hogar saludable, alimentacion y vida diaria", description: "Aprende habilidades practicas, nutricion, cuidado y decisiones sabias en el hogar." },
     geography: { name: "Geografia", tagline: "Mapas, lugares y entornos", description: "Explora relieves, clima, recursos, regiones y asentamientos humanos." },
-    "integrated-science": { name: "Ciencia integrada", tagline: "Ciencia sencilla para la vida diaria", description: "Explora la naturaleza, los materiales, la salud y el mundo que te rodea por medio de la ciencia." },
+    "integrated-science": { name: "Ciencias", tagline: "Ciencia sencilla para la vida diaria", description: "Explora la naturaleza, los materiales, la salud y el mundo que te rodea por medio de la ciencia." },
     government: { name: "Gobierno", tagline: "Liderazgo, instituciones y vida publica", description: "Comprende las ramas del gobierno, las constituciones, las elecciones y el orden civico." },
     "civic-education": { name: "Educacion civica", tagline: "Ciudadania, valores y comunidad", description: "Fortalece el caracter, la responsabilidad social, los valores nacionales y la convivencia pacifica." },
     phe: { name: "Educacion fisica y salud", tagline: "Condicion fisica, seguridad y vida activa", description: "Desarrolla habitos saludables mediante el movimiento, el deporte, la seguridad y el cuidado corporal." },
@@ -691,20 +754,23 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     law: { name: "Derecho", tagline: "Reglas, derechos, remedios y razonamiento", description: "Estudia sistemas juridicos, derechos, obligaciones y razonamiento basado en casos en las principales ramas del derecho." },
     engineering: { name: "Ingenieria", tagline: "Diseno, sistemas y resolucion aplicada", description: "Explora las principales ramas de la ingenieria, el diseno tecnico y el razonamiento cientifico aplicado." },
     medicine: { name: "Medicina", tagline: "Sistemas humanos, diagnostico y cuidado", description: "Aprende ciencias medicas fundamentales, bases clinicas y razonamiento centrado en el paciente." },
+    "mental-mathematics": { name: "Calculo mental", tagline: "Patrones cuantitativos y razonamiento numerico", description: "Desarrolla el razonamiento cuantitativo mediante relaciones numericas, secuencias, interpretacion de datos y problemas logicos." },
+    "global-perspectives": { name: "Perspectivas globales", tagline: "Puntos de vista, evidencias y desafios compartidos", description: "Explora problemas globales, compara puntos de vista, evalua evidencias y desarrolla soluciones reflexivas." },
+    brainteaser: { name: "Acertijos", tagline: "Palabras, analogias y logica verbal", description: "Desarrolla el razonamiento verbal mediante relaciones de palabras, analogias, clasificaciones, codigos de letras e inferencias." },
     "management-studies": { name: "Estudios de gestion", tagline: "Liderazgo, estrategia y rendimiento organizacional", description: "Estudia principios de gestion, personas, operaciones, estrategia y emprendimiento." },
   },
   pt: {
-    arithmetic: { name: "Aritmetica", tagline: "Velocidade, precisao e sentido numerico", description: "Pratique operacoes, fracoes, percentagens e calculo mental." },
-    english: { name: "Ingles", tagline: "Vocabulario, gramatica e leitura", description: "Fortalece a compreensao, a estrutura das frases e o dominio das palavras." },
+    arithmetic: { name: "Matematica", tagline: "Velocidade, precisao e sentido numerico", description: "Pratique operacoes, fracoes, percentagens e calculo mental." },
+    english: { name: "Lingua inglesa", tagline: "Vocabulario, gramatica e leitura", description: "Fortalece a compreensao, a estrutura das frases e o dominio das palavras." },
     physics: { name: "Fisica", tagline: "Forcas, energia e movimento", description: "Explora as leis que explicam o movimento, a luz e a materia." },
     chemistry: { name: "Quimica", tagline: "Elementos, reacoes e formulas", description: "Aprende atomos, compostos, misturas e mudancas quimicas." },
     biology: { name: "Biologia", tagline: "Sistemas de vida e seres vivos", description: "Estuda organismos, celulas, ecossistemas e sistemas do corpo." },
-    computer: { name: "Informatica", tagline: "Literacia digital e logica", description: "Desenvolve confianca em conceitos de computacao, dispositivos e algoritmos." },
+    computer: { name: "Ciencia da computacao", tagline: "Literacia digital e logica", description: "Desenvolve confianca em conceitos de computacao, dispositivos e algoritmos." },
     history: { name: "Historia", tagline: "Pessoas, cronologias e momentos decisivos", description: "Estuda eventos importantes, lideres, imperios e licoes do passado." },
     economics: { name: "Economia", tagline: "Escolhas, mercados e dinheiro", description: "Aprende sobre necessidades, comercio, poupanca, precos e producao." },
     "home-economics": { name: "Economia domestica", tagline: "Lar saudavel, alimentacao e vida diaria", description: "Aprende competencias praticas, nutricao, cuidado e escolhas sabias para o lar." },
     geography: { name: "Geografia", tagline: "Mapas, lugares e ambientes", description: "Explora relevos, clima, recursos, regioes e povoamento humano." },
-    "integrated-science": { name: "Ciencia integrada", tagline: "Ciencia simples para a vida diaria", description: "Explora a natureza, os materiais, a saude e o mundo a tua volta atraves da ciencia." },
+    "integrated-science": { name: "Ciencias", tagline: "Ciencia simples para a vida diaria", description: "Explora a natureza, os materiais, a saude e o mundo a tua volta atraves da ciencia." },
     government: { name: "Governo", tagline: "Lideranca, instituicoes e vida publica", description: "Compreende os ramos do governo, as constituicoes, as eleicoes e a ordem civica." },
     "civic-education": { name: "Educacao civica", tagline: "Cidadania, valores e comunidade", description: "Fortalece o carater, a responsabilidade social, os valores nacionais e a convivencia pacifica." },
     phe: { name: "Educacao fisica e saude", tagline: "Forma fisica, seguranca e vida ativa", description: "Desenvolve habitos saudaveis por meio do movimento, do desporto, da seguranca e do cuidado do corpo." },
@@ -723,20 +789,23 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     law: { name: "Direito", tagline: "Regras, direitos, recursos e raciocinio", description: "Estuda sistemas juridicos, direitos, obrigacoes e raciocinio baseado em casos nas principais areas do direito." },
     engineering: { name: "Engenharia", tagline: "Projeto, sistemas e resolucao aplicada", description: "Explora os principais ramos da engenharia, o design tecnico e o raciocinio cientifico aplicado." },
     medicine: { name: "Medicina", tagline: "Sistemas humanos, diagnostico e cuidado", description: "Aprende ciencias medicas fundamentais, bases clinicas e raciocinio centrado no paciente." },
+    "mental-mathematics": { name: "Calculo mental", tagline: "Padroes quantitativos e raciocinio numerico", description: "Desenvolve o raciocinio quantitativo com relacoes numericas, sequencias, interpretacao de dados e problemas logicos." },
+    "global-perspectives": { name: "Perspetivas globais", tagline: "Pontos de vista, evidencias e desafios partilhados", description: "Explora questoes globais, compara pontos de vista, avalia evidencias e desenvolve solucoes ponderadas." },
+    brainteaser: { name: "Quebra-cabecas", tagline: "Palavras, analogias e logica verbal", description: "Desenvolve o raciocinio verbal com relacoes entre palavras, analogias, classificacoes, codigos de letras e inferencias." },
     "management-studies": { name: "Estudos de gestao", tagline: "Lideranca, estrategia e desempenho organizacional", description: "Estuda principios de gestao, pessoas, operacoes, estrategia e empreendedorismo." },
   },
   sw: {
-    arithmetic: { name: "Hesabu", tagline: "Kasi, usahihi na hisia za namba", description: "Fanya mazoezi ya operesheni, sehemu, asilimia na hesabu ya haraka akilini." },
-    english: { name: "Kiingereza", tagline: "Msamiati, sarufi na usomaji", description: "Boresha ufahamu, muundo wa sentensi na matumizi ya maneno." },
+    arithmetic: { name: "Hisabati", tagline: "Kasi, usahihi na hisia za namba", description: "Fanya mazoezi ya operesheni, sehemu, asilimia na hesabu ya haraka akilini." },
+    english: { name: "Lugha ya Kiingereza", tagline: "Msamiati, sarufi na usomaji", description: "Boresha ufahamu, muundo wa sentensi na matumizi ya maneno." },
     physics: { name: "Fizikia", tagline: "Nguvu, nishati na mwendo", description: "Chunguza sheria zinazoeleza mwendo, mwanga na maada." },
     chemistry: { name: "Kemia", tagline: "Vipengele, miitikio na fomula", description: "Jifunze atomi, michanganyiko, mchanganyiko wa dutu na mabadiliko ya kemikali." },
     biology: { name: "Biolojia", tagline: "Mifumo ya uhai na viumbe hai", description: "Jifunze viumbe, seli, mifumo ya ikolojia na mifumo ya mwili." },
-    computer: { name: "Kompyuta", tagline: "Uelewa wa kidijitali na mantiki", description: "Jenga ujasiri katika dhana za kompyuta, vifaa na algoriti." },
+    computer: { name: "Sayansi ya Kompyuta", tagline: "Uelewa wa kidijitali na mantiki", description: "Jenga ujasiri katika dhana za kompyuta, vifaa na algoriti." },
     history: { name: "Historia", tagline: "Watu, ratiba za matukio na nyakati za mabadiliko", description: "Jifunze matukio muhimu, viongozi, falme na mafunzo kutoka zamani." },
     economics: { name: "Uchumi", tagline: "Maamuzi, masoko na fedha", description: "Jifunze mahitaji, biashara, akiba, bei na uzalishaji." },
     "home-economics": { name: "Sayansi ya nyumbani", tagline: "Nyumba yenye afya, lishe na maisha ya kila siku", description: "Jifunze stadi za maisha, lishe, uangalizi na maamuzi bora ya nyumbani." },
     geography: { name: "Jiografia", tagline: "Ramani, maeneo na mazingira", description: "Chunguza maumbo ya ardhi, hali ya hewa, rasilimali, kanda na makazi ya watu." },
-    "integrated-science": { name: "Sayansi jumuishi", tagline: "Sayansi rahisi kwa maisha ya kila siku", description: "Chunguza asili, vifaa, afya na dunia inayokuzunguka kupitia sayansi." },
+    "integrated-science": { name: "Sayansi", tagline: "Sayansi rahisi kwa maisha ya kila siku", description: "Chunguza asili, vifaa, afya na dunia inayokuzunguka kupitia sayansi." },
     government: { name: "Serikali", tagline: "Uongozi, taasisi na maisha ya umma", description: "Elewa mihimili ya serikali, katiba, uchaguzi na utaratibu wa kiraia." },
     "civic-education": { name: "Elimu ya uraia", tagline: "Uraia, maadili na jamii", description: "Jenga tabia, uwajibikaji wa kijamii, maadili ya kitaifa na kuishi kwa amani." },
     phe: { name: "Elimu ya afya na michezo", tagline: "Utimamu, usalama na maisha hai", description: "Jenga tabia za afya kupitia harakati, michezo, usalama na utunzaji wa mwili." },
@@ -755,11 +824,14 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     law: { name: "Sheria", tagline: "Kanuni, haki, tiba na hoja", description: "Jifunze mifumo ya sheria, haki, wajibu na hoja za kesi katika matawi makuu ya sheria." },
     engineering: { name: "Uhandisi", tagline: "Ubunifu, mifumo na utatuzi wa matumizi", description: "Chunguza matawi makuu ya uhandisi, usanifu wa kiufundi na fikra za kisayansi za matumizi." },
     medicine: { name: "Tiba", tagline: "Mifumo ya mwili, utambuzi na huduma", description: "Jifunze sayansi za msingi za tiba, misingi ya kliniki na hoja zinazomweka mgonjwa katikati." },
+    "mental-mathematics": { name: "Hesabu ya akili", tagline: "Mifumo ya kiasi na hoja za namba", description: "Jenga hoja za kiasi kupitia mahusiano ya namba, mfuatano, uchambuzi wa data na matatizo ya kimantiki." },
+    "global-perspectives": { name: "Mitazamo ya kimataifa", tagline: "Mitazamo, ushahidi na changamoto za pamoja", description: "Chunguza masuala ya dunia, linganisha mitazamo, tathmini ushahidi na unda suluhisho zenye kufikiriwa." },
+    brainteaser: { name: "Vitendawili", tagline: "Maneno, analojia na mantiki ya lugha", description: "Jenga hoja za lugha kupitia mahusiano ya maneno, analojia, uainishaji, misimbo ya herufi na hitimisho." },
     "management-studies": { name: "Masomo ya usimamizi", tagline: "Uongozi, mkakati na utendaji wa shirika", description: "Jifunze kanuni za usimamizi, watu, operesheni, mkakati na ujasiriamali." },
   },
   de: {
-    arithmetic: { name: "Arithmetik", tagline: "Tempo, Genauigkeit und Zahlensinn", description: "Übe Rechenoperationen, Brüche, Prozente und Kopfrechnen." },
-    english: { name: "Englisch", tagline: "Wortschatz, Grammatik und Lesen", description: "Stärke Textverständnis, Satzbau und Sprachsicherheit." },
+    arithmetic: { name: "Mathematik", tagline: "Tempo, Genauigkeit und Zahlensinn", description: "Übe Rechenoperationen, Brüche, Prozente und Kopfrechnen." },
+    english: { name: "Englische Sprache", tagline: "Wortschatz, Grammatik und Lesen", description: "Stärke Textverständnis, Satzbau und Sprachsicherheit." },
     physics: { name: "Physik", tagline: "Kräfte, Energie und Bewegung", description: "Erkunde Gesetze zu Bewegung, Licht und Materie." },
     chemistry: { name: "Chemie", tagline: "Elemente, Reaktionen und Formeln", description: "Lerne Atome, Verbindungen, Gemische und chemische Veränderungen kennen." },
     biology: { name: "Biologie", tagline: "Lebenssysteme und Lebewesen", description: "Untersuche Organismen, Zellen, Ökosysteme und Körpersysteme." },
@@ -768,7 +840,7 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     economics: { name: "Wirtschaft", tagline: "Entscheidungen, Märkte und Geld", description: "Lerne Bedürfnisse, Handel, Sparen, Preise und Produktion kennen." },
     "home-economics": { name: "Hauswirtschaft", tagline: "Gesundes Zuhause, Ernährung und Alltag", description: "Lerne praktische Alltagsfähigkeiten, Ernährung, Fürsorge und kluge Entscheidungen im Haushalt." },
     geography: { name: "Geographie", tagline: "Karten, Orte und Umwelten", description: "Erkunde Landschaftsformen, Wetter, Ressourcen, Regionen und Siedlungen." },
-    "integrated-science": { name: "Integrierte Naturwissenschaften", tagline: "Einfache Wissenschaft für den Alltag", description: "Entdecke Natur, Materialien, Gesundheit und die Welt um dich herum durch Wissenschaft." },
+    "integrated-science": { name: "Naturwissenschaften", tagline: "Einfache Wissenschaft für den Alltag", description: "Entdecke Natur, Materialien, Gesundheit und die Welt um dich herum durch Wissenschaft." },
     government: { name: "Politik", tagline: "Führung, Institutionen und öffentliches Leben", description: "Verstehe Staatsgewalten, Verfassungen, Wahlen und gesellschaftliche Ordnung." },
     "civic-education": { name: "Bürgerkunde", tagline: "Bürgersinn, Werte und Gemeinschaft", description: "Stärke Charakter, soziale Verantwortung, nationale Werte und friedliches Zusammenleben." },
     phe: { name: "Sport und Gesundheit", tagline: "Fitness, Sicherheit und aktives Leben", description: "Entwickle gesunde Gewohnheiten durch Bewegung, Sport, Sicherheit und Körperpflege." },
@@ -787,20 +859,23 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     law: { name: "Rechtswissenschaft", tagline: "Regeln, Rechte, Rechtsmittel und Argumentation", description: "Studiere Rechtssysteme, Rechte, Pflichten und fallbezogenes Denken in den Hauptbereichen des Rechts." },
     engineering: { name: "Ingenieurwesen", tagline: "Entwurf, Systeme und angewandtes Problemlösen", description: "Erkunde große Ingenieursdisziplinen, technisches Design und angewandtes wissenschaftliches Denken." },
     medicine: { name: "Medizin", tagline: "Menschliche Systeme, Diagnose und Versorgung", description: "Lerne zentrale medizinische Grundlagen, klinische Basisfächer und patientenorientiertes Denken über wichtige Fachgebiete hinweg." },
+    "mental-mathematics": { name: "Kopfrechnen", tagline: "Quantitative Muster und Zahlenlogik", description: "Entwickle quantitatives Denken mit Zahlenbeziehungen, Folgen, Datenauswertung und logischen Sachaufgaben." },
+    "global-perspectives": { name: "Globale Perspektiven", tagline: "Sichtweisen, Belege und gemeinsame globale Herausforderungen", description: "Untersuche globale Themen, vergleiche Sichtweisen, bewerte Belege und entwickle durchdachte Lösungen." },
+    brainteaser: { name: "Denksportaufgaben", tagline: "Wörter, Analogien und verbale Logik", description: "Entwickle verbales Denken mit Wortbeziehungen, Analogien, Klassifikationen, Buchstabencodes und Schlussfolgerungen." },
     "management-studies": { name: "Management", tagline: "Führung, Strategie und Organisationsleistung", description: "Lerne Managementprinzipien, Menschenführung, Prozesse, Strategie und Unternehmertum in Organisationen." },
   },
   zh: {
-    arithmetic: { name: "算术", tagline: "速度、准确与数感", description: "练习运算、分数、百分比和心算。" },
+    arithmetic: { name: "数学", tagline: "速度、准确与数感", description: "练习运算、分数、百分比和心算。" },
     english: { name: "英语", tagline: "词汇、语法与阅读", description: "提升阅读理解、句子结构和词汇能力。" },
     physics: { name: "物理", tagline: "力、能量与运动", description: "探索支配运动、光和物质的规律。" },
     chemistry: { name: "化学", tagline: "元素、反应与公式", description: "学习原子、化合物、混合物和化学变化。" },
     biology: { name: "生物", tagline: "生命系统与生物体", description: "学习生物体、细胞、生态系统和人体系统。" },
-    computer: { name: "计算机", tagline: "数字素养与逻辑", description: "建立对计算机概念、设备和算法的信心。" },
+    computer: { name: "计算机科学", tagline: "数字素养与逻辑", description: "建立对计算机概念、设备和算法的信心。" },
     history: { name: "历史", tagline: "人物、时间线与转折点", description: "学习重要事件、领袖、帝国以及历史带来的启示。" },
     economics: { name: "经济学", tagline: "选择、市场与金钱", description: "学习需求、贸易、储蓄、价格和生产。" },
     "home-economics": { name: "家政", tagline: "健康家庭、饮食与日常生活", description: "学习实用生活技能、营养、照护和明智的家庭选择。" },
     geography: { name: "地理", tagline: "地图、地点与环境", description: "探索地貌、天气、资源、区域和人类聚居。" },
-    "integrated-science": { name: "综合科学", tagline: "面向生活的基础科学", description: "通过科学探索自然、材料、健康和你周围的世界。" },
+    "integrated-science": { name: "科学", tagline: "面向生活的基础科学", description: "通过科学探索自然、材料、健康和你周围的世界。" },
     government: { name: "政府", tagline: "治理、机构与公共生活", description: "理解政府分支、宪法、选举和公共秩序。" },
     "civic-education": { name: "公民教育", tagline: "公民意识、价值与社区", description: "培养品格、社会责任、国家价值观和和平相处能力。" },
     phe: { name: "体育与健康教育", tagline: "体能、安全与积极生活", description: "通过运动、体育、安全和身体护理建立健康习惯。" },
@@ -819,20 +894,23 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     law: { name: "法学", tagline: "规则、权利、救济与推理", description: "学习法律体系、权利、义务以及各主要法学分支中的案例推理。" },
     engineering: { name: "工程学", tagline: "设计、系统与应用型解题", description: "探索主要工程分支、技术设计和应用科学推理。" },
     medicine: { name: "医学", tagline: "人体系统、诊断与照护", description: "学习核心医学科学、临床基础以及以患者为中心的推理。" },
+    "mental-mathematics": { name: "心算", tagline: "数量规律与数字推理", description: "通过数字关系、数列、数据解读和逻辑应用题培养数量推理能力。" },
+    "global-perspectives": { name: "全球视野", tagline: "观点、证据与共同的全球挑战", description: "探索全球问题，比较不同观点，评估证据并提出深思熟虑的解决方案。" },
+    brainteaser: { name: "益智谜题", tagline: "词语、类比与语言逻辑", description: "通过词语关系、类比、分类、字母编码和推断培养语言推理能力。" },
     "management-studies": { name: "管理学", tagline: "领导力、战略与组织绩效", description: "学习管理原则、人员管理、运营、战略与创业。" },
   },
   ar: {
-    arithmetic: { name: "الحساب", tagline: "السرعة والدقة والحس العددي", description: "تدرّب على العمليات، والكسور، والنسب المئوية، والحساب الذهني." },
+    arithmetic: { name: "الرياضيات", tagline: "السرعة والدقة والحس العددي", description: "تدرّب على العمليات، والكسور، والنسب المئوية، والحساب الذهني." },
     english: { name: "اللغة الإنجليزية", tagline: "المفردات والقواعد والقراءة", description: "طوّر الفهم القرائي وبناء الجملة والقوة اللغوية." },
     physics: { name: "الفيزياء", tagline: "القوى والطاقة والحركة", description: "استكشف القوانين التي تحكم الحركة والضوء والمادة." },
     chemistry: { name: "الكيمياء", tagline: "العناصر والتفاعلات والصيغ", description: "تعلّم الذرات والمركبات والمخاليط والتغيرات الكيميائية." },
     biology: { name: "الأحياء", tagline: "أنظمة الحياة والكائنات الحية", description: "ادرس الكائنات الحية والخلايا والأنظمة البيئية وأجهزة الجسم." },
-    computer: { name: "الحاسوب", tagline: "المعرفة الرقمية والمنطق", description: "ابنِ ثقة في مفاهيم الحاسوب والأجهزة والخوارزميات." },
+    computer: { name: "علوم الحاسوب", tagline: "المعرفة الرقمية والمنطق", description: "ابنِ ثقة في مفاهيم الحاسوب والأجهزة والخوارزميات." },
     history: { name: "التاريخ", tagline: "الأشخاص والخطوط الزمنية والتحولات", description: "ادرس الأحداث المهمة والقادة والإمبراطوريات والدروس المستفادة من الماضي." },
     economics: { name: "الاقتصاد", tagline: "الاختيارات والأسواق والمال", description: "تعلّم الاحتياجات والرغبات والتجارة والادخار والأسعار والإنتاج." },
     "home-economics": { name: "الاقتصاد المنزلي", tagline: "منزل صحي وغذاء وحياة يومية", description: "تعلّم مهارات الحياة العملية، والتغذية، والرعاية، والاختيارات المنزلية الحكيمة." },
     geography: { name: "الجغرافيا", tagline: "الخرائط والأماكن والبيئات", description: "استكشف التضاريس والطقس والموارد والأقاليم والاستيطان البشري." },
-    "integrated-science": { name: "العلوم المتكاملة", tagline: "علم بسيط للحياة اليومية", description: "استكشف الطبيعة والمواد والصحة والعالم من حولك من خلال العلم." },
+    "integrated-science": { name: "العلوم", tagline: "علم بسيط للحياة اليومية", description: "استكشف الطبيعة والمواد والصحة والعالم من حولك من خلال العلم." },
     government: { name: "الحكومة", tagline: "القيادة والمؤسسات والحياة العامة", description: "افهم فروع الحكومة والدساتير والانتخابات والنظام المدني." },
     "civic-education": { name: "التربية المدنية", tagline: "المواطنة والقيم والمجتمع", description: "ابنِ الشخصية والمسؤولية الاجتماعية والقيم الوطنية والعيش السلمي." },
     phe: { name: "التربية البدنية والصحية", tagline: "اللياقة والسلامة والحياة النشطة", description: "كوّن عادات صحية من خلال الحركة والرياضة والسلامة والعناية بالجسم." },
@@ -851,6 +929,9 @@ const localizedSubjectCopy: Partial<Record<AppLanguage, Record<string, Localized
     law: { name: "القانون", tagline: "القواعد والحقوق والإنصاف والاستدلال", description: "ادرس الأنظمة القانونية، والحقوق، والالتزامات، والاستدلال القائم على القضايا عبر فروع القانون." },
     engineering: { name: "الهندسة", tagline: "التصميم والأنظمة وحل المشكلات التطبيقية", description: "استكشف فروع الهندسة الرئيسية، والتصميم التقني، والتفكير العلمي التطبيقي." },
     medicine: { name: "الطب", tagline: "أنظمة الجسم والتشخيص والرعاية", description: "تعلّم العلوم الطبية الأساسية، والأسس السريرية، والتفكير المتمركز حول المريض." },
+    "mental-mathematics": { name: "الحساب الذهني", tagline: "الأنماط الكمية والاستدلال العددي", description: "طوّر الاستدلال الكمي من خلال العلاقات العددية والمتتاليات وتفسير البيانات والمسائل المنطقية." },
+    "global-perspectives": { name: "منظورات عالمية", tagline: "وجهات النظر والأدلة والتحديات العالمية المشتركة", description: "استكشف القضايا العالمية، وقارن وجهات النظر، وقيّم الأدلة، وطوّر حلولاً مدروسة." },
+    brainteaser: { name: "ألغاز ذهنية", tagline: "الكلمات والتناظر والمنطق اللفظي", description: "طوّر الاستدلال اللفظي من خلال علاقات الكلمات والتناظر والتصنيف ورموز الحروف والاستنتاج." },
     "management-studies": { name: "دراسات الإدارة", tagline: "القيادة والاستراتيجية والأداء المؤسسي", description: "ادرس مبادئ الإدارة، وإدارة الأفراد، والعمليات، والاستراتيجية، وريادة الأعمال." },
   },
 };
@@ -1488,6 +1569,14 @@ export function getSubjectById(id?: string | string[], language: AppLanguage = "
   }
 
   return getLocalizedSubjects(language).find((subject) => subject.id === id);
+}
+
+export function getSubjectDisplayName(
+  subjectId: string | undefined,
+  storedName: string,
+  language: AppLanguage = "en"
+) {
+  return getSubjectById(subjectId, language)?.name ?? storedName;
 }
 
 export function getTopicById(subject: Subject | undefined, topicId?: string | string[]) {

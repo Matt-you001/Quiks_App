@@ -148,14 +148,24 @@ export function hasRevenueCatConfig() {
 
 export function hasActiveProEntitlement(customerInfo: CustomerInfo) {
   const entitlementId = getRevenueCatEntitlementId();
-  if (!entitlementId) {
-    return false;
+  if (entitlementId) {
+    const configuredEntitlement =
+      customerInfo.entitlements.active[entitlementId] ??
+      customerInfo.entitlements.all[entitlementId];
+
+    if (configuredEntitlement?.isActive) {
+      return true;
+    }
   }
 
-  return Boolean(
-    customerInfo.entitlements.active[entitlementId]?.isActive ??
-      customerInfo.entitlements.all[entitlementId]?.isActive
+  // Each Quiks variant has one paid tier. Keep Pro access working if the
+  // dashboard entitlement identifier changes or a Play product has not yet
+  // been attached to the configured entitlement.
+  const hasAnyActiveEntitlement = Object.values(customerInfo.entitlements.active).some(
+    (entitlement) => entitlement.isActive
   );
+
+  return hasAnyActiveEntitlement || customerInfo.activeSubscriptions.length > 0;
 }
 
 async function syncTierFromCustomerInfo(customerInfo: CustomerInfo) {
@@ -231,6 +241,17 @@ export async function ensureRevenueCatConfigured(account: AppAccount | null = ge
 
 export async function syncRevenueCatIdentity(account: AppAccount | null) {
   await ensureRevenueCatConfigured(account);
+  await Purchases.invalidateCustomerInfoCache();
   const customerInfo = await Purchases.getCustomerInfo();
   await syncTierFromCustomerInfo(customerInfo);
+}
+
+export async function syncRevenueCatIdentityForAuthentication(account: AppAccount) {
+  const syncPromise = syncRevenueCatIdentity(account).catch(() => undefined);
+  await Promise.race([
+    syncPromise,
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 1500);
+    }),
+  ]);
 }

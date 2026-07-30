@@ -1,0 +1,127 @@
+env: load .env
+env: export EXPO_PUBLIC_AI_API_URL EXPO_PUBLIC_AI_MODE EXPO_PUBLIC_GEMINI_MODEL OPENAI_MODEL PORT EXPO_PUBLIC_FIREBASE_API_KEY EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN EXPO_PUBLIC_FIREBASE_PROJECT_ID EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID EXPO_PUBLIC_FIREBASE_APP_ID EXPO_PUBLIC_CHILDREN_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_CHILDREN_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_TEENS_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_TEENS_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_UNI_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_UNI_GOOGLE_WEB_CLIENT_ID
+Starting project at C:\Users\USER\Desktop\Quiks
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  expo@54.0.33 - expected version: ~54.0.36
+  expo-router@6.0.23 - expected version: ~6.0.24
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8092
+Logs for your project will appear below.
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  1.0% (1/1)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 45.8% (28/44)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 45.8% (29/44)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 46.5% ( 70/117)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 46.5% (128/235)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.4% (267/401)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.4% (359/537)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 59.1% (482/640)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 62.9% (637/850)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 72.0% (812/957)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80.7% ( 908/1012)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 88.2% (1052/1120)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.2% (1167/1190)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 97.7% (1197/1236)
+Web Bundling failed 1513ms node_modules\expo-router\entry.js (1 module)
+Error: Cannot parse given Error object
+    at Object.ErrorStackParser$$parse [as parse] (C:\Users\USER\Desktop\Quiks\node_modules\error-stack-parser\error-stack-parser.js:35:23)
+    at formatBundlingError (C:\Users\USER\Desktop\Quiks\node_modules\@expo\metro\node_modules\metro\src\lib\formatBundlingError.js:82:45)
+    at Server.requestProcessor [as _processBundleRequest] (C:\Users\USER\Desktop\Quiks\node_modules\@expo\metro\node_modules\metro\src\Server.js:736:65)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Server._processRequest (C:\Users\USER\Desktop\Quiks\node_modules\@expo\metro\node_modules\metro\src\Server.js:503:7)
+ ERROR  Importing native-only module "react-native/Libraries/Utilities/codegenNativeComponent" on web from: node_modules\react-native-google-mobile-ads\lib\module\specs\components\GoogleMobileAdsBannerViewNativeComponent.ts
+
+Import stack:
+
+ node_modules\react-native-google-mobile-ads\lib\module\specs\components\GoogleMobileAdsBannerViewNativeComponent.ts
+ | import "react-native/Libraries/Utilities/codegenNativeComponent"
+           ^ Importing react-native internals is not supported on web.
+
+ node_modules\react-native-google-mobile-ads\lib\module\ads\BannerAd.js
+ | import "../specs/components/GoogleMobileAdsBannerViewNativeComponent"
+
+ node_modules\react-native-google-mobile-ads\lib\module\index.js
+ | import "./ads/BannerAd"
+
+ components\DemoAdBanner.tsx
+ | import "react-native-google-mobile-ads"
+
+ app\classroom-result.tsx
+ | import "../components/DemoAdBanner"
+
+ app (require.context)
+
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundling failed 1765ms node_modules\expo-router\entry.js (1200 modules)
+ ERROR  Importing native-only module "react-native/Libraries/Utilities/codegenNativeComponent" on web from: node_modules\react-native-google-mobile-ads\lib\module\specs\components\GoogleMobileAdsNativeViewNativeComponent.ts
+
+Import stack:
+
+ node_modules\react-native-google-mobile-ads\lib\module\specs\components\GoogleMobileAdsNativeViewNativeComponent.ts
+ | import "react-native/Libraries/Utilities/codegenNativeComponent"
+           ^ Importing react-native internals is not supported on web.
+
+ node_modules\react-native-google-mobile-ads\lib\module\ads\native-ad\NativeAdView.js
+ | import "../../specs/components/GoogleMobileAdsNativeViewNativeComponent"
+
+ node_modules\react-native-google-mobile-ads\lib\module\index.js
+ | import "./ads/native-ad/NativeAdView"
+
+ components\DemoAdBanner.tsx
+ | import "react-native-google-mobile-ads"
+
+ app\classroom-result.tsx
+ | import "../components/DemoAdBanner"
+
+ app (require.context)
+
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundling failed 3085ms node_modules\expo-router\entry.js (1200 modules)
+ ERROR  Importing native-only module "react-native/Libraries/Utilities/codegenNativeComponent" on web from: node_modules\react-native-google-mobile-ads\lib\module\specs\components\GoogleMobileAdsBannerViewNativeComponent.ts
+
+Import stack:
+
+ node_modules\react-native-google-mobile-ads\lib\module\specs\components\GoogleMobileAdsBannerViewNativeComponent.ts
+ | import "react-native/Libraries/Utilities/codegenNativeComponent"
+           ^ Importing react-native internals is not supported on web.
+
+ node_modules\react-native-google-mobile-ads\lib\module\ads\BannerAd.js
+ | import "../specs/components/GoogleMobileAdsBannerViewNativeComponent"
+
+ node_modules\react-native-google-mobile-ads\lib\module\index.js
+ | import "./ads/BannerAd"
+
+ components\DemoAdBanner.tsx
+ | import "react-native-google-mobile-ads"
+
+ app\classroom-result.tsx
+ | import "../components/DemoAdBanner"
+
+ app (require.context)
+
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 31.9% (116/328)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 34.1% (268/459)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 59.3% (507/693)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 70.9% (708/841)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 81.4% (886/982)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 97.4% (1037/1051)
+Web Bundled 24838ms node_modules\expo-router\entry.js (1131 modules)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1131/1131)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1258/1258)

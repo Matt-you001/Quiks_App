@@ -27,7 +27,7 @@ import {
   signUpWithEmailAccount,
 } from "../lib/firebase";
 import { t } from "../lib/i18n";
-import { syncRevenueCatIdentity } from "../lib/revenuecat";
+import { syncRevenueCatIdentityForAuthentication } from "../lib/revenuecat";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import { getPostAuthRoute } from "../lib/web-checkout";
@@ -112,7 +112,7 @@ function GoogleSignupButton({
 }
 
 export default function SignupScreen() {
-  const params = useLocalSearchParams<{ redirect?: string; plan?: string }>();
+  const params = useLocalSearchParams<{ redirect?: string; plan?: string; joinCode?: string; className?: string }>();
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -130,11 +130,11 @@ export default function SignupScreen() {
         setLanguage(preferredLanguage);
 
         if (state.isAuthenticated || getAuthenticatedAccount()) {
-          const nextRoute = getPostAuthRoute(params.redirect, params.plan);
+          const nextRoute = getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className);
           router.replace(nextRoute as never);
         }
       });
-    }, [params.plan, params.redirect])
+    }, [params.className, params.joinCode, params.plan, params.redirect])
   );
 
   const handleSignup = async () => {
@@ -149,7 +149,15 @@ export default function SignupScreen() {
     const state = await readAppState();
     if (state.account?.provider === "email" && state.account.email === email.trim().toLowerCase()) {
       Alert.alert(t(language, "accountExistsTitle"), t(language, "accountExistsMessage"));
-      router.replace({ pathname: "/login" } as never);
+      router.replace({
+        pathname: "/login",
+        params: {
+          ...(params.redirect ? { redirect: params.redirect } : {}),
+          ...(params.plan ? { plan: params.plan } : {}),
+          ...(params.joinCode ? { joinCode: params.joinCode } : {}),
+          ...(params.className ? { className: params.className } : {}),
+        },
+      } as never);
       return;
     }
 
@@ -167,8 +175,8 @@ export default function SignupScreen() {
     try {
       const account = await signUpWithEmailAccount("", email, password);
       await setAuthenticatedAccount(account, true);
-      await syncRevenueCatIdentity(account).catch(() => undefined);
-      router.replace(getPostAuthRoute(params.redirect, params.plan) as never);
+      await syncRevenueCatIdentityForAuthentication(account);
+      router.replace(getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className) as never);
     } catch (error) {
       Alert.alert(t(language, "invalidCredentialsTitle"), formatFirebaseError(error));
     } finally {
@@ -233,8 +241,10 @@ export default function SignupScreen() {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
                       await setAuthenticatedAccount(account, true);
-                      await syncRevenueCatIdentity(account).catch(() => undefined);
-                      router.replace(getPostAuthRoute(params.redirect, params.plan) as never);
+                      await syncRevenueCatIdentityForAuthentication(account);
+                      router.replace(
+                        getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className) as never
+                      );
                     } catch {
                       Alert.alert(t(language, "invalidCredentialsTitle"), t(language, "invalidCredentialsMessage"));
                     }
@@ -250,6 +260,8 @@ export default function SignupScreen() {
                     params: {
                       ...(params.redirect ? { redirect: params.redirect } : {}),
                       ...(params.plan ? { plan: params.plan } : {}),
+                      ...(params.joinCode ? { joinCode: params.joinCode } : {}),
+                      ...(params.className ? { className: params.className } : {}),
                     },
                   } as never)
                 }
