@@ -52,13 +52,24 @@ function readPaddleClientToken() {
 
 let paddlePromise: Promise<Paddle | undefined> | null = null;
 let configuredToken: string | null = null;
+let checkoutCompletion:
+  | {
+      resolve: (transactionId: string | null) => void;
+    }
+  | null = null;
 
 function handlePaddleEvent(event: PaddleEventData) {
-  if (process.env.NODE_ENV !== "development") {
-    return;
+  if (event.name === "checkout.completed" && event.data?.transaction_id) {
+    checkoutCompletion?.resolve(event.data.transaction_id);
+    checkoutCompletion = null;
+  } else if (event.name === "checkout.closed") {
+    checkoutCompletion?.resolve(null);
+    checkoutCompletion = null;
   }
 
-  console.log("[Paddle event]", event.name ?? event.type ?? "unknown", event.data ?? null);
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Paddle event]", event.name ?? event.type ?? "unknown", event.data ?? null);
+  }
 }
 
 export function getPaddleClientToken() {
@@ -91,7 +102,10 @@ export async function ensurePaddleConfigured() {
   return (await paddlePromise) ?? null;
 }
 
-export async function openPaddleCheckout(priceId: string) {
+export async function openPaddleCheckout(
+  priceId: string,
+  account: { uid: string; email?: string }
+): Promise<string | null> {
   if (Platform.OS !== "web") {
     throw new Error("Paddle checkout is only available on web.");
   }
@@ -103,11 +117,20 @@ export async function openPaddleCheckout(priceId: string) {
 
   const checkoutOptions: CheckoutOpenOptions = {
     items: [{ priceId, quantity: 1 }],
+    customData: {
+      app_user_id: account.uid,
+      quiks_variant: appVariant.id,
+    },
+    ...(account.email ? { customer: { email: account.email } } : {}),
     settings: {
       displayMode: "overlay",
       theme: "light",
     },
   };
 
-  paddle.Checkout.open(checkoutOptions);
+  return new Promise<string | null>((resolve) => {
+    checkoutCompletion?.resolve(null);
+    checkoutCompletion = { resolve };
+    paddle.Checkout.open(checkoutOptions);
+  });
 }

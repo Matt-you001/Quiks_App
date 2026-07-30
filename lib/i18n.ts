@@ -242,6 +242,9 @@ type TranslationKey =
   | "subscription"
   | "manageSubscription"
   | "currentPlan"
+  | "planExpires"
+  | "lifetimeAccess"
+  | "planStatusRefreshing"
   | "freePlan"
   | "proPlan"
   | "upgradeToPro"
@@ -687,6 +690,9 @@ const english: TranslationMap = {
   subscription: "Subscription",
   manageSubscription: "Manage Subscription",
   currentPlan: "Current plan",
+  planExpires: "Expires",
+  lifetimeAccess: "Lifetime access",
+  planStatusRefreshing: "Refreshing subscription details…",
   freePlan: "Free",
   proPlan: "Pro",
   upgradeToPro: "Upgrade to Pro",

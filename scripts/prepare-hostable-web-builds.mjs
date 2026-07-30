@@ -185,6 +185,10 @@ for (const variant of variants) {
   const sourceExpoDir = join(sourceDir, "_expo");
   const targetExpoDir = join(targetDir, "expo");
   const indexFile = join(targetDir, "index.html");
+  const classroomInviteFile = join(targetDir, "classroom-invite.html");
+  const classroomInviteLauncher = existsSync(classroomInviteFile)
+    ? readFileSync(classroomInviteFile, "utf8")
+    : null;
   const assets = variantWebAssets[variant];
 
   if (!existsSync(sourceDir)) {
@@ -212,6 +216,9 @@ for (const variant of variants) {
 
   cpSync(join(assetRoot, assets.svgLogo), join(targetDir, "logo.svg"));
   cpSync(join(assetRoot, assets.faviconPng), join(targetDir, "favicon.png"));
+  if (classroomInviteLauncher) {
+    writeFileSync(classroomInviteFile, classroomInviteLauncher, "utf8");
+  }
   if (entryScriptName) {
     writeHostedRouteWrappers(targetDir, variant, entryScriptName);
   }

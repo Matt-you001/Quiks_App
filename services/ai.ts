@@ -5,6 +5,8 @@ import { getLocalQuestions } from "../lib/question-bank";
 import type {
   BreatherContent,
   BreatherRequest,
+  AccountSubscriptionStatusRequest,
+  AccountSubscriptionStatusResponse,
   ClassroomActivityCreateRequest,
   ClassroomActivityCreateResponse,
   ClassroomActivityDetailsRequest,
@@ -60,6 +62,7 @@ import type {
   CoachPlanRequest,
   PushTokenRegisterRequest,
   PushTokenRegisterResponse,
+  PaddleSubscriptionSyncRequest,
   FeedbackRequest,
   Question,
   QuestionRequest,
@@ -718,6 +721,18 @@ export async function registerPushToken(
   request: PushTokenRegisterRequest
 ): Promise<PushTokenRegisterResponse> {
   return postJson("/notifications/register-push-token", withVariantMeta(request));
+}
+
+export async function getAccountSubscriptionStatus(
+  request: AccountSubscriptionStatusRequest
+): Promise<AccountSubscriptionStatusResponse> {
+  return postJson("/subscriptions/status", withVariantMeta(request));
+}
+
+export async function syncPaddleSubscriptionPurchase(
+  request: PaddleSubscriptionSyncRequest
+): Promise<AccountSubscriptionStatusResponse> {
+  return postJson("/subscriptions/paddle/sync", withVariantMeta(request));
 }
 
 export async function syncClassroomProfile(request: ClassroomProfileSyncRequest) {

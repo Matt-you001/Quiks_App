@@ -6,6 +6,7 @@ import {
   ensureRevenueCatConfigured,
   getRevenueCatConfigErrorMessage,
   getRevenueCatEntitlementId,
+  getProSubscriptionDetails,
   hasActiveProEntitlement,
   hasRevenueCatConfig,
 } from "./revenuecat";
@@ -148,10 +149,11 @@ function normalizePlans(items: PurchasesPackage[]) {
     .sort((left, right) => rank[left.period] - rank[right.period]);
 }
 
-async function updateStoredTierFromActive(active: boolean) {
-  const nextTier = active ? "pro" : "free";
-  await setSubscriptionTier(nextTier);
-  return nextTier;
+async function updateStoredSubscription(customerInfo: Awaited<ReturnType<typeof Purchases.getCustomerInfo>>) {
+  const details = getProSubscriptionDetails(customerInfo);
+  const nextTier = details.active ? "pro" : "free";
+  await setSubscriptionTier(nextTier, details.expirationDate);
+  return details;
 }
 
 function wait(milliseconds: number) {
@@ -219,12 +221,11 @@ export async function loadSubscriptionStoreState(): Promise<SubscriptionStoreSta
 
   const customerInfo = await getFreshCustomerInfo();
   const plans = normalizePlans(availablePackages);
-  const active = hasActiveProEntitlement(customerInfo);
-  await updateStoredTierFromActive(active);
+  const subscription = await updateStoredSubscription(customerInfo);
 
   return {
     plans,
-    active,
+    active: subscription.active,
     available: availablePackages.length > 0,
     reason: plans.length === 0 ? "products_unavailable" : undefined,
   };
@@ -267,12 +268,11 @@ export async function purchaseProSubscription(productId: string): Promise<Subscr
 
   const purchaseResult = await Purchases.purchasePackage(selectedPackage);
   const customerInfo = await resolvePostPurchaseCustomerInfo(purchaseResult.customerInfo);
-  const active = hasActiveProEntitlement(customerInfo);
-  await updateStoredTierFromActive(active);
+  const subscription = await updateStoredSubscription(customerInfo);
 
   return {
-    active,
-    pending: !active,
+    active: subscription.active,
+    pending: !subscription.active,
   };
 }
 
@@ -288,11 +288,10 @@ export async function restoreProSubscription(): Promise<SubscriptionPurchaseResu
   await ensureRevenueCatConfigured(getAuthenticatedAccount());
   await Purchases.restorePurchases();
   const customerInfo = await getFreshCustomerInfo();
-  const active = hasActiveProEntitlement(customerInfo);
-  await updateStoredTierFromActive(active);
+  const subscription = await updateStoredSubscription(customerInfo);
 
   return {
-    active,
+    active: subscription.active,
     pending: false,
   };
 }

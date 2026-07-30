@@ -11,9 +11,10 @@ import { signOutAccount } from "../lib/firebase";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRevenueCatIdentity } from "../lib/revenuecat";
 import { canCreateAnotherProfile } from "../lib/subscription";
-import { logoutAccount, readAppState, setCurrentProfile } from "../lib/storage";
+import { logoutAccount, readAppState, setCurrentProfile, setSubscriptionTier as storeSubscriptionTier } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
+import { getAccountSubscriptionStatus } from "../services/ai";
 import type { SessionResult, UserProfile } from "../types/app";
 
 function getGradeRank(grade: string) {
@@ -98,6 +99,8 @@ export default function ProfileScreen() {
   const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
+  const [subscriptionExpiresAt, setSubscriptionExpiresAt] = useState<string | null>(null);
+  const [subscriptionUpdatedAt, setSubscriptionUpdatedAt] = useState(0);
   const [profileCount, setProfileCount] = useState(0);
   const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
 
@@ -119,7 +122,27 @@ export default function ProfileScreen() {
     setActiveProfile(profile);
     setResults(profile ? state.results[profile.id] ?? [] : []);
     setSubscriptionTier(state.subscriptionTier);
+    setSubscriptionExpiresAt(state.subscriptionExpiresAt);
+    setSubscriptionUpdatedAt(state.subscriptionUpdatedAt);
     setProfileCount(state.profiles.length);
+
+    if (state.account) {
+      const refreshSubscription =
+        Platform.OS === "web"
+          ? getAccountSubscriptionStatus({ accountUid: state.account.uid }).then(async (status) => {
+              await storeSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+            })
+          : syncRevenueCatIdentity(state.account).then(() => undefined);
+
+      void refreshSubscription
+        .then(async () => {
+          const refreshedState = await readAppState();
+          setSubscriptionTier(refreshedState.subscriptionTier);
+          setSubscriptionExpiresAt(refreshedState.subscriptionExpiresAt);
+          setSubscriptionUpdatedAt(refreshedState.subscriptionUpdatedAt);
+        })
+        .catch(() => undefined);
+    }
   }, []);
 
   const handleLogout = async () => {
@@ -225,6 +248,28 @@ export default function ProfileScreen() {
   const competitionWins = competitionResults.filter((result) => result.competitionOutcome === "won").length;
   const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profileCount);
   const isMobile = Platform.OS !== "web";
+  const subscriptionExpiryLabel = useMemo(() => {
+    if (subscriptionTier !== "pro") {
+      return null;
+    }
+
+    if (!subscriptionExpiresAt) {
+      return subscriptionUpdatedAt > 0
+        ? t(language, "lifetimeAccess")
+        : t(language, "planStatusRefreshing");
+    }
+
+    const expiryDate = new Date(subscriptionExpiresAt);
+    if (!Number.isFinite(expiryDate.getTime())) {
+      return t(language, "planStatusRefreshing");
+    }
+
+    return expiryDate.toLocaleDateString(language, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }, [language, subscriptionExpiresAt, subscriptionTier, subscriptionUpdatedAt]);
 
   const handleDeleteAccount = async () => {
     const deletionUrl = `https://techsolutionproviders.net/account-deletion-quiks.html?variant=${appVariant.id}`;
@@ -429,6 +474,22 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{t(language, "currentPlan")}</Text>
+        <View style={[styles.planBadge, subscriptionTier === "pro" ? styles.planBadgePro : styles.planBadgeFree]}>
+          <Text style={[styles.planBadgeText, subscriptionTier === "pro" ? styles.planBadgeTextPro : null]}>
+            {subscriptionTier === "pro" ? t(language, "proPlan") : t(language, "freePlan")}
+          </Text>
+        </View>
+        {subscriptionTier === "pro" && subscriptionExpiryLabel ? (
+          <Text style={styles.metricText}>
+            {t(language, "planExpires")}: {subscriptionExpiryLabel}
+          </Text>
+        ) : (
+          <Text style={styles.metricText}>{t(language, "freePlanStatus")}</Text>
+        )}
+      </View>
+
       <View style={styles.actionGrid}>
         <PrimaryButton
           label={t(language, "editProfileAction")}
@@ -589,6 +650,27 @@ const styles = StyleSheet.create({
     color: palette.navy,
     fontSize: 13,
     fontWeight: "800",
+  },
+  planBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    backgroundColor: "#EEF2F6",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  planBadgePro: {
+    backgroundColor: "#DDF8ED",
+  },
+  planBadgeFree: {
+    backgroundColor: "#EEF2F6",
+  },
+  planBadgeText: {
+    color: palette.slate,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  planBadgeTextPro: {
+    color: "#087A55",
   },
   historyControls: {
     marginTop: 12,

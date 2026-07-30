@@ -4,7 +4,7 @@ import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { t } from "../lib/i18n";
-import { ensurePaddleConfigured, hasPaddleClientToken, openPaddleCheckout } from "../lib/paddle";
+import { hasPaddleClientToken, openPaddleCheckout } from "../lib/paddle";
 import {
   endPurchaseConnection,
   getFallbackSubscriptionPlans,
@@ -14,11 +14,12 @@ import {
   restoreProSubscription,
   type SubscriptionPlan,
 } from "../lib/purchases";
-import { readAppState } from "../lib/storage";
+import { readAppState, setSubscriptionTier } from "../lib/storage";
 import { areSubscriptionPurchasesEnabled } from "../lib/subscription";
 import { palette, shadows } from "../lib/theme";
 import { normalizeSubscriptionPlanPeriod } from "../lib/web-checkout";
-import type { AppLanguage, SubscriptionTier } from "../types/app";
+import { getAccountSubscriptionStatus, syncPaddleSubscriptionPurchase } from "../services/ai";
+import type { AppAccount, AppLanguage, SubscriptionTier } from "../types/app";
 
 export default function SubscriptionScreen() {
   const purchasesEnabled = areSubscriptionPurchasesEnabled();
@@ -31,16 +32,14 @@ export default function SubscriptionScreen() {
   const [restoring, setRestoring] = useState(false);
   const [storeMessage, setStoreMessage] = useState<string | null>(null);
   const [storeReady, setStoreReady] = useState(false);
+  const [account, setAccount] = useState<AppAccount | null>(null);
 
   const load = useCallback(async () => {
     const state = await readAppState();
     const nextLanguage = state.profiles.find((profile) => profile.id === state.currentProfileId)?.language ?? "en";
     setLanguage(nextLanguage);
     setSubscriptionTierState(state.subscriptionTier);
-
-    if (purchasesEnabled && hasPaddleClientToken()) {
-      void ensurePaddleConfigured().catch(() => undefined);
-    }
+    setAccount(state.account);
 
     if (!purchasesEnabled) {
       setPlans([]);
@@ -53,6 +52,23 @@ export default function SubscriptionScreen() {
     if (!purchaseRuntimeAvailable()) {
       setStoreReady(false);
       setStoreMessage(t(nextLanguage, "subscriptionNotSupported"));
+      setLoadingStore(false);
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      setPlans(getFallbackSubscriptionPlans());
+      setStoreReady(hasPaddleClientToken());
+      if (state.account?.uid) {
+        try {
+          const status = await getAccountSubscriptionStatus({ accountUid: state.account.uid });
+          await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+          setSubscriptionTierState(status.active ? "pro" : "free");
+          setStoreMessage(null);
+        } catch {
+          setStoreMessage(t(nextLanguage, "subscriptionSyncFailedMessage"));
+        }
+      }
       setLoadingStore(false);
       return;
     }
@@ -98,8 +114,26 @@ export default function SubscriptionScreen() {
 
     setActiveProductId(productId);
     try {
-      if (Platform.OS === "web" && hasPaddleClientToken()) {
-        await openPaddleCheckout(productId);
+      if (Platform.OS === "web") {
+        if (!account) {
+          throw new Error(t(language, "authRequiredMessage"));
+        }
+
+        const transactionId = await openPaddleCheckout(productId, account);
+        if (!transactionId) {
+          return;
+        }
+
+        const status = await syncPaddleSubscriptionPurchase({
+          accountUid: account.uid,
+          transactionId,
+        });
+        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+        setSubscriptionTierState(status.active ? "pro" : "free");
+        Alert.alert(
+          status.active ? t(language, "purchaseSuccessTitle") : t(language, "purchasePendingTitle"),
+          status.active ? t(language, "purchaseSuccessMessage") : t(language, "purchasePendingMessage")
+        );
         return;
       }
 
@@ -129,6 +163,20 @@ export default function SubscriptionScreen() {
 
     setRestoring(true);
     try {
+      if (Platform.OS === "web") {
+        if (!account) {
+          throw new Error(t(language, "authRequiredMessage"));
+        }
+        const status = await getAccountSubscriptionStatus({ accountUid: account.uid });
+        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+        setSubscriptionTierState(status.active ? "pro" : "free");
+        Alert.alert(
+          status.active ? t(language, "restoreSuccessTitle") : t(language, "restoreFreeTitle"),
+          status.active ? t(language, "restoreSuccessMessage") : t(language, "restoreFreeMessage")
+        );
+        return;
+      }
+
       const result = await restoreProSubscription();
       setSubscriptionTierState(result.active ? "pro" : "free");
       Alert.alert(

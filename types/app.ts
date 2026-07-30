@@ -122,6 +122,8 @@ export interface StoredAppState {
   currentProfileId: string | null;
   results: Record<string, SessionResult[]>;
   subscriptionTier: SubscriptionTier;
+  subscriptionExpiresAt: string | null;
+  subscriptionUpdatedAt: number;
 }
 
 export interface QuestionRequest {
@@ -255,6 +257,19 @@ export interface ClassroomMembershipDecisionRequest {
 export interface ClassroomMembershipMutationResponse {
   classroom: ClassroomSummary;
   message: string;
+}
+
+export interface AccountSubscriptionStatusRequest {
+  accountUid: string;
+}
+
+export interface PaddleSubscriptionSyncRequest extends AccountSubscriptionStatusRequest {
+  transactionId: string;
+}
+
+export interface AccountSubscriptionStatusResponse {
+  active: boolean;
+  expiresAt: string | null;
 }
 
 export interface ClassroomQuestionCandidateRequest {

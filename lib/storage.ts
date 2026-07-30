@@ -20,6 +20,8 @@ const defaultState: StoredAppState = {
   currentProfileId: null,
   results: {},
   subscriptionTier: "free",
+  subscriptionExpiresAt: null,
+  subscriptionUpdatedAt: 0,
 };
 
 function enforceProfileLimit(state: StoredAppState): StoredAppState {
@@ -86,6 +88,12 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
     })
   );
 
+  const subscriptionTier = state.subscriptionTier === "pro" ? "pro" : "free";
+  const subscriptionExpiresAt =
+    subscriptionTier === "pro" && typeof state.subscriptionExpiresAt === "string"
+      ? state.subscriptionExpiresAt
+      : null;
+
   return enforceProfileLimit({
     account: state.account ?? null,
     isAuthenticated: Boolean(state.isAuthenticated && state.account),
@@ -94,7 +102,12 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
       ? preferredProfileId
       : profiles[0]?.id ?? null,
     results,
-    subscriptionTier: state.subscriptionTier === "pro" ? "pro" : "free",
+    subscriptionTier,
+    subscriptionExpiresAt,
+    subscriptionUpdatedAt:
+      typeof state.subscriptionUpdatedAt === "number" && Number.isFinite(state.subscriptionUpdatedAt)
+        ? state.subscriptionUpdatedAt
+        : 0,
   });
 }
 
@@ -161,6 +174,17 @@ function mergeStoredStates(
     normalizedRemote.currentProfileId ??
     profiles[0]?.id ??
     null;
+  const localSubscriptionIsNewer =
+    localState.subscriptionUpdatedAt > normalizedRemote.subscriptionUpdatedAt;
+  const remoteSubscriptionIsNewer =
+    normalizedRemote.subscriptionUpdatedAt > localState.subscriptionUpdatedAt;
+  const selectedSubscription = localSubscriptionIsNewer
+    ? localState
+    : remoteSubscriptionIsNewer
+      ? normalizedRemote
+      : localState.subscriptionTier === "pro"
+        ? localState
+        : normalizedRemote;
 
   return normalizeState({
     account: remoteAccount ?? localState.account ?? normalizedRemote.account ?? null,
@@ -168,8 +192,9 @@ function mergeStoredStates(
     profiles,
     currentProfileId: profiles.some((profile) => profile.id === preferredProfileId) ? preferredProfileId : profiles[0]?.id ?? null,
     results,
-    subscriptionTier:
-      localState.subscriptionTier === "pro" || normalizedRemote.subscriptionTier === "pro" ? "pro" : "free",
+    subscriptionTier: selectedSubscription.subscriptionTier,
+    subscriptionExpiresAt: selectedSubscription.subscriptionExpiresAt,
+    subscriptionUpdatedAt: selectedSubscription.subscriptionUpdatedAt,
   });
 }
 
@@ -410,9 +435,14 @@ export async function upsertResult(profileId: string, result: SessionResult) {
   return state;
 }
 
-export async function setSubscriptionTier(subscriptionTier: SubscriptionTier) {
+export async function setSubscriptionTier(
+  subscriptionTier: SubscriptionTier,
+  subscriptionExpiresAt: string | null = null
+) {
   const state = await readMutableAppState();
   state.subscriptionTier = subscriptionTier;
+  state.subscriptionExpiresAt = subscriptionTier === "pro" ? subscriptionExpiresAt : null;
+  state.subscriptionUpdatedAt = Date.now();
   const normalized = normalizeState(state);
   await writeAppState(normalized);
   return normalized;

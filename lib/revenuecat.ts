@@ -5,6 +5,7 @@ import type { AppAccount } from "../types/app";
 import { appVariant } from "./app-variant";
 import { getAuthenticatedAccount } from "./firebase";
 import { setSubscriptionTier } from "./storage";
+import { getAccountSubscriptionStatus } from "../services/ai";
 
 const fallbackEntitlementIds = {
   children: "entl5792d09222",
@@ -147,6 +148,35 @@ export function hasRevenueCatConfig() {
 }
 
 export function hasActiveProEntitlement(customerInfo: CustomerInfo) {
+  return getProSubscriptionDetails(customerInfo).active;
+}
+
+export function getProSubscriptionDetails(customerInfo: CustomerInfo) {
+  const entitlementId = getRevenueCatEntitlementId();
+  const configuredEntitlement = entitlementId
+    ? customerInfo.entitlements.active[entitlementId] ?? customerInfo.entitlements.all[entitlementId]
+    : undefined;
+
+  const activeEntitlement =
+    configuredEntitlement?.isActive
+      ? configuredEntitlement
+      : Object.values(customerInfo.entitlements.active).find((entitlement) => entitlement.isActive);
+
+  const active = Boolean(activeEntitlement) || customerInfo.activeSubscriptions.length > 0;
+
+  return {
+    active,
+    expirationDate: active
+      ? activeEntitlement?.expirationDate ?? customerInfo.latestExpirationDate ?? null
+      : null,
+  };
+}
+
+/*
+ * Keep this compatibility path for projects whose entitlement identifier was
+ * renamed before the product-to-entitlement mapping was corrected.
+ */
+export function hasConfiguredProEntitlement(customerInfo: CustomerInfo) {
   const entitlementId = getRevenueCatEntitlementId();
   if (entitlementId) {
     const configuredEntitlement =
@@ -169,9 +199,9 @@ export function hasActiveProEntitlement(customerInfo: CustomerInfo) {
 }
 
 async function syncTierFromCustomerInfo(customerInfo: CustomerInfo) {
-  const active = hasActiveProEntitlement(customerInfo);
-  await setSubscriptionTier(active ? "pro" : "free");
-  return active;
+  const details = getProSubscriptionDetails(customerInfo);
+  await setSubscriptionTier(details.active ? "pro" : "free", details.expirationDate);
+  return details;
 }
 
 async function syncSubscriberAttributes(account: AppAccount | null) {
@@ -243,11 +273,16 @@ export async function syncRevenueCatIdentity(account: AppAccount | null) {
   await ensureRevenueCatConfigured(account);
   await Purchases.invalidateCustomerInfoCache();
   const customerInfo = await Purchases.getCustomerInfo();
-  await syncTierFromCustomerInfo(customerInfo);
+  return syncTierFromCustomerInfo(customerInfo);
 }
 
 export async function syncRevenueCatIdentityForAuthentication(account: AppAccount) {
-  const syncPromise = syncRevenueCatIdentity(account).catch(() => undefined);
+  const syncPromise =
+    Platform.OS === "web"
+      ? getAccountSubscriptionStatus({ accountUid: account.uid })
+          .then((status) => setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt))
+          .catch(() => undefined)
+      : syncRevenueCatIdentity(account).catch(() => undefined);
   await Promise.race([
     syncPromise,
     new Promise<void>((resolve) => {

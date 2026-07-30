@@ -31,6 +31,103 @@ const competitionMatchByPlayer = new Map();
 const competitionChallenges = new Map();
 const competitionRematches = new Map();
 const pushTokensByPlayer = new Map();
+const revenueCatPublicKeys = {
+  children: {
+    android: process.env.REVENUECAT_CHILDREN_ANDROID_PUBLIC_KEY || "goog_jPXDDFSylXKTcMvzPNPPhTHIyeA",
+    paddle: process.env.REVENUECAT_CHILDREN_PADDLE_PUBLIC_KEY || "pdl_uDcNQNxHeNqGuOkDvOYPPlbVuAyp",
+    entitlement: process.env.REVENUECAT_CHILDREN_ENTITLEMENT_ID || "entl5792d09222",
+  },
+  teens: {
+    android: process.env.REVENUECAT_TEENS_ANDROID_PUBLIC_KEY || "goog_ciDxoaodJlvQwkRHzOEqvZFsktJ",
+    paddle: process.env.REVENUECAT_TEENS_PADDLE_PUBLIC_KEY || "pdl_WQjymgirStoqLGNJCSLDrLJqlFJV",
+    entitlement: process.env.REVENUECAT_TEENS_ENTITLEMENT_ID || "entl799f03ddcc",
+  },
+  uni: {
+    android: process.env.REVENUECAT_UNI_ANDROID_PUBLIC_KEY || "goog_jMWcZCwUSjbsYzrLdmREAjyMNYY",
+    paddle: process.env.REVENUECAT_UNI_PADDLE_PUBLIC_KEY || "pdl_zMZDPBTDiEmPYiEvOBcZSQVGkgpY",
+    entitlement: process.env.REVENUECAT_UNI_ENTITLEMENT_ID || "entl5ab41c922b",
+  },
+};
+
+function getRevenueCatConfig(appVariant = "children") {
+  return revenueCatPublicKeys[appVariant] ?? revenueCatPublicKeys.children;
+}
+
+function parseRevenueCatSubscriptionStatus(payload, appVariant) {
+  const subscriber = payload?.subscriber ?? payload;
+  const entitlement = subscriber?.entitlements?.[getRevenueCatConfig(appVariant).entitlement];
+  const expiresAt = entitlement?.expires_date ?? null;
+  const expirationTime = expiresAt ? new Date(expiresAt).getTime() : null;
+  const active = Boolean(
+    entitlement &&
+      (expirationTime === null || (Number.isFinite(expirationTime) && expirationTime > Date.now()))
+  );
+
+  return {
+    active,
+    expiresAt: active ? expiresAt : null,
+  };
+}
+
+async function fetchRevenueCatSubscriber(accountUid, appVariant) {
+  const config = getRevenueCatConfig(appVariant);
+  const revenueCatResponse = await fetch(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(accountUid)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${config.android}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!revenueCatResponse.ok) {
+    throw new Error(`RevenueCat subscriber lookup failed (${revenueCatResponse.status}).`);
+  }
+
+  return revenueCatResponse.json();
+}
+
+async function handleSubscriptionStatus(body, response) {
+  if (!body.accountUid?.trim()) {
+    sendJson(response, 400, { error: "Account UID is required." });
+    return;
+  }
+
+  const appVariant = body.appVariant ?? "children";
+  const subscriber = await fetchRevenueCatSubscriber(body.accountUid.trim(), appVariant);
+  sendJson(response, 200, parseRevenueCatSubscriptionStatus(subscriber, appVariant));
+}
+
+async function handlePaddleSubscriptionSync(body, response) {
+  if (!body.accountUid?.trim() || !body.transactionId?.trim()) {
+    sendJson(response, 400, { error: "Account UID and Paddle transaction ID are required." });
+    return;
+  }
+
+  const appVariant = body.appVariant ?? "children";
+  const config = getRevenueCatConfig(appVariant);
+  const receiptResponse = await fetch("https://api.revenuecat.com/v1/receipts", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.paddle}`,
+      "Content-Type": "application/json",
+      "X-Platform": "paddle",
+    },
+    body: JSON.stringify({
+      app_user_id: body.accountUid.trim(),
+      fetch_token: body.transactionId.trim(),
+    }),
+  });
+
+  if (!receiptResponse.ok) {
+    const receiptError = await receiptResponse.text();
+    throw new Error(`RevenueCat Paddle sync failed (${receiptResponse.status}): ${receiptError}`);
+  }
+
+  const receiptPayload = await receiptResponse.json();
+  sendJson(response, 200, parseRevenueCatSubscriptionStatus(receiptPayload, appVariant));
+}
 
 function isSameUtcDay(leftTimestamp, rightTimestamp) {
   const left = new Date(leftTimestamp);
@@ -2136,6 +2233,16 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/classes/list") {
       await handleClassroomList(body, response);
+      return;
+    }
+
+    if (url.pathname === "/subscriptions/status") {
+      await handleSubscriptionStatus(body, response);
+      return;
+    }
+
+    if (url.pathname === "/subscriptions/paddle/sync") {
+      await handlePaddleSubscriptionSync(body, response);
       return;
     }
 
