@@ -4,19 +4,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../../components/AppBackground";
 import { BackIconButton } from "../../components/BackIconButton";
+import { DemoAdBanner } from "../../components/DemoAdBanner";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { canShowAds } from "../../lib/ads";
 import { appVariant } from "../../lib/app-variant";
 import { t } from "../../lib/i18n";
 import { getUnlockedLevelsForGrade } from "../../lib/quiz";
 import { readAppState } from "../../lib/storage";
 import { getSubjectById, grades } from "../../lib/subjects";
 import { palette, shadows } from "../../lib/theme";
-import type { SessionResult, UserProfile } from "../../types/app";
+import type { SessionResult, SubscriptionTier, UserProfile } from "../../types/app";
 
 export default function SubjectDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [mode, setMode] = useState<"quiz" | "training">(appVariant.defaultMode);
   const [selectedGrade, setSelectedGrade] = useState(grades[0]);
   const language = profile?.language ?? "en";
@@ -31,6 +34,7 @@ export default function SubjectDetailScreen() {
     }
     setProfile(currentProfile);
     setResults(currentProfile ? state.results[currentProfile.id] ?? [] : []);
+    setSubscriptionTier(state.subscriptionTier);
   }, [slug]);
 
   useFocusEffect(
@@ -75,6 +79,8 @@ export default function SubjectDetailScreen() {
         <Text style={styles.subjectDescription}>{subject.description}</Text>
         <Text style={styles.profileLine}>{t(language, "activeLearner")}: {profile?.name ?? t(language, "noStudentSelected")}</Text>
       </View>
+
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "chooseMode")}</Text>

@@ -28,6 +28,7 @@ export default function ResultsScreen() {
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
+  const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [rematchState, setRematchState] = useState<CompetitionRematchResponse | null>(null);
   const [isRequestingRematch, setIsRequestingRematch] = useState(false);
   const [isAcceptingRematch, setIsAcceptingRematch] = useState(false);
@@ -67,6 +68,7 @@ export default function ResultsScreen() {
       setLanguage(profile?.language ?? "en");
       setProfile(profile);
       setSubscriptionTier(state.subscriptionTier);
+      setSubscriptionLoaded(true);
       setPassStreak(streak);
       setShowBreather(shouldOfferBreather(profileResults, result));
     });
@@ -77,12 +79,12 @@ export default function ResultsScreen() {
   }, [result]);
 
   useEffect(() => {
-    if (!result || !canShowAds(subscriptionTier)) {
+    if (!result || !subscriptionLoaded || !canShowAds(subscriptionTier)) {
       return;
     }
 
-    void showInterstitialAd();
-  }, [result, subscriptionTier]);
+    void showInterstitialAd(subscriptionTier);
+  }, [result, subscriptionLoaded, subscriptionTier]);
 
   const passed = result ? result.score >= SCORE_THRESHOLD : false;
   const rematchSubject = result ? getSubjectById(result.subjectId, language) : null;
@@ -386,7 +388,7 @@ export default function ResultsScreen() {
         ))}
       </View>
 
-      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} /> : null}
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       <View style={styles.actionColumn}>
         {passed && showBreather ? <PrimaryButton label={t(language, "takeLearningBreather")} onPress={openBreather} /> : null}

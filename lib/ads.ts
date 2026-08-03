@@ -2,11 +2,13 @@ import Constants from "expo-constants";
 import type { ComponentType } from "react";
 import { Platform } from "react-native";
 import { appVariant } from "./app-variant";
+import { readAppState } from "./storage";
 import type { SubscriptionTier } from "../types/app";
 
 type MobileAdsModule = {
   TestIds: {
     ADAPTIVE_BANNER: string;
+    BANNER: string;
     INTERSTITIAL: string;
     NATIVE: string;
     APP_OPEN: string;
@@ -14,10 +16,11 @@ type MobileAdsModule = {
   BannerAd: ComponentType<{
     unitId: string;
     size: string;
+    width?: number;
     requestOptions?: {
       requestNonPersonalizedAdsOnly?: boolean;
     };
-    onAdLoaded?: () => void;
+    onAdLoaded?: (dimensions: { width: number; height: number }) => void;
     onAdFailedToLoad?: (error: Error) => void;
   }>;
   BannerAdSize: {
@@ -175,8 +178,12 @@ export function getMobileAdsModule(): MobileAdsModule | null {
   }
 }
 
-export function getBannerAdUnitId(module: MobileAdsModule) {
-  return adsConfig.bannerUnitId || module.TestIds.ADAPTIVE_BANNER;
+export function getBannerAdUnitId(module: MobileAdsModule, adaptive = true) {
+  if (__DEV__) {
+    return adaptive ? module.TestIds.ADAPTIVE_BANNER : module.TestIds.BANNER;
+  }
+
+  return adsConfig.bannerUnitId || (adaptive ? module.TestIds.ADAPTIVE_BANNER : module.TestIds.BANNER);
 }
 
 export function getInterstitialAdUnitId(module: MobileAdsModule) {
@@ -206,14 +213,22 @@ export async function initializeMobileAds() {
       .default()
       .initialize()
       .then(() => true)
-      .catch(() => false);
+      .catch(() => {
+        mobileAdsInitPromise = null;
+        return false;
+      });
   }
 
   return mobileAdsInitPromise;
 }
 
-export async function showInterstitialAd() {
-  if (!adsConfig.interstitialEnabled || Platform.OS === "web") {
+export async function showInterstitialAd(subscriptionTier: SubscriptionTier) {
+  if (!canShowAds(subscriptionTier) || !adsConfig.interstitialEnabled || Platform.OS === "web") {
+    return false;
+  }
+
+  const storedState = await readAppState();
+  if (!canShowAds(storedState.subscriptionTier)) {
     return false;
   }
 
@@ -254,11 +269,20 @@ export async function showInterstitialAd() {
     };
 
     const unsubscribeLoaded = interstitial.addAdEventListener(mobileAds.AdEventType.LOADED, () => {
-      try {
-        interstitial.show();
-      } catch {
-        finish(false);
-      }
+      void readAppState()
+        .then((latestState) => {
+          if (!canShowAds(latestState.subscriptionTier)) {
+            finish(false);
+            return;
+          }
+
+          try {
+            interstitial.show();
+          } catch {
+            finish(false);
+          }
+        })
+        .catch(() => finish(false));
     });
     const unsubscribeClosed = interstitial.addAdEventListener(mobileAds.AdEventType.CLOSED, () => {
       finish(true);
@@ -305,7 +329,7 @@ function ensureAppOpenAdLoaded(mobileAds: MobileAdsModule) {
 }
 
 export async function preloadAppOpenAd(subscriptionTier: SubscriptionTier) {
-  if (!canShowAds(subscriptionTier) || Platform.OS === "web") {
+  if (!canShowAds(subscriptionTier) || !adsConfig.appOpenUnitId || Platform.OS === "web") {
     return false;
   }
 
@@ -324,7 +348,7 @@ export async function preloadAppOpenAd(subscriptionTier: SubscriptionTier) {
 }
 
 export async function showAppOpenAd(subscriptionTier: SubscriptionTier) {
-  if (!canShowAds(subscriptionTier) || Platform.OS === "web") {
+  if (!canShowAds(subscriptionTier) || !adsConfig.appOpenUnitId || Platform.OS === "web") {
     return false;
   }
 

@@ -2,8 +2,10 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { canShowAds } from "../lib/ads";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile } from "../lib/subscription";
@@ -78,6 +80,7 @@ export default function SelectProfileScreen() {
           }}
         />
       </View>
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
       <PremiumFeatureDialog
         visible={showProfileUpgrade}
         title={t(language, "profileLimitReachedTitle")}

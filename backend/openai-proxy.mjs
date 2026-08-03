@@ -39,7 +39,7 @@ const revenueCatPublicKeys = {
   },
   teens: {
     android: process.env.REVENUECAT_TEENS_ANDROID_PUBLIC_KEY || "goog_ciDxoaodJlvQwkRHzOEqvZFsktJ",
-    paddle: process.env.REVENUECAT_TEENS_PADDLE_PUBLIC_KEY || "pdl_WQjymgirStoqLGNJCSLDrLJqlFJV",
+    paddle: process.env.REVENUECAT_TEENS_PADDLE_PUBLIC_KEY || "pdl_lIrTQkvVsEgMYEupTWtazdvnJIdY",
     entitlement: process.env.REVENUECAT_TEENS_ENTITLEMENT_ID || "entl799f03ddcc",
   },
   uni: {

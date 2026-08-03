@@ -4,9 +4,11 @@ import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "rea
 import * as Clipboard from "expo-clipboard";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
+import { canShowAds } from "../lib/ads";
 import { signOutAccount } from "../lib/firebase";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRevenueCatIdentity } from "../lib/revenuecat";
@@ -446,6 +448,8 @@ export default function ProfileScreen() {
         <Text style={styles.metricText}>{t(language, "sessionsCompleted")}: {results.length}</Text>
         <Text style={styles.metricText}>{t(language, "latestScore")}: {latestPerformance}</Text>
       </View>
+
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       {competitionResults.length > 0 ? (
         <View style={styles.card}>

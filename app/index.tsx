@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
@@ -474,6 +474,8 @@ export default function HomeScreen() {
         />
       </View>
 
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
+
       {subscriptionTier === "free" ? (
         <View style={styles.subscriptionCard}>
           <Text style={styles.homeCompetitionTitle}>{t(language, "currentPlan")}</Text>
@@ -498,18 +500,24 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.subjectGrid}>
-        {localizedSubjects.map((subject) => (
-          <Pressable
-            key={subject.id}
-            onPress={() => openSubject(subject.id)}
-            style={[styles.subjectPressable, { width: subjectCardWidth }]}
-          >
-            <LinearGradient colors={subject.accent} style={[styles.subjectCard, !activeProfile ? styles.subjectCardDim : null]}>
-              <MaterialCommunityIcons name={subject.icon as never} size={28} color={palette.white} />
-              <Text style={styles.subjectName}>{subject.name}</Text>
-              <Text style={styles.subjectTagline}>{subject.tagline}</Text>
-            </LinearGradient>
-          </Pressable>
+        {localizedSubjects.map((subject, subjectIndex) => (
+          <Fragment key={subject.id}>
+            <Pressable
+              onPress={() => openSubject(subject.id)}
+              style={[styles.subjectPressable, { width: subjectCardWidth }]}
+            >
+              <LinearGradient colors={subject.accent} style={[styles.subjectCard, !activeProfile ? styles.subjectCardDim : null]}>
+                <MaterialCommunityIcons name={subject.icon as never} size={28} color={palette.white} />
+                <Text style={styles.subjectName}>{subject.name}</Text>
+                <Text style={styles.subjectTagline}>{subject.tagline}</Text>
+              </LinearGradient>
+            </Pressable>
+            {canShowAds(subscriptionTier) && subjectIndex === Math.floor((localizedSubjects.length - 1) / 2) ? (
+              <View style={styles.subjectAdSlot}>
+                <DemoAdBanner language={language} format="banner" />
+              </View>
+            ) : null}
+          </Fragment>
         ))}
       </View>
       <PremiumFeatureDialog
@@ -822,6 +830,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 14,
+  },
+  subjectAdSlot: {
+    width: "100%",
   },
   subjectPressable: {
     borderRadius: 26,

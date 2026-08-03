@@ -1,5 +1,5 @@
 import { type ReactElement, useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { appVariant } from "../lib/app-variant";
 import { getBannerAdUnitId, getMobileAdsModule, getNativeAdUnitId, initializeMobileAds } from "../lib/ads";
 import { t } from "../lib/i18n";
@@ -13,12 +13,21 @@ type DemoAdBannerProps = {
 };
 
 export function DemoAdBanner({ language, format = "native", compact = false }: DemoAdBannerProps) {
+  const { width: windowWidth } = useWindowDimensions();
   const [adsReady, setAdsReady] = useState(false);
   const [initializationFinished, setInitializationFinished] = useState(false);
+  const [initializationRetryKey, setInitializationRetryKey] = useState(0);
   const [bannerLoadFailed, setBannerLoadFailed] = useState(false);
   const [bannerRetryKey, setBannerRetryKey] = useState(0);
+  const [bannerDimensions, setBannerDimensions] = useState<{ width: number; height: number } | null>(null);
   const [nativeAd, setNativeAd] = useState<unknown | null>(null);
   const isWeb = Platform.OS === "web";
+  const minimumBannerWidth = Math.min(320, windowWidth);
+  const bannerWidth = Math.max(
+    1,
+    Math.floor(Math.min(Math.max(windowWidth - 40, minimumBannerWidth), 1200))
+  );
+  const useAdaptiveBanner = !compact;
 
   useEffect(() => {
     if (isWeb) {
@@ -42,7 +51,20 @@ export function DemoAdBanner({ language, format = "native", compact = false }: D
     return () => {
       cancelled = true;
     };
-  }, [isWeb]);
+  }, [initializationRetryKey, isWeb]);
+
+  useEffect(() => {
+    if (isWeb || adsReady || !initializationFinished) {
+      return;
+    }
+
+    const retryTimer = setTimeout(() => {
+      setInitializationFinished(false);
+      setInitializationRetryKey((currentKey) => currentKey + 1);
+    }, 30_000);
+
+    return () => clearTimeout(retryTimer);
+  }, [adsReady, initializationFinished, isWeb]);
 
   useEffect(() => {
     if (isWeb || format !== "native") {
@@ -82,31 +104,40 @@ export function DemoAdBanner({ language, format = "native", compact = false }: D
 
     const retryTimer = setTimeout(() => {
       setBannerLoadFailed(false);
+      setBannerDimensions(null);
       setBannerRetryKey((currentKey) => currentKey + 1);
     }, 30_000);
 
     return () => clearTimeout(retryTimer);
   }, [bannerLoadFailed, format, isWeb]);
 
-  if (appVariant.id === "children") {
+  if (appVariant.id === "children" && !isWeb) {
     return null;
   }
 
   if (isWeb) {
-    const placeholderId = appVariant.id === "teens" ? "adsense-slot-teens-banner" : "adsense-slot-uni-banner";
+    const placeholderId = `adsense-slot-${appVariant.id}-banner`;
 
     return (
-      <View style={[styles.card, format === "banner" ? styles.bannerCard : null]}>
+      <View
+        style={[
+          styles.card,
+          format === "banner" ? styles.bannerCard : null,
+          compact ? styles.compactCard : null,
+        ]}
+      >
         {format === "native" ? <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text> : null}
         {format === "native" ? <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text> : null}
         {format === "native" ? <Text style={styles.text}>
           This web slot is prepared for Google AdSense deployment on {appVariant.appName}. Replace the placeholder with
           your live script and slot ID when approval is complete.
         </Text> : null}
-        <View nativeID={placeholderId} style={styles.webSlot}>
-          <Text style={styles.webSlotLabel}>AdSense-ready banner</Text>
-          <Text style={styles.webSlotMeta}>{placeholderId}</Text>
-          <Text style={styles.webSlotHint}>Teens and Uni web only</Text>
+        <View nativeID={placeholderId} style={[styles.webSlot, compact ? styles.compactWebSlot : null]}>
+          <Text style={[styles.webSlotLabel, compact ? styles.compactWebSlotLabel : null]}>
+            {compact ? "Advertisement" : "AdSense-ready banner"}
+          </Text>
+          {!compact ? <Text style={styles.webSlotMeta}>{placeholderId}</Text> : null}
+          {!compact ? <Text style={styles.webSlotHint}>Free web plan only</Text> : null}
         </View>
       </View>
     );
@@ -174,15 +205,28 @@ export function DemoAdBanner({ language, format = "native", compact = false }: D
           <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text>
         ) : null}
         {format === "native" ? nativeAdCard : (
-          <View style={[styles.bannerWrap, compact ? styles.compactBannerWrap : null]}>
+          <View
+            style={[
+              styles.bannerWrap,
+              compact ? styles.compactBannerWrap : null,
+              bannerDimensions ? { minHeight: bannerDimensions.height } : null,
+            ]}
+          >
             <BannerAd
               key={bannerRetryKey}
-              unitId={getBannerAdUnitId(mobileAds)}
-              size={compact ? BannerAdSize.BANNER : BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+              unitId={getBannerAdUnitId(mobileAds, useAdaptiveBanner)}
+              size={useAdaptiveBanner ? BannerAdSize.LARGE_ANCHORED_ADAPTIVE_BANNER : BannerAdSize.BANNER}
+              width={useAdaptiveBanner ? bannerWidth : undefined}
               requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-              onAdLoaded={() => setBannerLoadFailed(false)}
+              onAdLoaded={(dimensions) => {
+                setBannerDimensions(dimensions);
+                setBannerLoadFailed(false);
+              }}
               onAdFailedToLoad={(error) => {
-                console.warn("AdMob banner failed to load:", error.message);
+                console.warn(
+                  `AdMob banner failed to load for ${appVariant.id} (${getBannerAdUnitId(mobileAds, useAdaptiveBanner)}):`,
+                  error.message
+                );
                 setBannerLoadFailed(true);
               }}
             />
@@ -226,6 +270,8 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   bannerCard: {
+    width: "100%",
+    minHeight: 50,
     borderWidth: 0,
     borderRadius: 0,
     backgroundColor: "transparent",
@@ -238,7 +284,7 @@ const styles = StyleSheet.create({
   },
   compactCard: {
     height: 54,
-    minHeight: 54,
+    minHeight: 50,
     marginTop: 0,
     borderRadius: 8,
     padding: 0,
@@ -265,8 +311,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bannerWrap: {
+    width: "100%",
+    minHeight: 50,
     borderRadius: 8,
-    overflow: "hidden",
     backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
@@ -274,13 +321,14 @@ const styles = StyleSheet.create({
   compactBannerWrap: {
     width: "100%",
     height: 50,
+    minHeight: 50,
     marginTop: 0,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
   },
   compactLoadingSlot: {
-    height: 54,
+    minHeight: 50,
   },
   nativeCard: {
     marginTop: 14,
@@ -353,11 +401,26 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 6,
   },
+  compactWebSlot: {
+    width: "100%",
+    height: 50,
+    minHeight: 50,
+    marginTop: 0,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 0,
+  },
   webSlotLabel: {
     color: palette.ink,
     fontSize: 18,
     fontWeight: "800",
     textAlign: "center",
+  },
+  compactWebSlotLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
   webSlotMeta: {
     color: palette.navy,

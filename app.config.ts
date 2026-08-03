@@ -38,7 +38,7 @@ const variantRevenueCatFallbacks: Record<
   teens: {
     androidApiKey: "goog_ciDxoaodJlvQwkRHzOEqvZFsktJ",
     iosApiKey: "",
-    webApiKey: "pdl_WQjymgirStoqLGNJCSLDrLJqlFJV",
+    webApiKey: "pdl_lIrTQkvVsEgMYEupTWtazdvnJIdY",
   },
   uni: {
     androidApiKey: "goog_jMWcZCwUSjbsYzrLdmREAjyMNYY",

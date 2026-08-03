@@ -7,6 +7,7 @@ import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { canShowAds } from "../lib/ads";
 import { appVariant } from "../lib/app-variant";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { calculateQuizTime, getLevelProgressForGrade } from "../lib/quiz";
@@ -670,7 +671,7 @@ export default function CompetitionScreen() {
           </View>
         ) : null}
 
-        {subscriptionTier === "free" ? <DemoAdBanner language={language} /> : null}
+        {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t(language, "openChallenges")}</Text>

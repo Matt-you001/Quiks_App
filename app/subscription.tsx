@@ -2,7 +2,9 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { canShowAds } from "../lib/ads";
 import { t } from "../lib/i18n";
 import { hasPaddleClientToken, openPaddleCheckout } from "../lib/paddle";
 import {
@@ -239,6 +241,8 @@ export default function SubscriptionScreen() {
           {subscriptionTier === "free" ? t(language, "freePlanStatus") : "Available if you cancel Pro later."}
         </Text>
       </View>
+
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "proPlan")}</Text>

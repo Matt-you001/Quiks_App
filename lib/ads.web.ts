@@ -1,8 +1,7 @@
-import { appVariant } from "./app-variant";
 import type { SubscriptionTier } from "../types/app";
 
 export function canShowAds(subscriptionTier: SubscriptionTier) {
-  return appVariant.id !== "children" && subscriptionTier === "free";
+  return subscriptionTier === "free";
 }
 
 export function getMobileAdsModule() {
@@ -29,7 +28,7 @@ export async function initializeMobileAds() {
   return false;
 }
 
-export async function showInterstitialAd() {
+export async function showInterstitialAd(_subscriptionTier: SubscriptionTier) {
   return false;
 }
 

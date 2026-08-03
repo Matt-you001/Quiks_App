@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { cancelCompetitionReminderNotifications, scheduleCompetitionReminderNotifications } from "../lib/notifications";
@@ -1221,17 +1221,18 @@ export default function SessionScreen() {
   }
 
   return (
-    <AppBackground scroll={false}>
-      {canShowAds(subscriptionTier) ? (
-        <View style={styles.fixedQuestionBanner}>
-          <DemoAdBanner language={language} format="banner" compact />
-        </View>
-      ) : null}
+    <AppBackground scroll={Platform.OS === "web"}>
       <ScrollView
-        style={styles.questionScroll}
+        style={[styles.questionScroll, Platform.OS === "web" ? styles.questionScrollWeb : null]}
         contentContainerStyle={styles.questionScrollContent}
+        scrollEnabled={Platform.OS !== "web"}
         showsVerticalScrollIndicator={false}
       >
+        {canShowAds(subscriptionTier) ? (
+          <View style={styles.questionBanner}>
+            <DemoAdBanner language={language} format="banner" compact />
+          </View>
+        ) : null}
         <View style={styles.panel}>
         <View style={styles.topRow}>
           <View>
@@ -1399,14 +1400,17 @@ export default function SessionScreen() {
 }
 
 const styles = StyleSheet.create({
-  fixedQuestionBanner: {
-    zIndex: 10,
-    height: 58,
-    paddingVertical: 2,
-    backgroundColor: palette.paper,
+  questionBanner: {
+    minHeight: 50,
+    marginTop: 10,
+    backgroundColor: "transparent",
   },
   questionScroll: {
     flex: 1,
+  },
+  questionScrollWeb: {
+    flex: 0,
+    overflow: "visible",
   },
   questionScrollContent: {
     paddingBottom: 24,

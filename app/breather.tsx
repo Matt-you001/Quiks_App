@@ -2,15 +2,17 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
+import { canShowAds } from "../lib/ads";
 import { getBreatherContent } from "../lib/breathers";
 import { t } from "../lib/i18n";
 import { readAppState } from "../lib/storage";
 import { getSubjectById } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import { generateBreather } from "../services/ai";
-import type { AppLanguage, BreatherContent, Difficulty, TestMode, UserProfile } from "../types/app";
+import type { AppLanguage, BreatherContent, Difficulty, SubscriptionTier, TestMode, UserProfile } from "../types/app";
 
 const allowedDifficulties: Difficulty[] = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
@@ -40,12 +42,14 @@ export default function BreatherScreen() {
       : difficulty;
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
 
   useEffect(() => {
     readAppState().then((state) => {
       const profile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
       setLanguage(profile?.language ?? "en");
       setProfile(profile);
+      setSubscriptionTier(state.subscriptionTier);
     });
   }, []);
   const resolvedSubject = getSubjectById(params.subjectId, language);
@@ -184,6 +188,8 @@ export default function BreatherScreen() {
           </Text>
         ))}
       </View>
+
+      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{content.teachingTitle ?? t(language, "whatThisTeaches")}</Text>
