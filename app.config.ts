@@ -200,11 +200,16 @@ function readEnvValue(key: keyof NodeJS.ProcessEnv | keyof typeof fallbackPublic
   return fallbackPublicEnv[key as keyof typeof fallbackPublicEnv];
 }
 
-function readVariantSubscriptionProductId(kind: "monthly" | "yearly") {
-  const variantKey = `EXPO_PUBLIC_${variant.toUpperCase()}_PRO_${kind.toUpperCase()}_PRODUCT_ID` as keyof NodeJS.ProcessEnv;
+function readSubscriptionProductId(targetVariant: AppVariant, kind: "monthly" | "yearly") {
+  const variantKey = `EXPO_PUBLIC_${targetVariant.toUpperCase()}_PRO_${kind.toUpperCase()}_PRODUCT_ID` as keyof NodeJS.ProcessEnv;
   const genericKey = `EXPO_PUBLIC_PRO_${kind.toUpperCase()}_PRODUCT_ID` as keyof NodeJS.ProcessEnv;
-  const value = process.env[variantKey] ?? process.env[genericKey] ?? variantSubscriptionFallbacks[variant][kind];
+  const genericValue = targetVariant === variant ? process.env[genericKey] : undefined;
+  const value = process.env[variantKey] ?? genericValue ?? variantSubscriptionFallbacks[targetVariant][kind];
   return value ? value.replace(/^"(.*)"$/, "$1") : "";
+}
+
+function readVariantSubscriptionProductId(kind: "monthly" | "yearly") {
+  return readSubscriptionProductId(variant, kind);
 }
 
 function readVariantEntitlementId() {
@@ -457,6 +462,12 @@ const config: ExpoConfig = {
     EXPO_PUBLIC_PRO_ENTITLEMENT_ID: readVariantEntitlementId(),
     EXPO_PUBLIC_PRO_MONTHLY_PRODUCT_ID: readVariantSubscriptionProductId("monthly"),
     EXPO_PUBLIC_PRO_YEARLY_PRODUCT_ID: readVariantSubscriptionProductId("yearly"),
+    EXPO_PUBLIC_CHILDREN_PRO_MONTHLY_PRODUCT_ID: readSubscriptionProductId("children", "monthly"),
+    EXPO_PUBLIC_CHILDREN_PRO_YEARLY_PRODUCT_ID: readSubscriptionProductId("children", "yearly"),
+    EXPO_PUBLIC_TEENS_PRO_MONTHLY_PRODUCT_ID: readSubscriptionProductId("teens", "monthly"),
+    EXPO_PUBLIC_TEENS_PRO_YEARLY_PRODUCT_ID: readSubscriptionProductId("teens", "yearly"),
+    EXPO_PUBLIC_UNI_PRO_MONTHLY_PRODUCT_ID: readSubscriptionProductId("uni", "monthly"),
+    EXPO_PUBLIC_UNI_PRO_YEARLY_PRODUCT_ID: readSubscriptionProductId("uni", "yearly"),
     "react-native-google-mobile-ads": {
       android_app_id: readVariantAdMobAppId("androidAppId"),
       ios_app_id: readVariantAdMobAppId("iosAppId"),

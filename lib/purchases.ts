@@ -76,14 +76,42 @@ function normalizeEnvValue(value?: string) {
   return value.replace(/^"(.*)"$/, "$1");
 }
 
-const productIds = {
-  monthly:
-    normalizeEnvValue(process.env.EXPO_PUBLIC_PRO_MONTHLY_PRODUCT_ID ?? extra.EXPO_PUBLIC_PRO_MONTHLY_PRODUCT_ID) ??
-    fallbackProductIds[appVariant.id].monthly,
-  yearly:
-    normalizeEnvValue(process.env.EXPO_PUBLIC_PRO_YEARLY_PRODUCT_ID ?? extra.EXPO_PUBLIC_PRO_YEARLY_PRODUCT_ID) ??
-    fallbackProductIds[appVariant.id].yearly,
-};
+const configuredProductIds = {
+  children: {
+    monthly:
+      normalizeEnvValue(
+        process.env.EXPO_PUBLIC_CHILDREN_PRO_MONTHLY_PRODUCT_ID ??
+          extra.EXPO_PUBLIC_CHILDREN_PRO_MONTHLY_PRODUCT_ID
+      ) ?? fallbackProductIds.children.monthly,
+    yearly:
+      normalizeEnvValue(
+        process.env.EXPO_PUBLIC_CHILDREN_PRO_YEARLY_PRODUCT_ID ??
+          extra.EXPO_PUBLIC_CHILDREN_PRO_YEARLY_PRODUCT_ID
+      ) ?? fallbackProductIds.children.yearly,
+  },
+  teens: {
+    monthly:
+      normalizeEnvValue(
+        process.env.EXPO_PUBLIC_TEENS_PRO_MONTHLY_PRODUCT_ID ?? extra.EXPO_PUBLIC_TEENS_PRO_MONTHLY_PRODUCT_ID
+      ) ?? fallbackProductIds.teens.monthly,
+    yearly:
+      normalizeEnvValue(
+        process.env.EXPO_PUBLIC_TEENS_PRO_YEARLY_PRODUCT_ID ?? extra.EXPO_PUBLIC_TEENS_PRO_YEARLY_PRODUCT_ID
+      ) ?? fallbackProductIds.teens.yearly,
+  },
+  uni: {
+    monthly:
+      normalizeEnvValue(
+        process.env.EXPO_PUBLIC_UNI_PRO_MONTHLY_PRODUCT_ID ?? extra.EXPO_PUBLIC_UNI_PRO_MONTHLY_PRODUCT_ID
+      ) ?? fallbackProductIds.uni.monthly,
+    yearly:
+      normalizeEnvValue(
+        process.env.EXPO_PUBLIC_UNI_PRO_YEARLY_PRODUCT_ID ?? extra.EXPO_PUBLIC_UNI_PRO_YEARLY_PRODUCT_ID
+      ) ?? fallbackProductIds.uni.yearly,
+  },
+} as const;
+
+const productIds = configuredProductIds[appVariant.id];
 const packageCache = new Map<string, PurchasesPackage>();
 const CUSTOMER_INFO_RETRY_DELAYS_MS = [750, 1500, 3000] as const;
 

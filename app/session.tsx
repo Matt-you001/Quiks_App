@@ -474,6 +474,11 @@ export default function SessionScreen() {
               response.playerTimeTakenSeconds ?? pendingCompetitionResult.competitionPlayerTimeSeconds,
             competitionOpponentTimeSeconds:
               response.opponentTimeTakenSeconds ?? pendingCompetitionResult.competitionOpponentTimeSeconds,
+            competitionParticipantCount:
+              response.participantCount ?? pendingCompetitionResult.competitionParticipantCount,
+            competitionMode: response.mode ?? pendingCompetitionResult.competitionMode,
+            competitionPlacement: response.playerPosition ?? pendingCompetitionResult.competitionPlacement,
+            competitionStandings: response.standings ?? pendingCompetitionResult.competitionStandings,
           };
           await upsertResult(profile.id, finalResult);
           setPendingCompetitionResult(null);
@@ -911,6 +916,10 @@ export default function SessionScreen() {
         result.competitionOpponentScore = competitionResult.opponentScore;
         result.competitionPlayerTimeSeconds = competitionResult.playerTimeTakenSeconds;
         result.competitionOpponentTimeSeconds = competitionResult.opponentTimeTakenSeconds;
+        result.competitionParticipantCount = competitionResult.participantCount;
+        result.competitionMode = competitionResult.mode;
+        result.competitionPlacement = competitionResult.playerPosition;
+        result.competitionStandings = competitionResult.standings;
 
         if (competitionResult.status === "submitted" || competitionResult.outcome === "pending") {
           setPendingCompetitionResult(result);

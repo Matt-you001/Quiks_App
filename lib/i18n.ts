@@ -191,6 +191,21 @@ type TranslationKey =
   | "competitionArenaHint"
   | "enterCompetition"
   | "createChallenge"
+  | "groupCompetition"
+  | "groupCompetitionHint"
+  | "createGroupCompetition"
+  | "joinGroupCompetition"
+  | "groupCompetitionCode"
+  | "groupCompetitionStartTime"
+  | "groupCompetitionStartHint"
+  | "groupCompetitionLobby"
+  | "groupCompetitionParticipants"
+  | "groupCompetitionNeedsParticipants"
+  | "groupCompetitionCancelled"
+  | "shareGroupInvitation"
+  | "copyGroupCode"
+  | "copyInvitationLink"
+  | "invalidStartTime"
   | "acceptChallenge"
   | "challengeBoard"
   | "challengeBoardHint"
@@ -639,6 +654,21 @@ const english: TranslationMap = {
   competitionArenaHint: "Enter a live competition and get matched with another learner on the same subject, grade, and level.",
   enterCompetition: "Join Competition",
   createChallenge: "Create Challenge",
+  groupCompetition: "Group Competition",
+  groupCompetitionHint: "Create a scheduled challenge for more than two learners, or join one with its invitation code.",
+  createGroupCompetition: "Create Group Competition",
+  joinGroupCompetition: "Join Group Competition",
+  groupCompetitionCode: "Group competition code",
+  groupCompetitionStartTime: "Start time",
+  groupCompetitionStartHint: "Use your local time in the format YYYY-MM-DD HH:mm. The competition starts only when at least two learners have joined.",
+  groupCompetitionLobby: "Group Competition Lobby",
+  groupCompetitionParticipants: "Participants",
+  groupCompetitionNeedsParticipants: "At least one more learner must join before the scheduled start time.",
+  groupCompetitionCancelled: "This competition was cancelled because fewer than two learners had joined at its start time.",
+  shareGroupInvitation: "Share Invitation",
+  copyGroupCode: "Copy Code",
+  copyInvitationLink: "Copy Invitation Link",
+  invalidStartTime: "Enter a valid future start time at least 30 seconds from now.",
   acceptChallenge: "Accept Challenge",
   challengeBoard: "Challenges",
   challengeBoardHint: "Create a challenge or accept one from another learner on the same track.",

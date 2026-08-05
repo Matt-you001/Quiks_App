@@ -99,6 +99,10 @@ export interface SessionResult {
   competitionOpponentScore?: number;
   competitionPlayerTimeSeconds?: number;
   competitionOpponentTimeSeconds?: number;
+  competitionParticipantCount?: number;
+  competitionMode?: "head_to_head" | "group";
+  competitionPlacement?: number;
+  competitionStandings?: CompetitionStanding[];
   questionSource?: QuestionResponse["source"];
 }
 
@@ -448,15 +452,79 @@ export interface CompetitionLiveProgress {
   submittedAt?: number;
 }
 
+export interface CompetitionStanding {
+  playerId: string;
+  playerName: string;
+  score: number;
+  timeTakenSeconds: number;
+  position: number;
+  finished: boolean;
+}
+
 export interface CompetitionQuestionPayload {
   competitionId: string;
   opponentName: string;
   opponentId?: string;
+  mode?: "head_to_head" | "group";
+  participantCount?: number;
   questions: Question[];
   chats?: CompetitionChatMessage[];
   startAt?: number;
   endAt?: number;
   liveProgress?: CompetitionLiveProgress[];
+  standings?: CompetitionStanding[];
+}
+
+export type GroupCompetitionStatus = "scheduled" | "starting" | "started" | "cancelled_insufficient_players";
+
+export interface GroupCompetitionParticipant {
+  playerId: string;
+  playerName: string;
+  joinedAt: number;
+  creator: boolean;
+}
+
+export interface GroupCompetitionSummary {
+  groupCompetitionId: string;
+  code: string;
+  status: GroupCompetitionStatus;
+  subjectId: string;
+  subjectName: string;
+  grade: string;
+  level: number;
+  difficulty: Difficulty;
+  focusMode: QuestionFocusMode;
+  topicId?: string;
+  topicLabel?: string;
+  creatorId: string;
+  creatorName: string;
+  createdAt: number;
+  startAt: number;
+  endAt: number;
+  participantCount: number;
+  participants: GroupCompetitionParticipant[];
+}
+
+export interface GroupCompetitionCreateRequest extends CompetitionJoinRequest {
+  durationSeconds: number;
+  startAt: number;
+}
+
+export interface GroupCompetitionJoinRequest {
+  code: string;
+  profile: UserProfile;
+}
+
+export interface GroupCompetitionStatusRequest {
+  groupCompetitionId?: string;
+  code?: string;
+  playerId: string;
+}
+
+export interface GroupCompetitionResponse {
+  status: GroupCompetitionStatus;
+  groupCompetition: GroupCompetitionSummary;
+  competition?: CompetitionQuestionPayload;
 }
 
 export type CompetitionChallengeStatus =
@@ -520,6 +588,10 @@ export interface CompetitionStatusResponse {
   opponentScore?: number;
   playerTimeTakenSeconds?: number;
   opponentTimeTakenSeconds?: number;
+  participantCount?: number;
+  mode?: "head_to_head" | "group";
+  playerPosition?: number;
+  standings?: CompetitionStanding[];
 }
 
 export interface CompetitionSubmitRequest {
@@ -540,6 +612,10 @@ export interface CompetitionSubmitResponse {
   opponentScore?: number;
   playerTimeTakenSeconds?: number;
   opponentTimeTakenSeconds?: number;
+  participantCount?: number;
+  mode?: "head_to_head" | "group";
+  playerPosition?: number;
+  standings?: CompetitionStanding[];
 }
 
 export interface CompetitionChatSendRequest {

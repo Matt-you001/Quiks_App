@@ -100,8 +100,10 @@ export default function ResultsScreen() {
       ? t(language, "notPassedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName })
       : "";
   const isCompetition = Boolean(result?.competitionId);
+  const isGroupCompetition = result?.competitionMode === "group";
   const canUseRematch = Boolean(
     result?.competitionId &&
+      !isGroupCompetition &&
       profile &&
       hasProAccess(subscriptionTier) &&
       rematchSubject &&
@@ -321,9 +323,15 @@ export default function ResultsScreen() {
       {isCompetition ? (
         <View style={styles.card}>
           <Text style={styles.title}>{t(language, "competitionSummary")}</Text>
-          <Text style={styles.summaryLine}>
-            {t(language, "opponent")}: {result.competitionOpponentName ?? "-"}
-          </Text>
+          {isGroupCompetition ? (
+            <Text style={styles.summaryLine}>
+              Position: {result.competitionPlacement ?? "-"} of {result.competitionParticipantCount}
+            </Text>
+          ) : (
+            <Text style={styles.summaryLine}>
+              {t(language, "opponent")}: {result.competitionOpponentName ?? "-"}
+            </Text>
+          )}
           <Text style={styles.summaryLine}>{competitionOutcomeText}</Text>
           <Text style={styles.summaryLine}>
             You: {result.competitionPlayerScore ?? result.score}% in {result.competitionPlayerTimeSeconds ?? result.timeTakenSeconds}s
@@ -333,6 +341,15 @@ export default function ResultsScreen() {
               {result.competitionOpponentName ?? t(language, "opponent")}: {result.competitionOpponentScore}% in{" "}
               {result.competitionOpponentTimeSeconds ?? 0}s
             </Text>
+          ) : null}
+          {isGroupCompetition && result.competitionStandings ? (
+            <View style={styles.rematchActions}>
+              {result.competitionStandings.map((standing) => (
+                <Text key={standing.playerId} style={styles.summaryLine}>
+                  #{standing.position} {standing.playerName}: {standing.score}%{standing.finished ? ` in ${standing.timeTakenSeconds}s` : ""}
+                </Text>
+              ))}
+            </View>
           ) : null}
           {canUseRematch ? (
             <View style={styles.rematchActions}>

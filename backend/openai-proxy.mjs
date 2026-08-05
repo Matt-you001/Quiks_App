@@ -30,6 +30,8 @@ const competitionMatches = new Map();
 const competitionMatchByPlayer = new Map();
 const competitionChallenges = new Map();
 const competitionRematches = new Map();
+const groupCompetitions = new Map();
+const groupCompetitionByCode = new Map();
 const pushTokensByPlayer = new Map();
 const revenueCatPublicKeys = {
   children: {
@@ -652,14 +654,73 @@ function buildCompetitionPayload(match, playerId) {
   const opponent = match.players.find((player) => player.playerId !== playerId) ?? match.players[1] ?? match.players[0];
   return {
     competitionId: match.id,
-    opponentName: opponent?.name ?? "Opponent",
+    opponentName:
+      match.mode === "group"
+        ? `${Math.max(0, match.players.length - 1)} other participant${match.players.length === 2 ? "" : "s"}`
+        : opponent?.name ?? "Opponent",
     opponentId: opponent?.playerId,
+    mode: match.mode ?? "head_to_head",
+    participantCount: match.players.length,
     questions: match.questions,
     chats: match.chats ?? [],
     startAt: match.startAt,
     endAt: match.endAt,
     liveProgress: Object.values(match.liveProgress ?? {}),
+    standings: buildCompetitionStandings(match),
   };
+}
+
+function buildGroupCompetitionSummary(group) {
+  return {
+    groupCompetitionId: group.id,
+    code: group.code,
+    status: group.status,
+    subjectId: group.subjectId,
+    subjectName: group.subjectName,
+    grade: group.grade,
+    level: group.level,
+    difficulty: group.difficulty,
+    focusMode: group.focusMode,
+    topicId: group.topicId,
+    topicLabel: group.topicLabel,
+    creatorId: group.creatorId,
+    creatorName: group.creatorName,
+    createdAt: group.createdAt,
+    startAt: group.startAt,
+    endAt: group.endAt,
+    participantCount: group.participants.length,
+    participants: group.participants.map((participant) => ({
+      playerId: participant.playerId,
+      playerName: participant.playerName,
+      joinedAt: participant.joinedAt,
+      creator: participant.playerId === group.creatorId,
+    })),
+  };
+}
+
+function createGroupCompetitionCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    let code = "";
+    const seed = randomUUID().replace(/-/g, "");
+    for (let index = 0; index < 6; index += 1) {
+      const hexPair = seed.slice(index * 2, index * 2 + 2);
+      code += alphabet[Number.parseInt(hexPair, 16) % alphabet.length];
+    }
+    if (!groupCompetitionByCode.has(code)) {
+      return code;
+    }
+  }
+  return randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+}
+
+function findGroupCompetition(body) {
+  if (body.groupCompetitionId) {
+    return groupCompetitions.get(body.groupCompetitionId);
+  }
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  const groupId = code ? groupCompetitionByCode.get(code) : undefined;
+  return groupId ? groupCompetitions.get(groupId) : undefined;
 }
 
 function buildChallengeSummary(challenge) {
@@ -862,84 +923,90 @@ function ensureCompetitionResolved(match) {
   }
 }
 
+function buildCompetitionStandings(match) {
+  const durationSeconds = Math.max(0, Math.floor((match.endAt - match.startAt) / 1000));
+  const standings = match.players
+    .map((player) => {
+      const submission = match.submissions?.[player.playerId];
+      const progress = match.liveProgress?.[player.playerId];
+      return {
+        playerId: player.playerId,
+        playerName: player.name,
+        score: submission?.score ?? progress?.score ?? 0,
+        timeTakenSeconds: submission?.timeTakenSeconds ?? durationSeconds,
+        finished: Boolean(submission),
+      };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      if (left.finished !== right.finished) {
+        return left.finished ? -1 : 1;
+      }
+      return left.timeTakenSeconds - right.timeTakenSeconds;
+    });
+
+  let previous = null;
+  let previousPosition = 0;
+  return standings.map((standing, index) => {
+    const isTied =
+      previous &&
+      standing.score === previous.score &&
+      standing.finished === previous.finished &&
+      standing.timeTakenSeconds === previous.timeTakenSeconds;
+    const position = isTied ? previousPosition : index + 1;
+    previous = standing;
+    previousPosition = position;
+    return { ...standing, position };
+  });
+}
+
 function getCompetitionOutcome(match, playerId) {
   ensureCompetitionResolved(match);
   const own = match.submissions[playerId];
   const opponent = match.players.find((player) => player.playerId !== playerId);
-  const rival = opponent ? match.submissions[opponent.playerId] : undefined;
+  const standings = buildCompetitionStandings(match);
+  const ownStanding = standings.find((standing) => standing.playerId === playerId);
+  const allSubmitted = Object.keys(match.submissions ?? {}).length >= match.players.length;
+  const bestOther = standings.find((standing) => standing.playerId !== playerId);
 
-  if (!own || !opponent || !rival) {
+  if (!own || !allSubmitted || !ownStanding) {
     return {
       status: "submitted",
       outcome: "pending",
-      opponentName: opponent?.name ?? "Opponent",
+      opponentName:
+        match.mode === "group"
+          ? `${Math.max(0, match.players.length - 1)} other participants`
+          : opponent?.name ?? "Opponent",
       opponentId: opponent?.playerId,
-      playerScore: own?.score ?? 0,
+      playerScore: own?.score ?? ownStanding?.score ?? 0,
       playerTimeTakenSeconds: own?.timeTakenSeconds,
+      participantCount: match.players.length,
+      mode: match.mode ?? "head_to_head",
+      playerPosition: ownStanding?.position,
+      standings,
     };
   }
 
-  if (own.score > rival.score) {
-    return {
-      status: "completed",
-      outcome: "won",
-      opponentName: opponent.name,
-      opponentId: opponent.playerId,
-      playerScore: own.score,
-      opponentScore: rival.score,
-      playerTimeTakenSeconds: own.timeTakenSeconds,
-      opponentTimeTakenSeconds: rival.timeTakenSeconds,
-    };
-  }
-
-  if (own.score < rival.score) {
-    return {
-      status: "completed",
-      outcome: "lost",
-      opponentName: opponent.name,
-      opponentId: opponent.playerId,
-      playerScore: own.score,
-      opponentScore: rival.score,
-      playerTimeTakenSeconds: own.timeTakenSeconds,
-      opponentTimeTakenSeconds: rival.timeTakenSeconds,
-    };
-  }
-
-  if (own.timeTakenSeconds < rival.timeTakenSeconds) {
-    return {
-      status: "completed",
-      outcome: "won",
-      opponentName: opponent.name,
-      opponentId: opponent.playerId,
-      playerScore: own.score,
-      opponentScore: rival.score,
-      playerTimeTakenSeconds: own.timeTakenSeconds,
-      opponentTimeTakenSeconds: rival.timeTakenSeconds,
-    };
-  }
-
-  if (own.timeTakenSeconds > rival.timeTakenSeconds) {
-    return {
-      status: "completed",
-      outcome: "lost",
-      opponentName: opponent.name,
-      opponentId: opponent.playerId,
-      playerScore: own.score,
-      opponentScore: rival.score,
-      playerTimeTakenSeconds: own.timeTakenSeconds,
-      opponentTimeTakenSeconds: rival.timeTakenSeconds,
-    };
-  }
-
+  const winners = standings.filter((standing) => standing.position === 1);
+  const outcome = ownStanding.position === 1 ? (winners.length > 1 ? "draw" : "won") : "lost";
   return {
     status: "completed",
-    outcome: "draw",
-    opponentName: opponent.name,
-    opponentId: opponent.playerId,
+    outcome,
+    opponentName:
+      match.mode === "group"
+        ? `${Math.max(0, match.players.length - 1)} other participants`
+        : opponent?.name ?? "Opponent",
+    opponentId: opponent?.playerId,
     playerScore: own.score,
-    opponentScore: rival.score,
+    opponentScore: bestOther?.score,
     playerTimeTakenSeconds: own.timeTakenSeconds,
-    opponentTimeTakenSeconds: rival.timeTakenSeconds,
+    opponentTimeTakenSeconds: bestOther?.timeTakenSeconds,
+    participantCount: match.players.length,
+    mode: match.mode ?? "head_to_head",
+    playerPosition: ownStanding.position,
+    standings,
   };
 }
 
@@ -1064,6 +1131,7 @@ async function createCompetitionMatch(waiter, challenger) {
   const questions = await generateQuestionSet(body);
   const match = {
     id: randomUUID(),
+    mode: "head_to_head",
     subjectId: challenger.body.subject?.id ?? waiter.body.subject?.id ?? "subject",
     grade: challenger.body.grade,
     level: challenger.body.level,
@@ -1121,6 +1189,7 @@ async function createChallengeCompetition(challenge, accepterProfile) {
   const endAt = startAt + (challenge.durationSeconds * 1000);
   const match = {
     id: randomUUID(),
+    mode: "head_to_head",
     challengeId: challenge.id,
     subjectId: challenge.subjectId,
     grade: challenge.grade,
@@ -1176,6 +1245,7 @@ async function createRematchCompetition(rematch) {
   const endAt = startAt + (rematch.durationSeconds * 1000);
   const match = {
     id: randomUUID(),
+    mode: "head_to_head",
     rematchSourceCompetitionId: rematch.sourceCompetitionId,
     subjectId: rematch.subjectId,
     grade: rematch.grade,
@@ -1520,8 +1590,15 @@ async function handleCompetitionStatus(body, response) {
         competition: buildCompetitionPayload(match, playerId),
         outcome: outcome.outcome,
         opponentName: outcome.opponentName,
+        opponentId: outcome.opponentId,
         playerScore: outcome.playerScore,
         opponentScore: outcome.opponentScore,
+        playerTimeTakenSeconds: outcome.playerTimeTakenSeconds,
+        opponentTimeTakenSeconds: outcome.opponentTimeTakenSeconds,
+        participantCount: outcome.participantCount,
+        mode: outcome.mode,
+        playerPosition: outcome.playerPosition,
+        standings: outcome.standings,
       });
       return;
     }
@@ -1608,6 +1685,186 @@ async function handleCompetitionProgress(body, response) {
   };
 
   sendJson(response, 200, { ok: true, competition: buildCompetitionPayload(match, body.playerId) });
+}
+
+function startGroupCompetition(group) {
+  if (group.competitionId) {
+    return competitionMatches.get(group.competitionId);
+  }
+
+  if (group.participants.length < 2) {
+    group.status = "cancelled_insufficient_players";
+    return null;
+  }
+
+  const players = group.participants.map((participant) => ({
+    playerId: participant.playerId,
+    name: participant.playerName,
+  }));
+  const liveProgress = Object.fromEntries(
+    players.map((player) => [
+      player.playerId,
+      {
+        playerId: player.playerId,
+        playerName: player.name,
+        answeredCount: 0,
+        correctAnswers: 0,
+        score: 0,
+        finished: false,
+      },
+    ])
+  );
+  const match = {
+    id: randomUUID(),
+    mode: "group",
+    groupCompetitionId: group.id,
+    subjectId: group.subjectId,
+    grade: group.grade,
+    level: group.level,
+    difficulty: group.difficulty,
+    focusMode: group.focusMode,
+    topicId: group.topicId,
+    topicLabel: group.topicLabel,
+    questions: group.questions,
+    players,
+    chats: [],
+    liveProgress,
+    submissions: {},
+    createdAt: Date.now(),
+    startAt: group.startAt,
+    endAt: group.endAt,
+  };
+
+  competitionMatches.set(match.id, match);
+  for (const player of players) {
+    competitionMatchByPlayer.set(player.playerId, match.id);
+  }
+  group.status = "started";
+  group.competitionId = match.id;
+  return match;
+}
+
+function refreshGroupCompetitionState(group) {
+  if (group.status === "started" || group.status === "cancelled_insufficient_players") {
+    return group.competitionId ? competitionMatches.get(group.competitionId) : null;
+  }
+  if (Date.now() < group.startAt) {
+    return null;
+  }
+  group.status = "starting";
+  return startGroupCompetition(group);
+}
+
+async function handleGroupCompetitionCreate(body, response) {
+  const profile = body.profile;
+  const requestedStartAt = Number(body.startAt);
+  if (!profile?.id || !body.subject?.id || !body.grade || !body.level || !Number.isFinite(requestedStartAt)) {
+    sendJson(response, 400, { error: "Group competition request is missing required fields." });
+    return;
+  }
+
+  const now = Date.now();
+  if (requestedStartAt < now + 30000) {
+    sendJson(response, 400, { error: "Group competition start time must be at least 30 seconds from now." });
+    return;
+  }
+  if (requestedStartAt > now + 30 * 24 * 60 * 60 * 1000) {
+    sendJson(response, 400, { error: "Group competition start time cannot be more than 30 days away." });
+    return;
+  }
+
+  const durationSeconds = Math.max(30, Number(body.durationSeconds ?? 120));
+  const questions = await generateQuestionSet(body);
+  const group = {
+    id: randomUUID(),
+    code: createGroupCompetitionCode(),
+    status: "scheduled",
+    creatorId: profile.id,
+    creatorName: profile.name ?? "Learner",
+    subjectId: body.subject.id,
+    subjectName: body.subject.name,
+    grade: body.grade,
+    level: body.level,
+    difficulty: body.difficulty ?? "Beginner",
+    focusMode: body.focusMode ?? "general",
+    topicId: body.topicId,
+    topicLabel: body.topicLabel,
+    questions,
+    body,
+    durationSeconds,
+    createdAt: now,
+    startAt: requestedStartAt,
+    endAt: requestedStartAt + durationSeconds * 1000,
+    participants: [
+      {
+        playerId: profile.id,
+        playerName: profile.name ?? "Learner",
+        joinedAt: now,
+      },
+    ],
+  };
+
+  groupCompetitions.set(group.id, group);
+  groupCompetitionByCode.set(group.code, group.id);
+  sendJson(response, 200, {
+    status: group.status,
+    groupCompetition: buildGroupCompetitionSummary(group),
+  });
+}
+
+async function handleGroupCompetitionJoin(body, response) {
+  const profile = body.profile;
+  const group = findGroupCompetition(body);
+  if (!profile?.id || !group) {
+    sendJson(response, 404, { error: "Group competition code was not found." });
+    return;
+  }
+
+  refreshGroupCompetitionState(group);
+  if (group.status !== "scheduled") {
+    sendJson(response, 400, {
+      error:
+        group.status === "cancelled_insufficient_players"
+          ? "This group competition was cancelled because too few people joined."
+          : "This group competition has already started.",
+      status: group.status,
+      groupCompetition: buildGroupCompetitionSummary(group),
+    });
+    return;
+  }
+
+  const existingParticipant = group.participants.find((participant) => participant.playerId === profile.id);
+  if (!existingParticipant) {
+    group.participants.push({
+      playerId: profile.id,
+      playerName: profile.name ?? "Learner",
+      joinedAt: Date.now(),
+    });
+  }
+
+  sendJson(response, 200, {
+    status: group.status,
+    groupCompetition: buildGroupCompetitionSummary(group),
+  });
+}
+
+async function handleGroupCompetitionStatus(body, response) {
+  const group = findGroupCompetition(body);
+  if (!group) {
+    sendJson(response, 404, { error: "Group competition was not found." });
+    return;
+  }
+  if (!body.playerId || !group.participants.some((participant) => participant.playerId === body.playerId)) {
+    sendJson(response, 403, { error: "Join this group competition before viewing its lobby." });
+    return;
+  }
+
+  const match = refreshGroupCompetitionState(group);
+  sendJson(response, 200, {
+    status: group.status,
+    groupCompetition: buildGroupCompetitionSummary(group),
+    competition: match ? buildCompetitionPayload(match, body.playerId) : undefined,
+  });
 }
 
 async function handleChallengeCreate(body, response) {
@@ -2148,6 +2405,21 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/competition/join") {
       await handleCompetitionJoin(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/group/create") {
+      await handleGroupCompetitionCreate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/group/join") {
+      await handleGroupCompetitionJoin(body, response);
+      return;
+    }
+
+    if (url.pathname === "/competition/group/status") {
+      await handleGroupCompetitionStatus(body, response);
       return;
     }
 

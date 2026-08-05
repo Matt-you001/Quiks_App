@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAudioPlayer } from "expo-audio";
+import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
 import { DemoAdBanner } from "../components/DemoAdBanner";
@@ -24,11 +25,14 @@ import { palette, shadows } from "../lib/theme";
 import {
   acceptCompetitionChallenge,
   createCompetitionChallenge,
+  createGroupCompetition,
   decideCompetitionChallengeAsCreator,
+  getGroupCompetitionStatus,
   getCompetitionStatus,
   getCompetitionChallengeStatus,
   getCompetitionLeaderboard,
   listCompetitionChallenges,
+  joinGroupCompetition,
 } from "../services/ai";
 import type {
   CompetitionChallengeNotificationDiagnostics,
@@ -36,22 +40,43 @@ import type {
   CompetitionChallengeSummary,
   CompetitionTopPerformer,
   Difficulty,
+  GroupCompetitionSummary,
   QuestionFocusMode,
   SessionResult,
   SubscriptionTier,
   UserProfile,
 } from "../types/app";
 
-type CompetitionScreenMode = "create" | "accept" | "waiting";
+type CompetitionScreenMode = "create" | "accept" | "waiting" | "group-lobby";
 type WaitingRole = "creator" | "accepter";
+type ChallengeKind = "head_to_head" | "group";
+
+function formatLocalStartTime(date = new Date(Date.now() + 10 * 60 * 1000)) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function parseLocalStartTime(value: string) {
+  const timestamp = new Date(value.trim().replace(" ", "T")).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getGroupInvitationLink(code: string) {
+  return `https://${appVariant.id}.quiks.site/competition?groupCode=${encodeURIComponent(code)}`;
+}
 
 export default function CompetitionScreen() {
-  const params = useLocalSearchParams<{ subjectId?: string; grade?: string; challengeId?: string }>();
+  const params = useLocalSearchParams<{ subjectId?: string; grade?: string; challengeId?: string; groupCode?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
   const [screenMode, setScreenMode] = useState<CompetitionScreenMode>("accept");
+  const [challengeKind, setChallengeKind] = useState<ChallengeKind>("head_to_head");
   const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+  const [groupStartTime, setGroupStartTime] = useState(formatLocalStartTime);
+  const [groupJoinCode, setGroupJoinCode] = useState(typeof params.groupCode === "string" ? params.groupCode.toUpperCase() : "");
+  const [activeGroup, setActiveGroup] = useState<GroupCompetitionSummary | null>(null);
   const [acceptingChallengeId, setAcceptingChallengeId] = useState<string | null>(null);
   const [challenges, setChallenges] = useState<CompetitionChallengeSummary[]>([]);
   const [topPerformers, setTopPerformers] = useState<CompetitionTopPerformer[]>([]);
@@ -404,6 +429,127 @@ export default function CompetitionScreen() {
     }
   };
 
+  const createScheduledGroupCompetition = async () => {
+    if (!profile || !setupSubject) {
+      return;
+    }
+    if (!canJoinMoreCompetitions) {
+      Alert.alert(t(language, "competitionArena"), t(language, "freeCompetitionLimitReached"), [
+        { text: t(language, "cancel"), style: "cancel" },
+        { text: t(language, "upgradeToPro"), onPress: () => router.push({ pathname: "/subscription", params: { source: "competition" } } as never) },
+      ]);
+      return;
+    }
+
+    const startAt = parseLocalStartTime(groupStartTime);
+    if (!startAt || startAt < Date.now() + 30_000) {
+      Alert.alert(t(language, "groupCompetitionStartTime"), t(language, "invalidStartTime"));
+      return;
+    }
+
+    setIsCreatingChallenge(true);
+    try {
+      const response = await createGroupCompetition({
+        subject: setupSubject,
+        grade,
+        level: selectedLevel,
+        difficulty,
+        focusMode,
+        topicId: selectedTopic?.id,
+        topicLabel: selectedTopic?.label,
+        profile,
+        durationSeconds: calculateQuizTime(selectedLevel),
+        startAt,
+      });
+      setActiveGroup(response.groupCompetition);
+      setGroupJoinCode(response.groupCompetition.code);
+      setScreenMode("group-lobby");
+      Alert.alert(t(language, "groupCompetitionLobby"), `Invitation code: ${response.groupCompetition.code}`);
+    } catch (error) {
+      Alert.alert(t(language, "groupCompetition"), error instanceof Error ? error.message : "The group competition could not be created.");
+    } finally {
+      setIsCreatingChallenge(false);
+    }
+  };
+
+  const joinScheduledGroupCompetition = async () => {
+    if (!profile || !groupJoinCode.trim()) {
+      return;
+    }
+    if (!canJoinMoreCompetitions) {
+      Alert.alert(t(language, "competitionArena"), t(language, "freeCompetitionLimitReached"), [
+        { text: t(language, "cancel"), style: "cancel" },
+        { text: t(language, "upgradeToPro"), onPress: () => router.push({ pathname: "/subscription", params: { source: "competition" } } as never) },
+      ]);
+      return;
+    }
+
+    setIsJoiningGroup(true);
+    try {
+      const response = await joinGroupCompetition({ code: groupJoinCode.trim().toUpperCase(), profile });
+      setActiveGroup(response.groupCompetition);
+      setGroupJoinCode(response.groupCompetition.code);
+      setScreenMode("group-lobby");
+    } catch (error) {
+      Alert.alert(t(language, "joinGroupCompetition"), error instanceof Error ? error.message : "That invitation could not be joined.");
+    } finally {
+      setIsJoiningGroup(false);
+    }
+  };
+
+  const openStartedGroupCompetition = (competition: NonNullable<Awaited<ReturnType<typeof getGroupCompetitionStatus>>["competition"]>) => {
+    if (!activeGroup) {
+      return;
+    }
+    router.replace({
+      pathname: "/session",
+      params: {
+        subjectId: activeGroup.subjectId,
+        grade: activeGroup.grade,
+        level: String(activeGroup.level),
+        difficulty: activeGroup.difficulty,
+        focusMode: activeGroup.focusMode,
+        topicId: activeGroup.topicId,
+        competitionId: competition.competitionId,
+        competitionOpponentName: competition.opponentName,
+        autoStart: "1",
+        mode: "quiz",
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (screenMode !== "group-lobby" || !activeGroup || !profile) {
+      return;
+    }
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const response = await getGroupCompetitionStatus({
+          groupCompetitionId: activeGroup.groupCompetitionId,
+          playerId: profile.id,
+        });
+        if (cancelled) {
+          return;
+        }
+        setActiveGroup(response.groupCompetition);
+        if (response.status === "started" && response.competition) {
+          openStartedGroupCompetition(response.competition);
+        }
+      } catch {
+        // Keep the lobby visible while a transient request is retried.
+      }
+    };
+
+    void poll();
+    const interval = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeGroup?.groupCompetitionId, profile, screenMode]);
+
   const acceptChallenge = async (challenge: CompetitionChallengeSummary) => {
     if (!profile) {
       return;
@@ -569,6 +715,66 @@ export default function CompetitionScreen() {
     </View>
   );
 
+  if (screenMode === "group-lobby" && activeGroup) {
+    const invitationLink = getGroupInvitationLink(activeGroup.code);
+    const isCancelled = activeGroup.status === "cancelled_insufficient_players";
+    const startLabel = new Date(activeGroup.startAt).toLocaleString();
+
+    return (
+      <AppBackground>
+        <BackIconButton fallbackHref="/competition" />
+        <View style={styles.heroCard}>
+          <Text style={styles.eyebrow}>{t(language, "groupCompetitionLobby")}</Text>
+          <Text style={styles.title}>{getSubjectDisplayName(activeGroup.subjectId, activeGroup.subjectName, language)}</Text>
+          <Text style={styles.heroText}>{t(language, "groupCompetitionCode")}: {activeGroup.code}</Text>
+          <Text style={styles.heroText}>{t(language, "groupCompetitionStartTime")}: {startLabel}</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t(language, "groupCompetitionParticipants")} ({activeGroup.participantCount})</Text>
+          <View style={styles.participantList}>
+            {activeGroup.participants.map((participant) => (
+              <View key={participant.playerId} style={styles.participantRow}>
+                <MaterialCommunityIcons name={participant.creator ? "crown" : "account"} size={22} color={palette.navy} />
+                <Text style={styles.participantName}>{participant.playerName}</Text>
+                {participant.creator ? <Text style={styles.creatorLabel}>Creator</Text> : null}
+              </View>
+            ))}
+          </View>
+          {isCancelled ? (
+            <Text style={styles.warningText}>{t(language, "groupCompetitionCancelled")}</Text>
+          ) : activeGroup.participantCount < 2 ? (
+            <Text style={styles.warningText}>{t(language, "groupCompetitionNeedsParticipants")}</Text>
+          ) : (
+            <Text style={styles.text}>The competition will open automatically at the scheduled start time.</Text>
+          )}
+        </View>
+
+        {!isCancelled ? (
+          <View style={styles.actionColumn}>
+            <PrimaryButton
+              label={t(language, "shareGroupInvitation")}
+              onPress={() => Share.share({ message: `Join my ${appVariant.appName} group competition with code ${activeGroup.code}: ${invitationLink}` })}
+            />
+            <PrimaryButton
+              label={t(language, "copyGroupCode")}
+              variant="secondary"
+              onPress={() => Clipboard.setStringAsync(activeGroup.code)}
+            />
+            <PrimaryButton
+              label={t(language, "copyInvitationLink")}
+              variant="secondary"
+              onPress={() => Clipboard.setStringAsync(invitationLink)}
+            />
+          </View>
+        ) : null}
+        <View style={styles.actionColumn}>
+          <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
+        </View>
+      </AppBackground>
+    );
+  }
+
   if (screenMode === "waiting" && activeChallenge) {
     const waitingStatus = activeChallenge.status ?? "open";
     const creatorMustConfirm = waitingStatus === "awaiting_creator_confirmation" && waitingRole === "creator";
@@ -630,10 +836,44 @@ export default function CompetitionScreen() {
               if (!selectedSubjectId && localizedSubjects[0]) {
                 setSelectedSubjectId(localizedSubjects[0].id);
               }
+              setChallengeKind("head_to_head");
               setScreenMode("create");
             }}
             style={styles.topActionButton}
             disabled={!canJoinMoreCompetitions}
+          />
+          <PrimaryButton
+            label={t(language, "groupCompetition")}
+            variant="secondary"
+            onPress={() => {
+              if (!selectedSubjectId && localizedSubjects[0]) {
+                setSelectedSubjectId(localizedSubjects[0].id);
+              }
+              setChallengeKind("group");
+              setScreenMode("create");
+            }}
+            style={styles.topActionButton}
+            disabled={!canJoinMoreCompetitions}
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t(language, "joinGroupCompetition")}</Text>
+          <Text style={styles.text}>{t(language, "groupCompetitionHint")}</Text>
+          <TextInput
+            value={groupJoinCode}
+            onChangeText={(value) => setGroupJoinCode(value.toUpperCase())}
+            placeholder="Enter invitation code"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={6}
+            style={styles.codeInput}
+          />
+          <PrimaryButton
+            label={t(language, "joinGroupCompetition")}
+            onPress={joinScheduledGroupCompetition}
+            loading={isJoiningGroup}
+            disabled={!groupJoinCode.trim() || !canJoinMoreCompetitions}
           />
         </View>
 
@@ -713,9 +953,9 @@ export default function CompetitionScreen() {
       <AppBackground>
         <BackIconButton fallbackHref="/" />
         <View style={styles.heroCard}>
-          <Text style={styles.eyebrow}>{t(language, "createChallenge")}</Text>
+          <Text style={styles.eyebrow}>{challengeKind === "group" ? t(language, "groupCompetition") : t(language, "createChallenge")}</Text>
           <Text style={styles.title}>{setupSubject.name}</Text>
-          <Text style={styles.heroText}>{t(language, "createChallengeHint")}</Text>
+          <Text style={styles.heroText}>{challengeKind === "group" ? t(language, "groupCompetitionHint") : t(language, "createChallengeHint")}</Text>
         </View>
 
         {subjectSelector}
@@ -809,10 +1049,25 @@ export default function CompetitionScreen() {
           </View>
         </View>
 
+        {challengeKind === "group" ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>{t(language, "groupCompetitionStartTime")}</Text>
+            <Text style={styles.text}>{t(language, "groupCompetitionStartHint")}</Text>
+            <TextInput
+              value={groupStartTime}
+              onChangeText={setGroupStartTime}
+              placeholder="YYYY-MM-DD HH:mm"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.codeInput}
+            />
+          </View>
+        ) : null}
+
         <View style={styles.actionColumn}>
           <PrimaryButton
-            label={t(language, "createChallenge")}
-            onPress={createChallenge}
+            label={challengeKind === "group" ? t(language, "createGroupCompetition") : t(language, "createChallenge")}
+            onPress={challengeKind === "group" ? createScheduledGroupCompetition : createChallenge}
             loading={isCreatingChallenge}
             disabled={!canJoinMoreCompetitions}
           />
@@ -892,6 +1147,9 @@ const styles = StyleSheet.create({
   topActionRow: {
     marginTop: 18,
     alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
   },
   topActionButton: {
     minWidth: 190,
@@ -1061,5 +1319,48 @@ const styles = StyleSheet.create({
   actionColumn: {
     gap: 12,
     marginTop: 18,
+  },
+  codeInput: {
+    marginTop: 14,
+    marginBottom: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CAD8E3",
+    backgroundColor: "#F7FBFD",
+    color: palette.ink,
+    fontSize: 17,
+    fontWeight: "700",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  participantList: {
+    gap: 10,
+  },
+  participantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    backgroundColor: "#F7FBFD",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  participantName: {
+    flex: 1,
+    color: palette.ink,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  creatorLabel: {
+    color: palette.navy,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  warningText: {
+    marginTop: 14,
+    color: palette.warn,
+    lineHeight: 21,
+    fontWeight: "700",
   },
 });

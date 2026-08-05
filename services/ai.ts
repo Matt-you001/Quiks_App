@@ -59,6 +59,10 @@ import type {
   CompetitionStatusResponse,
   CompetitionSubmitRequest,
   CompetitionSubmitResponse,
+  GroupCompetitionCreateRequest,
+  GroupCompetitionJoinRequest,
+  GroupCompetitionResponse,
+  GroupCompetitionStatusRequest,
   CoachPlanRequest,
   PushTokenRegisterRequest,
   PushTokenRegisterResponse,
@@ -649,6 +653,24 @@ export async function createCompetitionChallenge(
   request: CompetitionChallengeCreateRequest
 ): Promise<CompetitionChallengeCreateResponse> {
   return postJson("/competition/challenge/create", withVariantMeta(request));
+}
+
+export async function createGroupCompetition(
+  request: GroupCompetitionCreateRequest
+): Promise<GroupCompetitionResponse> {
+  return postJson("/competition/group/create", withVariantMeta(request));
+}
+
+export async function joinGroupCompetition(
+  request: GroupCompetitionJoinRequest
+): Promise<GroupCompetitionResponse> {
+  return postJson("/competition/group/join", withVariantMeta(request));
+}
+
+export async function getGroupCompetitionStatus(
+  request: GroupCompetitionStatusRequest
+): Promise<GroupCompetitionResponse> {
+  return postJson("/competition/group/status", withVariantMeta(request));
 }
 
 export async function listCompetitionChallenges(
