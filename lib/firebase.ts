@@ -9,6 +9,7 @@ import {
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
+  onAuthStateChanged,
   signOut,
   updateProfile,
   type Auth,
@@ -191,6 +192,27 @@ export function getAuthenticatedAccount() {
   }
 
   return toAccount(firebaseAuth.currentUser);
+}
+
+export function waitForFirebaseAuthAccount() {
+  if (!firebaseAuth) {
+    return Promise.resolve<AppAccount | null>(null);
+  }
+
+  return new Promise<AppAccount | null>((resolve) => {
+    let unsubscribe: () => void = () => undefined;
+    unsubscribe = onAuthStateChanged(
+      firebaseAuth,
+      (user) => {
+        unsubscribe();
+        resolve(user ? toAccount(user) : null);
+      },
+      () => {
+        unsubscribe();
+        resolve(null);
+      }
+    );
+  });
 }
 
 export async function signUpWithEmailAccount(name: string, email: string, password: string) {

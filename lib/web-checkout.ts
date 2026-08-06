@@ -35,11 +35,19 @@ export function getPostAuthRoute(
   redirect?: string | string[] | null,
   plan?: string | string[] | null,
   joinCode?: string | string[] | null,
-  className?: string | string[] | null
-): {
-  pathname: "/" | "/subscription" | "/classroom-invite";
-  params?: { plan?: SubscriptionPlanPeriod; joinCode?: string; className?: string };
-} {
+  className?: string | string[] | null,
+  returnTo?: string | string[] | null
+) {
+  const normalizedReturnTo = (Array.isArray(returnTo) ? returnTo[0] : returnTo)?.trim();
+  if (
+    normalizedReturnTo?.startsWith("/") &&
+    !normalizedReturnTo.startsWith("//") &&
+    !normalizedReturnTo.startsWith("/login") &&
+    !normalizedReturnTo.startsWith("/signup")
+  ) {
+    return normalizedReturnTo;
+  }
+
   const normalizedRedirect = Array.isArray(redirect) ? redirect[0] : redirect;
   if (normalizedRedirect === "subscription") {
     const normalizedPlan = normalizeSubscriptionPlanPeriod(plan);
