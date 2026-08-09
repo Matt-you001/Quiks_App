@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { appVariant } from "./app-variant";
 
 const fallbackGoogleConfig = {
@@ -89,3 +90,13 @@ export const googleAuthConfig = {
   iosClientId: resolveGoogleClientId("iosClientId"),
   webClientId: resolveGoogleClientId("webClientId"),
 };
+
+export function getGoogleAuthRedirectUri() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return undefined;
+  }
+
+  // Use one stable callback per variant domain, regardless of whether the
+  // request starts from /login, /signup, or a protected deep link.
+  return window.location.origin;
+}

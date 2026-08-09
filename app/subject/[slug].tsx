@@ -61,7 +61,7 @@ export default function SubjectDetailScreen() {
 
   if (!subject) {
     return (
-      <AppBackground>
+      <AppBackground webContentWidth="narrow">
         <View style={styles.fallbackCard}>
           <Text style={styles.subjectTitle}>{appVariant.curriculumSingular === "course" ? t(language, "courseNotFound") : t(language, "subjectNotFound")}</Text>
           <PrimaryButton label={t(language, "backHome")} onPress={() => router.replace("/")} />
@@ -71,7 +71,7 @@ export default function SubjectDetailScreen() {
   }
 
   return (
-    <AppBackground>
+    <AppBackground webContentWidth="standard">
       <BackIconButton fallbackHref="/" />
       <View style={styles.heroCard}>
         <MaterialCommunityIcons name={subject.icon as never} size={34} color={palette.white} />

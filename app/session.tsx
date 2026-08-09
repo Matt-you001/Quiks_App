@@ -4,12 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
+import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { cancelCompetitionReminderNotifications, scheduleCompetitionReminderNotifications } from "../lib/notifications";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { canShowAds } from "../lib/ads";
 import { getDifficultyLabel, t } from "../lib/i18n";
-import { getLocalQuestions } from "../lib/question-bank";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState, upsertResult } from "../lib/storage";
 import { canUseAiToday, canUseClassroom, hasProAccess } from "../lib/subscription";
 import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
@@ -99,6 +99,7 @@ export default function SessionScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [questionSource, setQuestionSource] = useState<QuestionResponse["source"] | null>(null);
+  const [showAiUpgrade, setShowAiUpgrade] = useState(false);
   const [activitySubjectName, setActivitySubjectName] = useState<string | null>(subject?.name ?? null);
   const [activityTopicLabel, setActivityTopicLabel] = useState<string | null>(null);
   const [competitionChats, setCompetitionChats] = useState<CompetitionChatMessage[]>([]);
@@ -688,19 +689,13 @@ export default function SessionScreen() {
         recentQuestionIds,
       };
       const allowAi = hasProAccess(subscriptionTier) || canUseAiToday(subscriptionTier, results);
-      const response = allowAi
-        ? await generateQuestions(request)
-        : {
-            questions: getLocalQuestions(request),
-            source: "local" as const,
-          };
-
       if (!allowAi) {
-        Alert.alert(t(language, "upgradeToPro"), t(language, "freeAiLimitReached"), [
-          { text: t(language, "cancel"), style: "cancel" },
-          { text: t(language, "upgradeToPro"), onPress: () => router.push({ pathname: "/subscription", params: { source: "ai-practice" } } as never) },
-        ]);
+        setPhase("setup");
+        setShowAiUpgrade(true);
+        return;
       }
+
+      const response = await generateQuestions(request);
 
       const nextQuestions = normalizeQuestions(response.questions);
       setQuestionSource(response.source);
@@ -1188,6 +1183,18 @@ export default function SessionScreen() {
             onPress={loadQuestions}
           />
         </View>
+        <PremiumFeatureDialog
+          visible={showAiUpgrade}
+          title={t(language, "upgradeToPro")}
+          message={t(language, "freeAiLimitReached")}
+          upgradeLabel={t(language, "upgradeToPro")}
+          cancelLabel={t(language, "cancel")}
+          onClose={() => setShowAiUpgrade(false)}
+          onUpgrade={() => {
+            setShowAiUpgrade(false);
+            router.push({ pathname: "/subscription", params: { source: "ai-practice" } } as never);
+          }}
+        />
       </AppBackground>
     );
   }

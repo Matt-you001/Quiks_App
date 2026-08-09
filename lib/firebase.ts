@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
+  browserLocalPersistence,
   createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
@@ -15,6 +16,7 @@ import {
   type Auth,
   type User,
 } from "firebase/auth";
+import { Platform } from "react-native";
 import { doc, getDoc, getFirestore, setDoc } from "firebase/firestore";
 import type { Persistence } from "firebase/auth";
 import type { AppAccount, StoredAppState } from "../types/app";
@@ -111,7 +113,10 @@ export const firebaseAuth: Auth | null = (() => {
   }
 
   try {
-    const persistence = rnAuth.getReactNativePersistence?.(AsyncStorage);
+    const persistence =
+      Platform.OS === "web"
+        ? browserLocalPersistence
+        : rnAuth.getReactNativePersistence?.(AsyncStorage);
     return initializeAuth(firebaseApp, {
       ...(persistence ? { persistence } : {}),
     });

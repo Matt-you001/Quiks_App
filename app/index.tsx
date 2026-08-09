@@ -281,7 +281,7 @@ export default function HomeScreen() {
   const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
   const subjectColumns = width >= 1420 ? 5 : width >= 1120 ? 4 : width >= 820 ? 3 : width >= 560 ? 2 : 1;
   const subjectGap = 14;
-  const desktopCanvasWidth = Math.min(Math.max(width - 40, 320), 1200);
+  const desktopCanvasWidth = isWeb ? Math.max(width - 40, 320) : Math.min(Math.max(width - 40, 320), 1200);
   const subjectCardWidth =
     subjectColumns === 1
       ? desktopCanvasWidth
@@ -299,8 +299,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <AppBackground>
-      <View style={[styles.heroCard, isWeb ? styles.heroCardWeb : null]}>
+    <AppBackground webContentWidth="wide">
+      <View style={[styles.heroCard, isWeb ? styles.heroCardWeb : null, isWeb ? styles.homeSurfaceWeb : null]}>
         {!isWeb ? <Image source={heroLogos[appVariant.id]} style={styles.heroLogo} resizeMode="cover" /> : null}
         <Text style={[styles.title, isWeb ? styles.titleWeb : null]}>{appVariant.heroTitle}</Text>
         <Text style={styles.audienceBadge}>{heroAudienceLabel}</Text>
@@ -344,7 +344,7 @@ export default function HomeScreen() {
 
       {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
-      <View style={styles.card}>
+      <View style={[styles.card, isWeb ? styles.homeSurfaceWeb : null]}>
         <Text style={styles.cardTitle}>{t(language, "studentsList")}</Text>
         <Text style={styles.cardHint}>{t(language, "selectLearnerPrompt")}</Text>
 
@@ -404,7 +404,13 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <View style={[styles.activeLearnerCard, !activeProfile ? styles.activeLearnerCardMuted : null]}>
+      <View
+        style={[
+          styles.activeLearnerCard,
+          !activeProfile ? styles.activeLearnerCardMuted : null,
+          isWeb ? styles.homeSurfaceWeb : null,
+        ]}
+      >
         <View style={styles.activeLearnerHeader}>
           <Text style={styles.activeLearnerEyebrow}>{t(language, "currentLearner")}</Text>
           {activeProfile ? (
@@ -447,7 +453,13 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <View style={[styles.homeActionColumn, showWideActions ? styles.homeActionRowDesktop : null]}>
+      <View
+        style={[
+          styles.homeActionColumn,
+          showWideActions ? styles.homeActionRowDesktop : null,
+          isWeb ? styles.homeSurfaceWeb : null,
+        ]}
+      >
         <PrimaryButton
           label={canUseClassroom(subscriptionTier) ? "Classroom" : "Classroom"}
           variant="secondary"
@@ -474,10 +486,8 @@ export default function HomeScreen() {
         />
       </View>
 
-      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
-
       {subscriptionTier === "free" ? (
-        <View style={styles.subscriptionCard}>
+        <View style={[styles.subscriptionCard, isWeb ? styles.homeSurfaceWeb : null]}>
           <Text style={styles.homeCompetitionTitle}>{t(language, "currentPlan")}</Text>
           <Text style={styles.homeCompetitionText}>{t(language, "freePlanStatus")}</Text>
           <PrimaryButton
@@ -504,7 +514,7 @@ export default function HomeScreen() {
           <Fragment key={subject.id}>
             <Pressable
               onPress={() => openSubject(subject.id)}
-              style={[styles.subjectPressable, { width: subjectCardWidth }]}
+              style={[styles.subjectPressable, { width: subjectCardWidth }, isWeb ? styles.subjectPressableWeb : null]}
             >
               <LinearGradient colors={subject.accent} style={[styles.subjectCard, !activeProfile ? styles.subjectCardDim : null]}>
                 <MaterialCommunityIcons name={subject.icon as never} size={28} color={palette.white} />
@@ -512,7 +522,7 @@ export default function HomeScreen() {
                 <Text style={styles.subjectTagline}>{subject.tagline}</Text>
               </LinearGradient>
             </Pressable>
-            {canShowAds(subscriptionTier) && subjectIndex === Math.floor((localizedSubjects.length - 1) / 2) ? (
+            {!isWeb && canShowAds(subscriptionTier) && subjectIndex === Math.floor((localizedSubjects.length - 1) / 2) ? (
               <View style={styles.subjectAdSlot}>
                 <DemoAdBanner language={language} format="banner" />
               </View>
@@ -790,6 +800,7 @@ const styles = StyleSheet.create({
   homeActionRowDesktop: {
     flexDirection: "row",
     alignItems: "flex-start",
+    justifyContent: "center",
   },
   homeActionButtonDesktop: {
     flex: 1,
@@ -800,6 +811,11 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     padding: 18,
     ...shadows.card,
+  },
+  homeSurfaceWeb: {
+    width: "100%",
+    maxWidth: 960,
+    alignSelf: "center",
   },
   homeCompetitionTitle: {
     color: palette.ink,
@@ -836,6 +852,9 @@ const styles = StyleSheet.create({
   },
   subjectPressable: {
     borderRadius: 26,
+  },
+  subjectPressableWeb: {
+    flexGrow: 1,
   },
   subjectCard: {
     borderRadius: 26,

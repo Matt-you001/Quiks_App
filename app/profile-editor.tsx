@@ -16,6 +16,7 @@ const defaultForm = {
   name: "",
   age: "",
   targetExam: appVariant.defaultTargetExam,
+  preferredCurriculum: "",
   dailyGoalMinutes: String(appVariant.defaultDailyGoalMinutes),
   schoolName: "",
   teachingFocus: "",
@@ -53,6 +54,7 @@ export default function ProfileEditorScreen() {
           name: activeProfile.name,
           age: String(activeProfile.age),
           targetExam: activeProfile.targetExam,
+          preferredCurriculum: activeProfile.preferredCurriculum ?? "",
           dailyGoalMinutes: String(activeProfile.dailyGoalMinutes),
           schoolName: activeProfile.schoolName ?? "",
           teachingFocus: activeProfile.teachingFocus ?? "",
@@ -104,6 +106,8 @@ export default function ProfileEditorScreen() {
       name: form.name.trim(),
       age: isTeacher ? (Number.isFinite(age) && age >= 18 ? age : editingProfile?.age ?? 18) : age,
       targetExam: isTeacher ? t(form.language, "teacherAccount") : form.targetExam.trim() || "General school prep",
+      preferredCurriculum:
+        !isTeacher && appVariant.id !== "uni" ? form.preferredCurriculum.trim() : "",
       dailyGoalMinutes: isTeacher ? 0 : goal,
       schoolName: isTeacher ? form.schoolName.trim() : "",
       teachingFocus: isTeacher ? form.teachingFocus.trim() : "",
@@ -119,7 +123,7 @@ export default function ProfileEditorScreen() {
   };
 
   return (
-    <AppBackground>
+    <AppBackground webContentWidth="narrow">
       <View style={styles.heroCard}>
         <Text style={styles.title}>{isEditMode ? t(form.language, "editProfile") : t(form.language, "createProfile")}</Text>
         <Text style={styles.subtitle}>
@@ -209,6 +213,19 @@ export default function ProfileEditorScreen() {
               placeholder={appVariant.targetExamPlaceholder}
               placeholderTextColor="#7C8EA3"
             />
+
+            {appVariant.id !== "uni" ? (
+              <>
+                <Text style={styles.label}>{t(form.language, "preferredCurriculum")}</Text>
+                <TextInput
+                  value={form.preferredCurriculum}
+                  onChangeText={(value) => setForm((current) => ({ ...current, preferredCurriculum: value }))}
+                  style={styles.input}
+                  placeholder={t(form.language, "preferredCurriculumPlaceholder")}
+                  placeholderTextColor="#7C8EA3"
+                />
+              </>
+            ) : null}
 
             <Text style={styles.label}>{t(form.language, "dailyGoalMinutes")}</Text>
             <TextInput

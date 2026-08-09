@@ -48,7 +48,7 @@ export default function SelectProfileScreen() {
   const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
 
   return (
-    <AppBackground>
+    <AppBackground webContentWidth="standard">
       <View style={styles.hero}>
         <Text style={styles.title}>{t(language, "chooseLearner")}</Text>
         <Text style={styles.subtitle}>

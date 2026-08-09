@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,7 +11,7 @@ import {
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
-import { googleAuthConfig } from "../lib/auth-config";
+import { getGoogleAuthRedirectUri, googleAuthConfig } from "../lib/auth-config";
 import {
   beginNativeGoogleSignIn,
   formatGoogleSignInError,
@@ -46,9 +45,10 @@ function GoogleSignupButton({
   const [request, response, promptAsync] = !isNativeFlow
     ? (
         require("expo-auth-session/providers/google") as typeof import("expo-auth-session/providers/google")
-      ).useAuthRequest({
+      ).useIdTokenAuthRequest({
         clientId: googleAuthConfig.webClientId || googleAuthConfig.expoClientId,
         iosClientId: googleAuthConfig.iosClientId,
+        redirectUri: getGoogleAuthRedirectUri(),
       })
     : [null, null, null];
 
@@ -57,17 +57,21 @@ function GoogleSignupButton({
       return;
     }
 
-    const WebBrowser = require("expo-web-browser") as typeof import("expo-web-browser");
-    WebBrowser.maybeCompleteAuthSession();
-  }, [isNativeFlow]);
-
-  useEffect(() => {
-    if (isNativeFlow) {
-      return;
-    }
-
     const completeGoogle = async () => {
-      if (response?.type !== "success") {
+      if (!response) {
+        return;
+      }
+
+      if (response.type === "error") {
+        setGoogleLoading(false);
+        Alert.alert(
+          t(language, "invalidCredentialsTitle"),
+          response.error?.message || response.params.error_description || t(language, "invalidCredentialsMessage")
+        );
+        return;
+      }
+
+      if (response.type !== "success") {
         return;
       }
 
@@ -75,6 +79,10 @@ function GoogleSignupButton({
       const accessToken = response.params.access_token;
       if (!idToken) {
         setGoogleLoading(false);
+        Alert.alert(
+          t(language, "invalidCredentialsTitle"),
+          "Google did not return the identity token required to complete sign-up. Please try again."
+        );
         return;
       }
 
@@ -193,13 +201,7 @@ export default function SignupScreen() {
   };
 
   return (
-    <AppBackground scroll={false}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+    <AppBackground webContentWidth="narrow">
           <View style={styles.heroCard}>
             <Text style={styles.eyebrow}>{appVariant.appName}</Text>
             <Text style={styles.title}>{t(language, "createAccount")}</Text>
@@ -277,20 +279,12 @@ export default function SignupScreen() {
               />
             </View>
           </View>
-        </ScrollView>
     </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   flex: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 280,
-  },
-  scrollView: {
     flex: 1,
   },
   heroCard: {

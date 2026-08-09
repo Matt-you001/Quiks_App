@@ -116,31 +116,7 @@ export function DemoAdBanner({ language, format = "native", compact = false }: D
   }
 
   if (isWeb) {
-    const placeholderId = `adsense-slot-${appVariant.id}-banner`;
-
-    return (
-      <View
-        style={[
-          styles.card,
-          format === "banner" ? styles.bannerCard : null,
-          compact ? styles.compactCard : null,
-        ]}
-      >
-        {format === "native" ? <Text style={styles.eyebrow}>{t(language, "sponsoredLearningSpot")}</Text> : null}
-        {format === "native" ? <Text style={styles.title}>{t(language, "sponsoredLearningSpot")}</Text> : null}
-        {format === "native" ? <Text style={styles.text}>
-          This web slot is prepared for Google AdSense deployment on {appVariant.appName}. Replace the placeholder with
-          your live script and slot ID when approval is complete.
-        </Text> : null}
-        <View nativeID={placeholderId} style={[styles.webSlot, compact ? styles.compactWebSlot : null]}>
-          <Text style={[styles.webSlotLabel, compact ? styles.compactWebSlotLabel : null]}>
-            {compact ? "Advertisement" : "AdSense-ready banner"}
-          </Text>
-          {!compact ? <Text style={styles.webSlotMeta}>{placeholderId}</Text> : null}
-          {!compact ? <Text style={styles.webSlotHint}>Free web plan only</Text> : null}
-        </View>
-      </View>
-    );
+    return null;
   }
 
   const mobileAds = getMobileAdsModule();
@@ -225,7 +201,7 @@ export function DemoAdBanner({ language, format = "native", compact = false }: D
               onAdFailedToLoad={(error) => {
                 console.warn(
                   `AdMob banner failed to load for ${appVariant.id} (${getBannerAdUnitId(mobileAds, useAdaptiveBanner)}):`,
-                  error.message
+                  error
                 );
                 setBannerLoadFailed(true);
               }}

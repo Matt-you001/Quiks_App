@@ -1,6 +1,7 @@
 import { router, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
+import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Platform, View } from "react-native";
 import { appVariant } from "../lib/app-variant";
@@ -15,6 +16,12 @@ import {
 } from "../lib/notifications";
 import { palette } from "../lib/theme";
 
+if (Platform.OS === "web") {
+  // The OAuth popup redirects to the variant root, so complete the handshake
+  // before the protected-route gate can send that popup to /signup.
+  WebBrowser.maybeCompleteAuthSession();
+}
+
 export default function RootLayout() {
   useNotificationNavigation();
   usePendingChallengeWatcher();
@@ -22,6 +29,7 @@ export default function RootLayout() {
   const appStateRef = useRef(AppState.currentState);
   const hydratedAccountUidRef = useRef<string | null>(null);
   const segments = useSegments();
+  const rootSegment = segments[0];
   const [webAuthReady, setWebAuthReady] = useState(Platform.OS !== "web");
 
   useEffect(() => {
@@ -30,7 +38,7 @@ export default function RootLayout() {
       return;
     }
 
-    const route = segments[0];
+    const route = rootSegment;
     if (route === "login" || route === "signup") {
       setWebAuthReady(true);
       return;
@@ -71,7 +79,7 @@ export default function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, [segments]);
+  }, [rootSegment]);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(palette.navy).catch(() => undefined);

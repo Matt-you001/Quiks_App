@@ -467,6 +467,11 @@ export default function ProfileScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "profileDetails")}</Text>
         <Text style={styles.metricText}>{t(language, "targetExam")}: {activeProfile.targetExam}</Text>
+        {activeProfile.role === "student" && appVariant.id !== "uni" && activeProfile.preferredCurriculum ? (
+          <Text style={styles.metricText}>
+            {t(language, "preferredCurriculum")}: {activeProfile.preferredCurriculum}
+          </Text>
+        ) : null}
         <Text style={styles.metricText}>{t(language, "dailyTarget")}: {activeProfile.dailyGoalMinutes} minutes</Text>
         <Text style={styles.metricText}>{t(language, "currentLanguage")}: {getLanguageLabel(activeProfile.language)}</Text>
         <Text style={styles.metricText}>

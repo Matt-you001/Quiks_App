@@ -51,6 +51,8 @@ type TranslationKey =
   | "name"
   | "age"
   | "targetExam"
+  | "preferredCurriculum"
+  | "preferredCurriculumPlaceholder"
   | "dailyGoalMinutes"
   | "language"
   | "cancel"
@@ -514,6 +516,8 @@ const english: TranslationMap = {
   name: "Name",
   age: "Age",
   targetExam: "Target exam",
+  preferredCurriculum: "Preferred curriculum",
+  preferredCurriculumPlaceholder: "e.g. Nigerian, British, Cambridge or IB",
   dailyGoalMinutes: "Daily goal in minutes",
   language: "Language",
   cancel: "Cancel",
@@ -753,7 +757,7 @@ const english: TranslationMap = {
   childrenAdFreeNote: "Quiks Children stays ad-free for a safer child learning experience.",
   profileLimitReachedTitle: "Profile limit reached",
   profileLimitReachedMessage: "Free access allows only one learner profile. Upgrade to Pro to add more profiles.",
-  freeAiLimitReached: "You have used today's free AI practice limit. More sessions will use the local question bank unless you upgrade to Pro.",
+  freeAiLimitReached: "You have used today's free AI practice limit. Upgrade to Pro to continue using AI-generated questions.",
   freeCompetitionLimitReached: "You have reached today's free competition limit. Upgrade to Pro for unlimited competitions and rematches.",
   freePlanStatus: "You are on the Free plan.",
   proPlanStatus: "You are on the Pro plan.",
@@ -924,6 +928,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     name: "Name",
     age: "Alter",
     targetExam: "Zielprufung",
+    preferredCurriculum: "Bevorzugter Lehrplan",
+    preferredCurriculumPlaceholder: "z. B. nigerianisch, britisch, Cambridge oder IB",
     dailyGoalMinutes: "Tagliches Ziel in Minuten",
     language: "Sprache",
     cancel: "Abbrechen",
@@ -1201,6 +1207,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     name: "Nom",
     age: "Age",
     targetExam: "Examen cible",
+    preferredCurriculum: "Programme scolaire prefere",
+    preferredCurriculumPlaceholder: "p. ex. nigerian, britannique, Cambridge ou IB",
     dailyGoalMinutes: "Objectif quotidien en minutes",
     language: "Langue",
     cancel: "Annuler",
@@ -1260,6 +1268,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     name: "Nombre",
     age: "Edad",
     targetExam: "Examen objetivo",
+    preferredCurriculum: "Plan de estudios preferido",
+    preferredCurriculumPlaceholder: "p. ej., nigeriano, britanico, Cambridge o IB",
     dailyGoalMinutes: "Meta diaria en minutos",
     language: "Idioma",
     cancel: "Cancelar",
@@ -1307,6 +1317,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     name: "Nome",
     age: "Idade",
     targetExam: "Exame alvo",
+    preferredCurriculum: "Curriculo preferido",
+    preferredCurriculumPlaceholder: "ex.: nigeriano, britanico, Cambridge ou IB",
     dailyGoalMinutes: "Meta diaria em minutos",
     language: "Idioma",
     cancel: "Cancelar",
@@ -1361,6 +1373,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     name: "姓名",
     age: "年龄",
     targetExam: "目标考试",
+    preferredCurriculum: "首选课程体系",
+    preferredCurriculumPlaceholder: "例如：尼日利亚、英国、剑桥或 IB 课程",
     dailyGoalMinutes: "每日目标分钟数",
     language: "语言",
     cancel: "取消",
@@ -1485,6 +1499,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     name: "الاسم",
     age: "العمر",
     targetExam: "الامتحان المستهدف",
+    preferredCurriculum: "المنهج الدراسي المفضل",
+    preferredCurriculumPlaceholder: "مثال: النيجيري أو البريطاني أو كامبردج أو البكالوريا الدولية",
     dailyGoalMinutes: "الهدف اليومي بالدقائق",
     language: "اللغة",
     cancel: "إلغاء",
@@ -1602,6 +1618,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     name: "Jina",
     age: "Umri",
     targetExam: "Mtihani lengwa",
+    preferredCurriculum: "Mtaala unaopendelewa",
+    preferredCurriculumPlaceholder: "mf. Nigeria, Uingereza, Cambridge au IB",
     dailyGoalMinutes: "Lengo la kila siku kwa dakika",
     language: "Lugha",
     cancel: "Ghairi",

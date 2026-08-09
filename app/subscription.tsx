@@ -229,7 +229,7 @@ export default function SubscriptionScreen() {
     purchasesEnabled && !loadingStore && subscriptionTier !== "pro" && storePlans.length === 0;
 
   return (
-    <AppBackground>
+    <AppBackground webContentWidth="standard">
       <View style={styles.heroCard}>
         <Text style={styles.title}>{t(language, "manageSubscription")}</Text>
       </View>
@@ -262,7 +262,7 @@ export default function SubscriptionScreen() {
           ) : null}
           {storeMessage ? <Text style={styles.storeMessage}>{storeMessage}</Text> : null}
           {purchasesEnabled && ((storeReady && visiblePlans.length > 0) || shouldShowFallbackPlans) ? (
-            <View style={styles.planList}>
+            <View style={[styles.planList, Platform.OS === "web" ? styles.planListWeb : null]}>
               {visiblePlans.map((plan) => {
                 const isSelectedPlan = selectedPlanPeriod !== null && plan.period === selectedPlanPeriod;
                 const actionLabel =
@@ -273,7 +273,14 @@ export default function SubscriptionScreen() {
                       : t(language, "upgradeToPro");
 
                 return (
-                  <View key={plan.productId} style={[styles.planCard, isSelectedPlan ? styles.selectedPlanCard : null]}>
+                  <View
+                    key={plan.productId}
+                    style={[
+                      styles.planCard,
+                      Platform.OS === "web" ? styles.planCardWeb : null,
+                      isSelectedPlan ? styles.selectedPlanCard : null,
+                    ]}
+                  >
                     {isSelectedPlan ? (
                       <View style={styles.selectedPlanHeader}>
                         <Text style={styles.selectedPlanBadge}>Selected plan</Text>
@@ -380,12 +387,22 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 10,
   },
+  planListWeb: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "stretch",
+  },
   planCard: {
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#DEE7EF",
     padding: 14,
     gap: 8,
+  },
+  planCardWeb: {
+    flexGrow: 1,
+    flexBasis: 320,
+    maxWidth: 480,
   },
   selectedPlanCard: {
     borderColor: palette.aqua,

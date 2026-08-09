@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
 import { palette } from "../lib/theme";
 
 interface PrimaryButtonProps {
@@ -31,6 +31,7 @@ export function PrimaryButton({
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.base,
+        Platform.OS === "web" ? styles.webBase : null,
         compact ? styles.compactBase : null,
         variantStyle,
         pressed && !disabled ? styles.pressed : null,
@@ -56,6 +57,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
+  },
+  webBase: {
+    width: "100%",
+    maxWidth: 288,
+    alignSelf: "center",
   },
   compactBase: {
     minHeight: 32,

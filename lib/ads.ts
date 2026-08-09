@@ -212,8 +212,12 @@ export async function initializeMobileAds() {
     mobileAdsInitPromise = mobileAds
       .default()
       .initialize()
-      .then(() => true)
-      .catch(() => {
+      .then((adapterStatuses) => {
+        console.info(`AdMob initialized for ${appVariant.id}.`, adapterStatuses);
+        return true;
+      })
+      .catch((error) => {
+        console.warn(`AdMob initialization failed for ${appVariant.id}.`, error);
         mobileAdsInitPromise = null;
         return false;
       });

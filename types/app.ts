@@ -56,6 +56,7 @@ export interface UserProfile {
   name: string;
   age: number;
   targetExam: string;
+  preferredCurriculum?: string;
   dailyGoalMinutes: number;
   schoolName?: string;
   teachingFocus?: string;
