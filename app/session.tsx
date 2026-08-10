@@ -10,6 +10,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { canShowAds } from "../lib/ads";
 import { getDifficultyLabel, t } from "../lib/i18n";
+import { getLocalQuestions } from "../lib/question-bank";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState, upsertResult } from "../lib/storage";
 import { canUseAiToday, canUseClassroom, hasProAccess } from "../lib/subscription";
 import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
@@ -43,6 +44,7 @@ import type {
   Difficulty,
   Question,
   QuestionFocusMode,
+  QuestionRequest,
   QuestionResponse,
   SessionResult,
   Subject,
@@ -100,6 +102,7 @@ export default function SessionScreen() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [questionSource, setQuestionSource] = useState<QuestionResponse["source"] | null>(null);
   const [showAiUpgrade, setShowAiUpgrade] = useState(false);
+  const [pendingLocalRequest, setPendingLocalRequest] = useState<QuestionRequest | null>(null);
   const [activitySubjectName, setActivitySubjectName] = useState<string | null>(subject?.name ?? null);
   const [activityTopicLabel, setActivityTopicLabel] = useState<string | null>(null);
   const [competitionChats, setCompetitionChats] = useState<CompetitionChatMessage[]>([]);
@@ -555,6 +558,46 @@ export default function SessionScreen() {
   );
   const canUseCompetitionRematch = Boolean(isCompetition && profile && hasProAccess(subscriptionTier));
 
+  const startQuestionSession = async (request: QuestionRequest, response: QuestionResponse) => {
+    const nextQuestions = normalizeQuestions(response.questions);
+    setQuestionSource(response.source);
+    if (request.profile) {
+      await appendQuestionHistory(
+        request.profile.id,
+        request.subject.id,
+        nextQuestions.map((question) => question.id)
+      );
+    }
+    setQuestions(nextQuestions);
+    setAnswers(Array(nextQuestions.length).fill(null));
+    setCurrentIndex(0);
+    setSelectedAnswer(null);
+    setElapsed(0);
+    setTimeLeft(request.mode === "quiz" ? calculateQuizTime(request.level) : 0);
+    setPhase("active");
+  };
+
+  const continueWithLocalQuestions = async () => {
+    const request = pendingLocalRequest;
+    setShowAiUpgrade(false);
+    setPendingLocalRequest(null);
+    if (!request) {
+      return;
+    }
+
+    setPhase("loading");
+    try {
+      await startQuestionSession(request, {
+        questions: getLocalQuestions(request),
+        source: "local",
+      });
+    } catch {
+      setQuestionSource(null);
+      Alert.alert(t(language, "unableToStartSession"), t(language, "questionGenerationFailed"));
+      setPhase("setup");
+    }
+  };
+
   const loadQuestions = async () => {
     if (!profile || (!subject && !isClassroomActivity)) {
       return;
@@ -675,7 +718,7 @@ export default function SessionScreen() {
       }
 
       const recentQuestionIds = profile ? await getRecentQuestionIds(profile.id, effectiveSubject.id) : [];
-      const request = {
+      const request: QuestionRequest = {
         subject: effectiveSubject,
         grade,
         difficulty,
@@ -690,29 +733,14 @@ export default function SessionScreen() {
       };
       const allowAi = hasProAccess(subscriptionTier) || canUseAiToday(subscriptionTier, results);
       if (!allowAi) {
+        setPendingLocalRequest(request);
         setPhase("setup");
         setShowAiUpgrade(true);
         return;
       }
 
       const response = await generateQuestions(request);
-
-      const nextQuestions = normalizeQuestions(response.questions);
-      setQuestionSource(response.source);
-      if (profile) {
-        await appendQuestionHistory(
-          profile.id,
-          effectiveSubject.id,
-          nextQuestions.map((question) => question.id)
-        );
-      }
-      setQuestions(nextQuestions);
-      setAnswers(Array(nextQuestions.length).fill(null));
-      setCurrentIndex(0);
-      setSelectedAnswer(null);
-      setElapsed(0);
-      setTimeLeft(mode === "quiz" ? calculateQuizTime(selectedLevel) : 0);
-      setPhase("active");
+      await startQuestionSession(request, response);
     } catch (error) {
       setQuestionSource(null);
       Alert.alert(t(language, "unableToStartSession"), t(language, "questionGenerationFailed"));
@@ -1189,9 +1217,10 @@ export default function SessionScreen() {
           message={t(language, "freeAiLimitReached")}
           upgradeLabel={t(language, "upgradeToPro")}
           cancelLabel={t(language, "cancel")}
-          onClose={() => setShowAiUpgrade(false)}
+          onClose={continueWithLocalQuestions}
           onUpgrade={() => {
             setShowAiUpgrade(false);
+            setPendingLocalRequest(null);
             router.push({ pathname: "/subscription", params: { source: "ai-practice" } } as never);
           }}
         />
@@ -1360,7 +1389,26 @@ export default function SessionScreen() {
               {selectedAnswer === currentQuestion?.answer ? t(language, "correct") : t(language, "keepGoing")}
             </Text>
             <Text style={styles.explanationText}>{currentQuestion?.explanation}</Text>
-            {mode === "training" ? <PrimaryButton label={t(language, "nextQuestion")} onPress={() => advance()} /> : null}
+            {mode === "training" ? (
+              <View style={styles.explanationActions}>
+                <PrimaryButton
+                  label={t(language, "learnMore")}
+                  variant="secondary"
+                  onPress={() => router.push({
+                    pathname: "/learning-hub" as never,
+                    params: {
+                      subjectId: subject.id,
+                      subjectName: resolvedSubjectName,
+                      topicName: activityTopicLabel ?? resolvedTopicLabel ?? selectedTopic?.label ?? "Concept behind this answer",
+                      grade,
+                      context: `Question: ${currentQuestion?.prompt ?? ""}\nCorrect answer: ${currentQuestion?.answer ?? ""}\nExplanation: ${currentQuestion?.explanation ?? ""}`,
+                    },
+                  } as never)}
+                  style={styles.explanationActionButton}
+                />
+                <PrimaryButton label={t(language, "nextQuestion")} onPress={() => advance()} style={styles.explanationActionButton} />
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -1795,5 +1843,14 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 8,
     marginBottom: 14,
+  },
+  explanationActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 14,
+  },
+  explanationActionButton: {
+    flex: 1,
+    marginTop: 0,
   },
 });

@@ -120,6 +120,28 @@ export interface BreatherContent {
   continueLabel?: string;
 }
 
+export interface LearningLessonSection {
+  heading: string;
+  content: string;
+}
+
+export interface LearningLesson {
+  title: string;
+  overview: string;
+  sections: LearningLessonSection[];
+  examples: string[];
+  keyPoints: string[];
+  practiceTip: string;
+}
+
+export interface LearningLessonRequest {
+  subjectName: string;
+  topicName: string;
+  grade: string;
+  context?: string;
+  profile?: UserProfile | null;
+}
+
 export interface StoredAppState {
   account: AppAccount | null;
   isAuthenticated: boolean;

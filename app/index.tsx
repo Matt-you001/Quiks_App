@@ -484,6 +484,12 @@ export default function HomeScreen() {
           }
           style={showWideActions ? styles.homeActionButtonDesktop : styles.homeCompetitionButton}
         />
+        <PrimaryButton
+          label={t(language, "learningHub")}
+          variant="secondary"
+          onPress={() => router.push("/learning-hub" as never)}
+          style={showWideActions ? styles.homeActionButtonDesktop : undefined}
+        />
       </View>
 
       {subscriptionTier === "free" ? (
@@ -814,7 +820,7 @@ const styles = StyleSheet.create({
   },
   homeSurfaceWeb: {
     width: "100%",
-    maxWidth: 960,
+    maxWidth: 576,
     alignSelf: "center",
   },
   homeCompetitionTitle: {

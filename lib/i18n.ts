@@ -147,6 +147,18 @@ type TranslationKey =
   | "correct"
   | "keepGoing"
   | "nextQuestion"
+  | "learnMore"
+  | "learningHub"
+  | "learningHubHint"
+  | "generateLesson"
+  | "lessonOverview"
+  | "lessonExamples"
+  | "lessonKeyPoints"
+  | "lessonPracticeTip"
+  | "customSubject"
+  | "others"
+  | "enterCustomSubject"
+  | "unableGenerateLesson"
   | "noResultFound"
   | "excellentWork"
   | "greatJob"
@@ -612,6 +624,18 @@ const english: TranslationMap = {
   correct: "Correct",
   keepGoing: "Keep going",
   nextQuestion: "Next question",
+  learnMore: "Learn More",
+  learningHub: "Learning Hub",
+  learningHubHint: "Choose a subject, topic, and grade to generate a focused lesson.",
+  generateLesson: "Generate Lesson",
+  lessonOverview: "Overview",
+  lessonExamples: "Examples",
+  lessonKeyPoints: "Key points",
+  lessonPracticeTip: "Practice tip",
+  customSubject: "Other subject",
+  others: "Others",
+  enterCustomSubject: "Enter a subject",
+  unableGenerateLesson: "The lesson could not be generated. Please try again.",
   noResultFound: "No result found",
   excellentWork: "Excellent work",
   greatJob: "Great job",

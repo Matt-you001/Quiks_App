@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   webBase: {
     width: "100%",
-    maxWidth: 288,
+    maxWidth: 202,
     alignSelf: "center",
   },
   compactBase: {

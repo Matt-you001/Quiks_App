@@ -86,10 +86,10 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   webContentNarrow: {
-    maxWidth: 576,
+    maxWidth: 461,
   },
   webContentStandard: {
-    maxWidth: 728,
+    maxWidth: 510,
   },
   webContentWide: {
     maxWidth: 1200,

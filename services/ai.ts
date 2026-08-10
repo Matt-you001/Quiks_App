@@ -68,6 +68,8 @@ import type {
   PushTokenRegisterResponse,
   PaddleSubscriptionSyncRequest,
   FeedbackRequest,
+  LearningLesson,
+  LearningLessonRequest,
   Question,
   QuestionRequest,
   QuestionResponse,
@@ -643,6 +645,18 @@ export async function generateBreather(request: BreatherRequest): Promise<Breath
   }
 
   throw new Error("Live breather generation is unavailable.");
+}
+
+export async function generateLearningLesson(request: LearningLessonRequest): Promise<LearningLesson> {
+  if (!apiUrl || aiMode === "demo") {
+    throw new Error("Live lesson generation is unavailable.");
+  }
+
+  const response = await postJson<Record<string, unknown>, { lesson: LearningLesson }>(
+    "/learning-hub/lesson",
+    withVariantMeta(request) as unknown as Record<string, unknown>
+  );
+  return response.lesson;
 }
 
 export async function joinCompetition(request: CompetitionJoinRequest): Promise<CompetitionJoinResponse> {

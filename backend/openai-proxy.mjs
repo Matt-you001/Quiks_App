@@ -1338,6 +1338,42 @@ function buildBreatherSchema() {
   };
 }
 
+function buildLearningLessonSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      lesson: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          overview: { type: "string" },
+          sections: {
+            type: "array",
+            minItems: 2,
+            maxItems: 5,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                heading: { type: "string" },
+                content: { type: "string" },
+              },
+              required: ["heading", "content"],
+            },
+          },
+          examples: { type: "array", minItems: 1, maxItems: 4, items: { type: "string" } },
+          keyPoints: { type: "array", minItems: 2, maxItems: 6, items: { type: "string" } },
+          practiceTip: { type: "string" },
+        },
+        required: ["title", "overview", "sections", "examples", "keyPoints", "practiceTip"],
+      },
+    },
+    required: ["lesson"],
+  };
+}
+
 async function handleQuestions(body, response) {
   const data = await createOpenAiResponse({
     schemaName: "quiz_questions",
@@ -1516,6 +1552,46 @@ async function handleBreather(body, response) {
   });
 
   sendJson(response, 200, { breather: data.breather });
+}
+
+async function handleLearningLesson(body, response) {
+  const data = await createOpenAiResponse({
+    schemaName: "learning_hub_lesson",
+    schema: buildLearningLessonSchema(),
+    instructions: [
+      "You are an expert teacher creating a focused lesson for the Quiks Learning Hub.",
+      "Teach the requested subject and topic at the specified grade and app-variant academic standard.",
+      "Use clear explanations, a logical teaching sequence, worked or practical examples, key points, and a useful practice tip.",
+      "If answer context is supplied, identify and teach the underlying concept rather than merely repeating the answer.",
+      "Keep the lesson age-appropriate, academically accurate, and in the learner's selected language.",
+      "Follow the learner's preferred curriculum and target exam when provided.",
+    ].join(" "),
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              `Subject/Course: ${body.subjectName ?? "Unknown"}`,
+              `Topic: ${body.topicName ?? "General overview"}`,
+              `Grade/Band: ${body.grade ?? "Unknown"}`,
+              `Answer context: ${body.context || "None"}`,
+              `App variant: ${body.appVariant ?? "children"}`,
+              `Audience: ${body.appAudienceLabel ?? "General learners"}`,
+              `Learner age: ${body.profile?.age ?? "Unknown"}`,
+              `Target exam: ${body.profile?.targetExam ?? "General study"}`,
+              `Preferred curriculum: ${body.profile?.preferredCurriculum || "Not specified"}`,
+              `Variant guidance: ${body.appGuidance ?? ""}`,
+              `Write the entire lesson in ${body.learnerLanguageLabel ?? "English"}.`,
+            ].join("\n"),
+          },
+        ],
+      },
+    ],
+  });
+
+  sendJson(response, 200, { lesson: data.lesson });
 }
 
 async function handleCompetitionJoin(body, response) {
@@ -2406,6 +2482,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/breather") {
       await handleBreather(body, response);
+      return;
+    }
+
+    if (url.pathname === "/learning-hub/lesson") {
+      await handleLearningLesson(body, response);
       return;
     }
 

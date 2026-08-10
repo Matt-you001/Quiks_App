@@ -23,6 +23,7 @@ const sharedLinks = [
 ] as const;
 
 const advancedLinks = [
+  { label: "Learning Hub", href: "/learning-hub" },
   { label: "Classroom", href: "/classroom" },
   { label: "Competition", href: "/competition" },
 ] as const;
