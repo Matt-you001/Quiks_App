@@ -23,6 +23,7 @@ const defaultState: StoredAppState = {
   profiles: [],
   currentProfileId: null,
   results: {},
+  learningHubGenerationDates: [],
   subscriptionTier: "free",
   subscriptionExpiresAt: null,
   subscriptionUpdatedAt: 0,
@@ -94,6 +95,12 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
   );
 
   const subscriptionTier = state.subscriptionTier === "pro" ? "pro" : "free";
+  const learningHubGenerationDates = Array.isArray(state.learningHubGenerationDates)
+    ? state.learningHubGenerationDates
+        .filter((value): value is string => typeof value === "string" && Number.isFinite(new Date(value).getTime()))
+        .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())
+        .slice(-90)
+    : [];
   const subscriptionExpiresAt =
     subscriptionTier === "pro" && typeof state.subscriptionExpiresAt === "string"
       ? state.subscriptionExpiresAt
@@ -107,6 +114,7 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
       ? preferredProfileId
       : profiles[0]?.id ?? null,
     results,
+    learningHubGenerationDates,
     subscriptionTier,
     subscriptionExpiresAt,
     subscriptionUpdatedAt:
@@ -174,6 +182,9 @@ function mergeStoredStates(
   const normalizedRemote = normalizeState(remoteState);
   const profiles = mergeProfiles(localState.profiles, normalizedRemote.profiles);
   const results = mergeResultsMap(localState.results, normalizedRemote.results);
+  const learningHubGenerationDates = Array.from(
+    new Set([...localState.learningHubGenerationDates, ...normalizedRemote.learningHubGenerationDates])
+  );
   const preferredProfileId =
     localState.currentProfileId ??
     normalizedRemote.currentProfileId ??
@@ -197,6 +208,7 @@ function mergeStoredStates(
     profiles,
     currentProfileId: profiles.some((profile) => profile.id === preferredProfileId) ? preferredProfileId : profiles[0]?.id ?? null,
     results,
+    learningHubGenerationDates,
     subscriptionTier: selectedSubscription.subscriptionTier,
     subscriptionExpiresAt: selectedSubscription.subscriptionExpiresAt,
     subscriptionUpdatedAt: selectedSubscription.subscriptionUpdatedAt,
@@ -483,6 +495,15 @@ export async function setSubscriptionTier(
   const normalized = normalizeState(state);
   await writeAppState(normalized);
   return normalized;
+}
+
+export async function recordLearningHubGeneration(dateIso = new Date().toISOString()) {
+  const state = await readMutableAppState();
+  state.learningHubGenerationDates = Array.from(new Set([...state.learningHubGenerationDates, dateIso]))
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())
+    .slice(-90);
+  await writeAppState(state, { awaitCloudSync: true });
+  return state;
 }
 
 export async function setAuthenticatedAccount(account: AppAccount | null, isAuthenticated: boolean) {

@@ -1374,6 +1374,17 @@ function buildLearningLessonSchema() {
   };
 }
 
+function buildLearningHubAnswerSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      answer: { type: "string" },
+    },
+    required: ["answer"],
+  };
+}
+
 async function handleQuestions(body, response) {
   const data = await createOpenAiResponse({
     schemaName: "quiz_questions",
@@ -1592,6 +1603,37 @@ async function handleLearningLesson(body, response) {
   });
 
   sendJson(response, 200, { lesson: data.lesson });
+}
+
+async function handleLearningHubQuestion(body, response) {
+  if (typeof body.question !== "string" || !body.question.trim()) {
+    sendJson(response, 400, { error: "Enter a question to continue." });
+    return;
+  }
+
+  const data = await createOpenAiResponse({
+    schemaName: "learning_hub_answer",
+    schema: buildLearningHubAnswerSchema(),
+    instructions: [
+      "Answer the user's direct question clearly, accurately, and as a self-contained response.",
+      "Explain the reasoning or process instead of returning only a short final answer.",
+      "Use a concise worked example when it improves understanding.",
+      "Respond in the language used by the question and avoid unnecessary jargon.",
+    ].join(" "),
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: body.question.trim(),
+          },
+        ],
+      },
+    ],
+  });
+
+  sendJson(response, 200, { answer: data.answer });
 }
 
 async function handleCompetitionJoin(body, response) {
@@ -2487,6 +2529,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/learning-hub/lesson") {
       await handleLearningLesson(body, response);
+      return;
+    }
+
+    if (url.pathname === "/learning-hub/ask") {
+      await handleLearningHubQuestion(body, response);
       return;
     }
 

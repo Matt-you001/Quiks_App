@@ -70,6 +70,7 @@ import type {
   FeedbackRequest,
   LearningLesson,
   LearningLessonRequest,
+  LearningHubQuestionRequest,
   Question,
   QuestionRequest,
   QuestionResponse,
@@ -657,6 +658,18 @@ export async function generateLearningLesson(request: LearningLessonRequest): Pr
     withVariantMeta(request) as unknown as Record<string, unknown>
   );
   return response.lesson;
+}
+
+export async function askLearningHubQuestion(request: LearningHubQuestionRequest): Promise<string> {
+  if (!apiUrl || aiMode === "demo") {
+    throw new Error("Live Learning Hub answers are unavailable.");
+  }
+
+  const response = await postJson<Record<string, unknown>, { answer: string }>(
+    "/learning-hub/ask",
+    request as unknown as Record<string, unknown>
+  );
+  return response.answer;
 }
 
 export async function joinCompetition(request: CompetitionJoinRequest): Promise<CompetitionJoinResponse> {

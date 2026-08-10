@@ -1391,6 +1391,7 @@ export default function SessionScreen() {
             <Text style={styles.explanationText}>{currentQuestion?.explanation}</Text>
             {mode === "training" ? (
               <View style={styles.explanationActions}>
+                <PrimaryButton label={t(language, "nextQuestion")} onPress={() => advance()} style={styles.explanationActionButton} />
                 <PrimaryButton
                   label={t(language, "learnMore")}
                   variant="secondary"
@@ -1406,7 +1407,6 @@ export default function SessionScreen() {
                   } as never)}
                   style={styles.explanationActionButton}
                 />
-                <PrimaryButton label={t(language, "nextQuestion")} onPress={() => advance()} style={styles.explanationActionButton} />
               </View>
             ) : null}
           </View>

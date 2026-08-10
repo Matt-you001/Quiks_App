@@ -142,12 +142,17 @@ export interface LearningLessonRequest {
   profile?: UserProfile | null;
 }
 
+export interface LearningHubQuestionRequest {
+  question: string;
+}
+
 export interface StoredAppState {
   account: AppAccount | null;
   isAuthenticated: boolean;
   profiles: UserProfile[];
   currentProfileId: string | null;
   results: Record<string, SessionResult[]>;
+  learningHubGenerationDates: string[];
   subscriptionTier: SubscriptionTier;
   subscriptionExpiresAt: string | null;
   subscriptionUpdatedAt: number;

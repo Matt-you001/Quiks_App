@@ -159,6 +159,16 @@ type TranslationKey =
   | "others"
   | "enterCustomSubject"
   | "unableGenerateLesson"
+  | "learningHubDailyLimit"
+  | "copyLesson"
+  | "lessonCopied"
+  | "askAQuestion"
+  | "askQuestionHint"
+  | "enterQuestion"
+  | "submitQuestion"
+  | "questionAnswer"
+  | "unableAnswerQuestion"
+  | "answerCopied"
   | "noResultFound"
   | "excellentWork"
   | "greatJob"
@@ -636,6 +646,16 @@ const english: TranslationMap = {
   others: "Others",
   enterCustomSubject: "Enter a subject",
   unableGenerateLesson: "The lesson could not be generated. Please try again.",
+  learningHubDailyLimit: "Free users can generate one Learning Hub lesson per day. Upgrade to Pro for unlimited lessons.",
+  copyLesson: "Copy",
+  lessonCopied: "Lesson copied",
+  askAQuestion: "Ask a Question",
+  askQuestionHint: "Ask about something you are learning and receive a clear explanation.",
+  enterQuestion: "Type your question",
+  submitQuestion: "Get Answer",
+  questionAnswer: "Answer",
+  unableAnswerQuestion: "Your question could not be answered. Please try again.",
+  answerCopied: "Answer copied",
   noResultFound: "No result found",
   excellentWork: "Excellent work",
   greatJob: "Great job",

@@ -103,6 +103,18 @@ export function getDailyCompetitionLimit(subscriptionTier: SubscriptionTier) {
   return hasProAccess(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_COMPETITION_LIMITS[appVariant.id];
 }
 
+export function getDailyLearningHubLimit(subscriptionTier: SubscriptionTier) {
+  return isProTier(subscriptionTier) ? Number.POSITIVE_INFINITY : 1;
+}
+
+export function getDailyLearningHubGenerationsUsed(generationDates: string[]) {
+  return generationDates.filter(isSameLocalDay).length;
+}
+
+export function canGenerateLearningHubToday(subscriptionTier: SubscriptionTier, generationDates: string[]) {
+  return getDailyLearningHubGenerationsUsed(generationDates) < getDailyLearningHubLimit(subscriptionTier);
+}
+
 export function getDailyAiSessionsUsed(results: SessionResult[]) {
   return results.filter((result) => isSameLocalDay(result.date) && result.questionSource === "remote" && !result.competitionId).length;
 }
