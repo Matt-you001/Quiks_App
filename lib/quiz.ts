@@ -7,6 +7,23 @@ export interface LevelProgressOption {
   isNextUnlocked: boolean;
 }
 
+export const GRADE_LEVEL_COUNT = 20;
+export const LEVELS_PER_DIFFICULTY = 5;
+
+const gradeDifficulties: Difficulty[] = ["Beginner", "Intermediate", "Advanced", "Expert"];
+
+export function getDifficultyForLevel(level: number): Difficulty {
+  const normalizedLevel = Math.min(Math.max(Math.floor(level), 1), GRADE_LEVEL_COUNT);
+  return gradeDifficulties[Math.floor((normalizedLevel - 1) / LEVELS_PER_DIFFICULTY)];
+}
+
+export function getDifficultyLevelRange(difficulty: Difficulty) {
+  const index = gradeDifficulties.indexOf(difficulty);
+  const safeIndex = Math.max(index, 0);
+  const firstLevel = safeIndex * LEVELS_PER_DIFFICULTY + 1;
+  return { firstLevel, lastLevel: firstLevel + LEVELS_PER_DIFFICULTY - 1 };
+}
+
 export function shuffleOptions(options: string[]) {
   const next = [...options];
   for (let i = next.length - 1; i > 0; i -= 1) {
@@ -40,7 +57,7 @@ export function getUnlockedLevels(results: SessionResult[], subjectId: string) {
   let maxUnlocked = 1;
   for (const result of results) {
     if (result.subjectId === subjectId && result.score >= SCORE_THRESHOLD) {
-      maxUnlocked = Math.max(maxUnlocked, result.level + 1);
+      maxUnlocked = Math.max(maxUnlocked, Math.min(result.level + 1, GRADE_LEVEL_COUNT));
     }
   }
   return Array.from({ length: maxUnlocked }, (_, index) => index + 1);
@@ -50,7 +67,7 @@ export function getUnlockedLevelsForGrade(results: SessionResult[], subjectId: s
   let maxUnlocked = 1;
   for (const result of results) {
     if (result.subjectId === subjectId && result.grade === grade && result.score >= SCORE_THRESHOLD) {
-      maxUnlocked = Math.max(maxUnlocked, result.level + 1);
+      maxUnlocked = Math.max(maxUnlocked, Math.min(result.level + 1, GRADE_LEVEL_COUNT));
     }
   }
   return Array.from({ length: maxUnlocked }, (_, index) => index + 1);

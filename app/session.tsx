@@ -13,7 +13,7 @@ import { getDifficultyLabel, t } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
 import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState, upsertResult } from "../lib/storage";
 import { canUseAiToday, canUseClassroom, hasProAccess } from "../lib/subscription";
-import { calculateQuizTime, getLevelProgressForGrade, getNextDifficulty, normalizeQuestions, scoreQuestions } from "../lib/quiz";
+import { calculateQuizTime, getDifficultyForLevel, getDifficultyLevelRange, getLevelProgressForGrade, getNextDifficulty, GRADE_LEVEL_COUNT, normalizeQuestions, scoreQuestions } from "../lib/quiz";
 import {
   getSubjectById,
   getSubjectDisplayName,
@@ -75,7 +75,10 @@ export default function SessionScreen() {
   const language = profile?.language ?? "en";
   const subject = getSubjectById(params.subjectId, language);
   const mode: TestMode = params.mode === "training" ? "training" : "quiz";
-  const presetLevel = Number(params.level ?? 1);
+  const presetLevel = Math.min(Math.max(Number(params.level ?? 1), 1), GRADE_LEVEL_COUNT);
+  const isCompetition = typeof params.competitionId === "string";
+  const isClassroomActivity = typeof params.classroomActivityId === "string";
+  const usesAssignedDifficulty = isCompetition || isClassroomActivity;
   const hasPresetGrade = typeof params.grade === "string" && grades.includes(params.grade);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [grade, setGrade] = useState(() =>
@@ -86,12 +89,12 @@ export default function SessionScreen() {
   const [isCustomTopic, setIsCustomTopic] = useState(false);
   const [customTopicInput, setCustomTopicInput] = useState("");
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
-  const [selectedLevel, setSelectedLevel] = useState(Math.max(1, presetLevel));
+  const [selectedLevel, setSelectedLevel] = useState(presetLevel);
   const [levelTouched, setLevelTouched] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>(() =>
-    params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)
+    usesAssignedDifficulty && params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)
       ? params.difficulty
-      : appVariant.defaultDifficulty
+      : getDifficultyForLevel(presetLevel)
   );
   const [phase, setPhase] = useState<SessionPhase>("setup");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -117,8 +120,6 @@ export default function SessionScreen() {
   const lastScheduledCompetitionRef = useRef<string | null>(null);
   const isFinishingRef = useRef(false);
   const sessionResultIdRef = useRef<string>(`${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
-  const isCompetition = typeof params.competitionId === "string";
-  const isClassroomActivity = typeof params.classroomActivityId === "string";
   const competitionOpponentName =
     typeof params.competitionOpponentName === "string" ? params.competitionOpponentName : undefined;
   const competitionQuickMessages = useMemo(
@@ -188,10 +189,16 @@ export default function SessionScreen() {
       setTopicId(params.topicId);
     }
 
-    if (params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)) {
+    if (usesAssignedDifficulty && params.difficulty && ["Beginner", "Intermediate", "Advanced", "Expert"].includes(params.difficulty)) {
       setDifficulty(params.difficulty);
     }
-  }, [params.grade, params.difficulty, params.focusMode, params.topicId]);
+  }, [params.grade, params.difficulty, params.focusMode, params.topicId, usesAssignedDifficulty]);
+
+  useEffect(() => {
+    if (!usesAssignedDifficulty) {
+      setDifficulty(getDifficultyForLevel(selectedLevel));
+    }
+  }, [selectedLevel, usesAssignedDifficulty]);
 
   useEffect(() => {
     if (subject?.name) {
@@ -491,7 +498,7 @@ export default function SessionScreen() {
             pathname: "/results",
             params: {
               result: JSON.stringify(finalResult),
-              nextDifficulty: getNextDifficulty(difficulty),
+              nextDifficulty: usesAssignedDifficulty ? getNextDifficulty(difficulty) : getDifficultyForLevel(selectedLevel + 1),
             },
           });
         }
@@ -917,6 +924,7 @@ export default function SessionScreen() {
       aiFeedback: feedback,
       aiStudyPlan: studyPlan,
       questionSource: questionSource ?? undefined,
+      classroomActivityId: typeof params.classroomActivityId === "string" ? params.classroomActivityId : undefined,
     };
 
     if (isCompetition && params.competitionId) {
@@ -994,7 +1002,7 @@ export default function SessionScreen() {
       pathname: "/results",
       params: {
         result: JSON.stringify(result),
-        nextDifficulty: getNextDifficulty(difficulty),
+        nextDifficulty: usesAssignedDifficulty ? getNextDifficulty(difficulty) : getDifficultyForLevel(selectedLevel + 1),
       },
     });
   };
@@ -1193,18 +1201,18 @@ export default function SessionScreen() {
 
           <Text style={styles.label}>{t(language, "difficulty")}</Text>
           <View style={styles.choiceWrap}>
-            {(["Beginner", "Intermediate", "Advanced", "Expert"] as Difficulty[]).map((entry) => (
-              <Pressable
-                key={entry}
-                onPress={() => setDifficulty(entry)}
-                style={[styles.choiceChip, difficulty === entry ? styles.choiceChipActive : null]}
-              >
-                <Text style={[styles.choiceText, difficulty === entry ? styles.choiceTextActive : null]}>
-                  {getDifficultyLabel(language, entry)}
-                </Text>
-              </Pressable>
-            ))}
+            <View style={[styles.choiceChip, styles.choiceChipActive]}>
+              <Text style={[styles.choiceText, styles.choiceTextActive]}>{getDifficultyLabel(language, difficulty)}</Text>
+            </View>
           </View>
+          {!usesAssignedDifficulty ? (
+            <Text style={styles.hintText}>
+              {t(language, "difficultyLevelRange", {
+                first: getDifficultyLevelRange(difficulty).firstLevel,
+                last: getDifficultyLevelRange(difficulty).lastLevel,
+              })}
+            </Text>
+          ) : null}
 
           <PrimaryButton
             label={t(language, "start", { mode: mode === "training" ? appVariant.trainingLabel : appVariant.quizLabel })}

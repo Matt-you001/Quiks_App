@@ -166,6 +166,17 @@ function describeAcademicStage(request: QuestionRequest) {
   ].join(" ");
 }
 
+function describeLevelCurriculumFocus(request: QuestionRequest) {
+  if (request.focusMode === "topic" || request.subject.topics.length === 0) return null;
+  const normalizedLevel = Math.min(Math.max(request.level, 1), 20);
+  const topicIndex = Math.min(
+    Math.floor(((normalizedLevel - 1) * request.subject.topics.length) / 20),
+    request.subject.topics.length - 1
+  );
+  const topic = request.subject.topics[topicIndex];
+  return `Level curriculum focus: Give primary emphasis to ${topic.label} (${topic.description}) while including useful review from earlier subject topics.`;
+}
+
 function buildPromptLines(request: QuestionRequest) {
   const language = normalizeLanguage(request.profile?.language);
   return [
@@ -183,6 +194,7 @@ function buildPromptLines(request: QuestionRequest) {
     `Variant guidance: ${appVariant.aiGuidance}`,
     `Academic stage guidance: ${describeAcademicStage(request)}`,
     `Difficulty rigour guidance: ${describeDifficultyRigour(request)}`,
+    describeLevelCurriculumFocus(request) ?? "",
     request.focusMode === "topic"
       ? "Generate questions only from the selected topic. Do not mix unrelated topics into this set."
       : "Use a healthy mix of topics within the subject or course.",
@@ -192,7 +204,7 @@ function buildPromptLines(request: QuestionRequest) {
     "Avoid generic filler, placeholders, or over-simplified questions that belong to a lower academic stage.",
     "Never answer a teens or university request with primary-school style content.",
     `Write all question prompts, answer options, and explanations in ${getLanguagePromptLabel(language)}.`,
-  ];
+  ].filter(Boolean);
 }
 
 async function postJson<TRequest, TResponse>(path: string, body: TRequest): Promise<TResponse> {

@@ -208,6 +208,15 @@ function describeAcademicStage(body) {
   ].join(" ");
 }
 
+function describeLevelCurriculumFocus(body) {
+  const topics = Array.isArray(body.subject?.topics) ? body.subject.topics : [];
+  if (body.focusMode === "topic" || topics.length === 0) return null;
+  const normalizedLevel = Math.min(Math.max(Number(body.level ?? 1), 1), 20);
+  const topicIndex = Math.min(Math.floor(((normalizedLevel - 1) * topics.length) / 20), topics.length - 1);
+  const topic = topics[topicIndex];
+  return `Level curriculum focus: Give primary emphasis to ${topic.label ?? "the designated topic"} (${topic.description ?? "the expected curriculum content"}) while including useful review from earlier subject topics.`;
+}
+
 function buildQuestionPromptLines(body) {
   return [
     `Subject/Course: ${body.subject?.name ?? "Unknown"}`,
@@ -228,6 +237,7 @@ function buildQuestionPromptLines(body) {
     `Variant guidance: ${body.appGuidance ?? ""}`,
     `Academic stage guidance: ${describeAcademicStage(body)}`,
     `Difficulty rigour guidance: ${describeDifficultyRigour(body)}`,
+    describeLevelCurriculumFocus(body) ?? "",
     body.focusMode === "topic"
       ? "Generate questions only from the selected topic. Do not mix in unrelated topics."
       : "Use a healthy spread of topics within the subject or course.",
@@ -237,7 +247,7 @@ function buildQuestionPromptLines(body) {
     "Avoid over-simplified filler questions that belong to a lower academic stage.",
     "Never answer a teens or university request with primary-school style content.",
     `Write all question prompts, answer options, and explanations in ${body.learnerLanguageLabel ?? "English"}.`,
-  ];
+  ].filter(Boolean);
 }
 
 function sendJson(response, statusCode, payload) {
@@ -1533,7 +1543,7 @@ async function handleBreather(body, response) {
               `Subject/Course: ${body.subject?.name ?? "Unknown"}`,
               `Grade/Band: ${body.grade ?? "Unknown"}`,
               `Level: ${body.level ?? 1}`,
-              `Pass streak: ${body.streak ?? 0}`,
+              `Successful sessions completed: ${body.successfulSessionCount ?? 0}`,
               `Mode: ${body.mode ?? "quiz"}`,
               `Difficulty: ${body.difficulty ?? "Beginner"}`,
               `Question focus: ${body.focusMode === "topic" ? `Topic only (${body.topicLabel ?? body.topicId ?? "selected topic"})` : "General mixed practice"}`,

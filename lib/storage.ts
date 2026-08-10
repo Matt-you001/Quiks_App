@@ -24,6 +24,8 @@ const defaultState: StoredAppState = {
   currentProfileId: null,
   results: {},
   learningHubGenerationDates: [],
+  reviewPromptLastShownAt: null,
+  reviewCompletedAt: null,
   subscriptionTier: "free",
   subscriptionExpiresAt: null,
   subscriptionUpdatedAt: 0,
@@ -105,6 +107,14 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
     subscriptionTier === "pro" && typeof state.subscriptionExpiresAt === "string"
       ? state.subscriptionExpiresAt
       : null;
+  const reviewPromptLastShownAt =
+    typeof state.reviewPromptLastShownAt === "string" && Number.isFinite(new Date(state.reviewPromptLastShownAt).getTime())
+      ? state.reviewPromptLastShownAt
+      : null;
+  const reviewCompletedAt =
+    typeof state.reviewCompletedAt === "string" && Number.isFinite(new Date(state.reviewCompletedAt).getTime())
+      ? state.reviewCompletedAt
+      : null;
 
   return enforceProfileLimit({
     account: state.account ?? null,
@@ -115,6 +125,8 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
       : profiles[0]?.id ?? null,
     results,
     learningHubGenerationDates,
+    reviewPromptLastShownAt,
+    reviewCompletedAt,
     subscriptionTier,
     subscriptionExpiresAt,
     subscriptionUpdatedAt:
@@ -201,6 +213,12 @@ function mergeStoredStates(
       : localState.subscriptionTier === "pro"
         ? localState
         : normalizedRemote;
+  const latestReviewPromptTime = [localState.reviewPromptLastShownAt, normalizedRemote.reviewPromptLastShownAt]
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? null;
+  const latestReviewCompletionTime = [localState.reviewCompletedAt, normalizedRemote.reviewCompletedAt]
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? null;
 
   return normalizeState({
     account: remoteAccount ?? localState.account ?? normalizedRemote.account ?? null,
@@ -209,6 +227,8 @@ function mergeStoredStates(
     currentProfileId: profiles.some((profile) => profile.id === preferredProfileId) ? preferredProfileId : profiles[0]?.id ?? null,
     results,
     learningHubGenerationDates,
+    reviewPromptLastShownAt: latestReviewPromptTime,
+    reviewCompletedAt: latestReviewCompletionTime,
     subscriptionTier: selectedSubscription.subscriptionTier,
     subscriptionExpiresAt: selectedSubscription.subscriptionExpiresAt,
     subscriptionUpdatedAt: selectedSubscription.subscriptionUpdatedAt,
@@ -502,6 +522,20 @@ export async function recordLearningHubGeneration(dateIso = new Date().toISOStri
   state.learningHubGenerationDates = Array.from(new Set([...state.learningHubGenerationDates, dateIso]))
     .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())
     .slice(-90);
+  await writeAppState(state, { awaitCloudSync: true });
+  return state;
+}
+
+export async function recordReviewPromptShown(dateIso = new Date().toISOString()) {
+  const state = await readMutableAppState();
+  state.reviewPromptLastShownAt = dateIso;
+  await writeAppState(state, { awaitCloudSync: true });
+  return state;
+}
+
+export async function recordReviewCompleted(dateIso = new Date().toISOString()) {
+  const state = await readMutableAppState();
+  state.reviewCompletedAt = dateIso;
   await writeAppState(state, { awaitCloudSync: true });
   return state;
 }

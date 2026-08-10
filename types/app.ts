@@ -104,7 +104,29 @@ export interface SessionResult {
   competitionMode?: "head_to_head" | "group";
   competitionPlacement?: number;
   competitionStandings?: CompetitionStanding[];
+  classroomActivityId?: string;
   questionSource?: QuestionResponse["source"];
+}
+
+export interface GradeCertificate {
+  id: string;
+  profileId: string;
+  learnerName: string;
+  quiksId: string;
+  age: number;
+  targetExam: string;
+  preferredCurriculum?: string;
+  schoolName?: string;
+  subjectId: string;
+  subjectName: string;
+  grade: string;
+  awardedAt: string;
+  completionResultId: string;
+  averageScore: number;
+  averageTimeSeconds: number;
+  speedPercent: number;
+  excellence: "Outstanding" | "Excellent" | "Very Good" | "Accomplished";
+  speedAward: "Lightning Fast" | "Swift" | "Focused";
 }
 
 export interface BreatherContent {
@@ -153,6 +175,8 @@ export interface StoredAppState {
   currentProfileId: string | null;
   results: Record<string, SessionResult[]>;
   learningHubGenerationDates: string[];
+  reviewPromptLastShownAt: string | null;
+  reviewCompletedAt: string | null;
   subscriptionTier: SubscriptionTier;
   subscriptionExpiresAt: string | null;
   subscriptionUpdatedAt: number;
@@ -441,7 +465,7 @@ export interface BreatherRequest {
   subject: Subject;
   grade: string;
   level: number;
-  streak: number;
+  successfulSessionCount: number;
   mode?: TestMode;
   difficulty?: Difficulty;
   focusMode?: QuestionFocusMode;

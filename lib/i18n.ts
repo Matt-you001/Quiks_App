@@ -1,4 +1,4 @@
-import type { AppLanguage } from "../types/app";
+import type { AppLanguage, GradeCertificate } from "../types/app";
 
 type TranslationKey =
   | "signIn"
@@ -196,6 +196,69 @@ type TranslationKey =
   | "quickTakeaways"
   | "reflection"
   | "continueLearning"
+  | "breatherRead"
+  | "breatherPlay"
+  | "breatherMove"
+  | "breatherRelax"
+  | "sudokuTitle"
+  | "sudokuHint"
+  | "memoryMatchTitle"
+  | "memoryMatchHint"
+  | "wordBuilderTitle"
+  | "wordBuilderHint"
+  | "patternDetectiveTitle"
+  | "patternDetectiveHint"
+  | "breathingResetTitle"
+  | "breathingResetHint"
+  | "movementBreakTitle"
+  | "movementBreakHint"
+  | "checkAnswer"
+  | "tryAgain"
+  | "wellDone"
+  | "startBreathing"
+  | "breatheIn"
+  | "holdBreath"
+  | "breatheOut"
+  | "movementComplete"
+  | "difficultyLevelRange"
+  | "certificateUnlocked"
+  | "gradeCertificate"
+  | "certificateUnlockedMessage"
+  | "viewCertificate"
+  | "certificateProgress"
+  | "certificateProgressMessage"
+  | "myCertificates"
+  | "noCertificatesYet"
+  | "learnFastGrowSteady"
+  | "officialAchievement"
+  | "gradeCompletionCertificate"
+  | "presentedTo"
+  | "certificateStatement"
+  | "levelOfExcellence"
+  | "averageScore"
+  | "speedAchievement"
+  | "averageTime"
+  | "certified"
+  | "dateAwarded"
+  | "certificateIssuer"
+  | "certificateId"
+  | "printSaveCertificate"
+  | "shareCertificate"
+  | "backToProfile"
+  | "certificateNotAvailable"
+  | "unableShareCertificate"
+  | "excellenceOutstanding"
+  | "excellenceExcellent"
+  | "excellenceVeryGood"
+  | "excellenceAccomplished"
+  | "speedLightningFast"
+  | "speedSwift"
+  | "speedFocused"
+  | "enjoyingQuiks"
+  | "reviewPromptMessage"
+  | "reviewOnPlayStore"
+  | "maybeLater"
+  | "unableOpenPlayStore"
   | "currentLanguage"
   | "sessionTitle"
   | "selectedGradeStartHint"
@@ -664,7 +727,7 @@ const english: TranslationMap = {
   notPassedLevel: "You did not pass Level {level} in {subject} yet, but you can improve with another try.",
   rewardUnlocked: "Reward unlocked",
   takeLearningBreather: "Take a learning breather",
-  breatherRewardText: "You have passed {count} {levelWord} in {subject}. A short reset is ready if you want one before the next exercise.",
+  breatherRewardText: "You have completed {count} successful sessions in {subject}. A short reset is ready if you want one before the next exercise.",
   performanceMessage: "Performance message",
   sessionSummary: "Session summary",
   correctAnswers: "Correct answers",
@@ -683,6 +746,69 @@ const english: TranslationMap = {
   quickTakeaways: "Quick takeaways",
   reflection: "Reflection",
   continueLearning: "Continue learning",
+  breatherRead: "Read",
+  breatherPlay: "Play",
+  breatherMove: "Move",
+  breatherRelax: "Relax",
+  sudokuTitle: "Sudoku Reset",
+  sudokuHint: "Fill every empty cell so each row, column and block contains each number once.",
+  memoryMatchTitle: "Memory Match",
+  memoryMatchHint: "Turn over two cards at a time and find every matching pair.",
+  wordBuilderTitle: "Word Builder",
+  wordBuilderHint: "Unscramble the letters using the clue below.",
+  patternDetectiveTitle: "Pattern Detective",
+  patternDetectiveHint: "Choose the item that correctly continues the pattern.",
+  breathingResetTitle: "One-minute Reset",
+  breathingResetHint: "Follow the breathing guide and let your attention settle.",
+  movementBreakTitle: "Move and Reset",
+  movementBreakHint: "Complete these gentle movements before returning to learning.",
+  checkAnswer: "Check Answer",
+  tryAgain: "Not quite—try again.",
+  wellDone: "Well done! Your Breather is complete.",
+  startBreathing: "Start Breathing",
+  breatheIn: "Breathe in",
+  holdBreath: "Hold",
+  breatheOut: "Breathe out",
+  movementComplete: "I Completed the Movements",
+  difficultyLevelRange: "This difficulty is assigned to Levels {first}–{last}.",
+  certificateUnlocked: "Certificate unlocked",
+  gradeCertificate: "Grade Certificate",
+  certificateUnlockedMessage: "You completed all 20 certifying levels for {subject} in {grade}.",
+  viewCertificate: "View Certificate",
+  certificateProgress: "Certificate progress",
+  certificateProgressMessage: "{count} of {total} certifying Quiz/Test levels completed.",
+  myCertificates: "My Certificates",
+  noCertificatesYet: "Complete all 20 Quiz/Test levels for a subject and grade to earn a certificate.",
+  learnFastGrowSteady: "Learn fast. Grow steady.",
+  officialAchievement: "Official achievement",
+  gradeCompletionCertificate: "Certificate of Grade Completion",
+  presentedTo: "This certificate is proudly presented to",
+  certificateStatement: "For successfully completing all {levels} levels of {subject} for {grade}, demonstrating knowledge across Beginner, Intermediate, Advanced and Expert difficulty.",
+  levelOfExcellence: "Level of excellence",
+  averageScore: "average score",
+  speedAchievement: "Speed achievement",
+  averageTime: "average time",
+  certified: "Certified",
+  dateAwarded: "Date awarded",
+  certificateIssuer: "Certificate issuer",
+  certificateId: "Certificate ID",
+  printSaveCertificate: "Print / Save Certificate",
+  shareCertificate: "Share Certificate",
+  backToProfile: "Back to Profile",
+  certificateNotAvailable: "This certificate is not available yet.",
+  unableShareCertificate: "The certificate could not be shared.",
+  excellenceOutstanding: "Outstanding",
+  excellenceExcellent: "Excellent",
+  excellenceVeryGood: "Very Good",
+  excellenceAccomplished: "Accomplished",
+  speedLightningFast: "Lightning Fast",
+  speedSwift: "Swift",
+  speedFocused: "Focused",
+  enjoyingQuiks: "Enjoying Quiks?",
+  reviewPromptMessage: "Your review helps other learners discover {appName} and helps us keep improving it.",
+  reviewOnPlayStore: "Review on Play Store",
+  maybeLater: "Maybe Later",
+  unableOpenPlayStore: "The Play Store review page could not be opened.",
   currentLanguage: "Current language",
   sessionTitle: "{subject} session",
   selectedGradeStartHint: "Selected grade: {grade}. Choose difficulty and start your {mode}.",
@@ -1064,7 +1190,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     notPassedLevel: "Du hast Stufe {level} in {subject} noch nicht bestanden, aber mit einem weiteren Versuch kannst du dich verbessern.",
     rewardUnlocked: "Belohnung freigeschaltet",
     takeLearningBreather: "Lernpause starten",
-    breatherRewardText: "Du hast {count} {levelWord} in {subject} bestanden. Eine kurze Pause ist bereit, wenn du vor der nächsten Übung eine machen möchtest.",
+    breatherRewardText: "Du hast {count} erfolgreiche Lerneinheiten in {subject} abgeschlossen. Eine kurze Pause ist bereit, wenn du vor der nächsten Übung eine machen möchtest.",
     performanceMessage: "Leistungsrückmeldung",
     sessionSummary: "Sitzungsübersicht",
     correctAnswers: "Richtige Antworten",
@@ -1508,7 +1634,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     notPassedLevel: "你还没有通过 {subject} 的第 {level} 级，但再练习一次就会更好。",
     rewardUnlocked: "奖励已解锁",
     takeLearningBreather: "进入学习放松环节",
-    breatherRewardText: "你已经在 {subject} 中连续通过了 {count} 个{levelWord}。如果你愿意，现在可以先进行一个简短放松后再继续。",
+    breatherRewardText: "你已经在 {subject} 中完成了 {count} 次成功的学习。现在可以进行一次短暂放松，然后再继续。",
     performanceMessage: "表现反馈",
     sessionSummary: "学习总结",
     correctAnswers: "答对题数",
@@ -1634,7 +1760,7 @@ const translations: Record<AppLanguage, TranslationMap> = {
     notPassedLevel: "لم تجتز المستوى {level} في {subject} بعد، لكن يمكنك التحسن بمحاولة أخرى.",
     rewardUnlocked: "تم فتح المكافأة",
     takeLearningBreather: "خذ استراحة تعليمية",
-    breatherRewardText: "لقد اجتزت {count} {levelWord} في {subject}. توجد استراحة قصيرة جاهزة إذا أردت قبل التمرين التالي.",
+    breatherRewardText: "لقد أكملت {count} جلسات ناجحة في {subject}. توجد استراحة قصيرة جاهزة إذا أردت قبل التمرين التالي.",
     performanceMessage: "رسالة الأداء",
     sessionSummary: "ملخص الجلسة",
     correctAnswers: "الإجابات الصحيحة",
@@ -1740,5 +1866,35 @@ export function getDifficultyLabel(language: AppLanguage | undefined, difficulty
       return t(language, "difficultyExpert");
     default:
       return difficulty;
+  }
+}
+
+export function getCertificateExcellenceLabel(
+  language: AppLanguage | undefined,
+  excellence: GradeCertificate["excellence"]
+) {
+  switch (excellence) {
+    case "Outstanding":
+      return t(language, "excellenceOutstanding");
+    case "Excellent":
+      return t(language, "excellenceExcellent");
+    case "Very Good":
+      return t(language, "excellenceVeryGood");
+    default:
+      return t(language, "excellenceAccomplished");
+  }
+}
+
+export function getCertificateSpeedLabel(
+  language: AppLanguage | undefined,
+  speedAward: GradeCertificate["speedAward"]
+) {
+  switch (speedAward) {
+    case "Lightning Fast":
+      return t(language, "speedLightningFast");
+    case "Swift":
+      return t(language, "speedSwift");
+    default:
+      return t(language, "speedFocused");
   }
 }

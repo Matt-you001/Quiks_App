@@ -1,15 +1,19 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { ReviewPromptDialog } from "../components/ReviewPromptDialog";
 import { canShowAds, showInterstitialAd } from "../lib/ads";
-import { getSubjectPassStreak, shouldOfferBreather } from "../lib/breathers";
-import { t } from "../lib/i18n";
-import { calculateQuizTime } from "../lib/quiz";
+import { appVariant } from "../lib/app-variant";
+import { getSubjectSuccessfulSessionCount, shouldOfferBreather } from "../lib/breathers";
+import { getCertificateProgress, getGradeCertificate } from "../lib/certificates";
+import { getCertificateExcellenceLabel, getCertificateSpeedLabel, t } from "../lib/i18n";
+import { calculateQuizTime, getDifficultyForLevel, GRADE_LEVEL_COUNT } from "../lib/quiz";
+import { openPlayStoreReview, shouldShowReviewPrompt } from "../lib/reviews";
 import { hasProAccess } from "../lib/subscription";
-import { readAppState } from "../lib/storage";
+import { readAppState, recordReviewCompleted, recordReviewPromptShown } from "../lib/storage";
 import { getSubjectById, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import {
@@ -17,14 +21,17 @@ import {
   getCompetitionRematchStatus,
   requestCompetitionRematch,
 } from "../services/ai";
-import type { AppLanguage, CompetitionRematchResponse, Difficulty, SessionResult, SubscriptionTier, UserProfile } from "../types/app";
+import type { AppLanguage, CompetitionRematchResponse, Difficulty, GradeCertificate, SessionResult, SubscriptionTier, UserProfile } from "../types/app";
 
 const allowedDifficulties: Difficulty[] = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
 export default function ResultsScreen() {
   const params = useLocalSearchParams<{ result?: string; nextDifficulty?: string }>();
   const [showBreather, setShowBreather] = useState(false);
-  const [passStreak, setPassStreak] = useState(0);
+  const [successfulSessionCount, setSuccessfulSessionCount] = useState(0);
+  const [certificate, setCertificate] = useState<GradeCertificate | null>(null);
+  const [certificateProgress, setCertificateProgress] = useState(0);
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
@@ -33,6 +40,7 @@ export default function ResultsScreen() {
   const [isRequestingRematch, setIsRequestingRematch] = useState(false);
   const [isAcceptingRematch, setIsAcceptingRematch] = useState(false);
   const rematchNavigatedRef = useRef(false);
+  const reviewPromptRecordedRef = useRef(false);
 
   const result = useMemo(() => {
     if (!params.result || Array.isArray(params.result)) {
@@ -63,14 +71,40 @@ export default function ResultsScreen() {
       const currentProfileId = state.currentProfileId;
       const profileResults = currentProfileId ? state.results[currentProfileId] ?? [] : [];
       const profile = state.profiles.find((item) => item.id === currentProfileId) ?? null;
-      const streak = getSubjectPassStreak(profileResults, result.subjectId);
+      const completedSuccesses = getSubjectSuccessfulSessionCount(profileResults, result.subjectId);
 
       setLanguage(profile?.language ?? "en");
       setProfile(profile);
       setSubscriptionTier(state.subscriptionTier);
       setSubscriptionLoaded(true);
-      setPassStreak(streak);
-      setShowBreather(shouldOfferBreather(profileResults, result));
+      setSuccessfulSessionCount(completedSuccesses);
+      const gradeCertificate = profile
+        ? getGradeCertificate(profile, profileResults, result.subjectId, result.grade)
+        : null;
+      setCertificate(gradeCertificate);
+      setCertificateProgress(getCertificateProgress(profileResults, result.subjectId, result.grade));
+      const breatherAvailable = shouldOfferBreather(profileResults, result);
+      const certificateUnlocked = gradeCertificate?.completionResultId === result.id;
+      setShowBreather(certificateUnlocked ? false : breatherAvailable);
+
+      const totalSuccessfulSessions = profileResults.filter((entry) => entry.score >= SCORE_THRESHOLD).length;
+      const canPromptForReview =
+        Platform.OS === "android" &&
+        result.score >= SCORE_THRESHOLD &&
+        !result.competitionId &&
+        !result.classroomActivityId &&
+        !breatherAvailable &&
+        !certificateUnlocked &&
+        shouldShowReviewPrompt(
+          totalSuccessfulSessions,
+          state.reviewPromptLastShownAt,
+          state.reviewCompletedAt
+        );
+      if (canPromptForReview && !reviewPromptRecordedRef.current) {
+        reviewPromptRecordedRef.current = true;
+        setShowReviewPrompt(true);
+        void recordReviewPromptShown();
+      }
     });
 
     return () => {
@@ -100,6 +134,7 @@ export default function ResultsScreen() {
       ? t(language, "notPassedLevel", { level: result.level, subject: result.topicLabel ?? result.subjectName })
       : "";
   const isCompetition = Boolean(result?.competitionId);
+  const certificateJustUnlocked = certificate?.completionResultId === result?.id;
   const isGroupCompetition = result?.competitionMode === "group";
   const canUseRematch = Boolean(
     result?.competitionId &&
@@ -198,6 +233,10 @@ export default function ResultsScreen() {
   };
 
   const goToNextLevel = () => {
+    if (result.level >= GRADE_LEVEL_COUNT) {
+      router.replace({ pathname: "/subject/[slug]", params: { slug: result.subjectId } } as never);
+      return;
+    }
     router.replace({
       pathname: "/session",
       params: {
@@ -205,7 +244,7 @@ export default function ResultsScreen() {
         mode: result.mode,
         level: String(result.level + 1),
         grade: result.grade,
-        difficulty: nextDifficulty,
+        difficulty: isCompetition ? nextDifficulty : getDifficultyForLevel(result.level + 1),
         focusMode: result.focusMode ?? "general",
         topicId: result.topicId,
         autoStart: "1",
@@ -214,7 +253,7 @@ export default function ResultsScreen() {
   };
 
   const openBreather = () => {
-    router.push({
+    router.replace({
       pathname: "/breather",
       params: {
         subjectId: result.subjectId,
@@ -224,12 +263,30 @@ export default function ResultsScreen() {
         mode: result.mode,
         difficulty: result.difficulty,
         nextDifficulty,
-        streak: String(passStreak),
+        successfulSessionCount: String(successfulSessionCount),
         focusMode: result.focusMode ?? "general",
         topicId: result.topicId,
         topicLabel: result.topicLabel,
       },
     });
+  };
+
+  const openCertificate = () => {
+    if (!certificate) return;
+    router.push({
+      pathname: "/certificate",
+      params: { profileId: certificate.profileId, subjectId: certificate.subjectId, grade: certificate.grade },
+    } as never);
+  };
+
+  const reviewOnPlayStore = async () => {
+    setShowReviewPrompt(false);
+    try {
+      await openPlayStoreReview();
+      await recordReviewCompleted();
+    } catch {
+      Alert.alert(t(language, "enjoyingQuiks"), t(language, "unableOpenPlayStore"));
+    }
   };
 
   const requestRematch = async () => {
@@ -312,10 +369,31 @@ export default function ResultsScreen() {
           <Text style={styles.rewardTitle}>{t(language, "takeLearningBreather")}</Text>
           <Text style={styles.rewardText}>
             {t(language, "breatherRewardText", {
-              count: passStreak,
-              levelWord: passStreak === 1 ? "level" : "levels",
+              count: successfulSessionCount,
               subject: result.subjectName,
             })}
+          </Text>
+        </View>
+      ) : null}
+
+      {certificateJustUnlocked && certificate ? (
+        <View style={styles.certificateRewardCard}>
+          <Text style={styles.rewardEyebrow}>{t(language, "certificateUnlocked")}</Text>
+          <Text style={styles.rewardTitle}>{t(language, "gradeCertificate")}</Text>
+          <Text style={styles.rewardText}>
+            {t(language, "certificateUnlockedMessage", { subject: result.subjectName, grade: result.grade })}
+          </Text>
+          <Text style={styles.certificateMetric}>{getCertificateExcellenceLabel(language, certificate.excellence)} · {certificate.averageScore}%</Text>
+          <Text style={styles.certificateMetric}>{getCertificateSpeedLabel(language, certificate.speedAward)}</Text>
+          <PrimaryButton label={t(language, "viewCertificate")} onPress={openCertificate} style={styles.certificateButton} />
+        </View>
+      ) : null}
+
+      {result.mode === "quiz" && !certificate && certificateProgress > 0 ? (
+        <View style={styles.certificateProgressCard}>
+          <Text style={styles.title}>{t(language, "certificateProgress")}</Text>
+          <Text style={styles.summaryLine}>
+            {t(language, "certificateProgressMessage", { count: certificateProgress, total: GRADE_LEVEL_COUNT })}
           </Text>
         </View>
       ) : null}
@@ -410,7 +488,7 @@ export default function ResultsScreen() {
       <View style={styles.actionColumn}>
         {passed && showBreather ? <PrimaryButton label={t(language, "takeLearningBreather")} onPress={openBreather} /> : null}
         <View style={styles.actionRow}>
-          {passed ? (
+          {passed && result.level < GRADE_LEVEL_COUNT ? (
             <PrimaryButton
               label={showBreather ? t(language, "skipBreatherAndContinue") : t(language, "nextLevel")}
               variant={showBreather ? "secondary" : "primary"}
@@ -418,6 +496,9 @@ export default function ResultsScreen() {
               style={styles.actionButton}
               compact
             />
+          ) : null}
+          {certificate && !certificateJustUnlocked ? (
+            <PrimaryButton label={t(language, "viewCertificate")} variant="secondary" onPress={openCertificate} style={styles.actionButton} compact />
           ) : null}
           <PrimaryButton
             label={t(language, "repeatThisLevel")}
@@ -429,6 +510,15 @@ export default function ResultsScreen() {
           <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={backHome} style={styles.actionButton} compact />
         </View>
       </View>
+      <ReviewPromptDialog
+        visible={showReviewPrompt}
+        title={t(language, "enjoyingQuiks")}
+        message={t(language, "reviewPromptMessage", { appName: appVariant.appName })}
+        reviewLabel={t(language, "reviewOnPlayStore")}
+        laterLabel={t(language, "maybeLater")}
+        onReview={reviewOnPlayStore}
+        onLater={() => setShowReviewPrompt(false)}
+      />
     </AppBackground>
   );
 }
@@ -471,6 +561,30 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: "#F2C982",
+  },
+  certificateRewardCard: {
+    marginTop: 18,
+    backgroundColor: "#FFF8DE",
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: palette.warn,
+    padding: 20,
+    ...shadows.card,
+  },
+  certificateProgressCard: {
+    marginTop: 18,
+    backgroundColor: "#F7FBFD",
+    borderRadius: 24,
+    padding: 18,
+    ...shadows.card,
+  },
+  certificateMetric: {
+    color: palette.navy,
+    fontWeight: "900",
+    marginTop: 8,
+  },
+  certificateButton: {
+    marginTop: 16,
   },
   rewardEyebrow: {
     color: "#9A6400",

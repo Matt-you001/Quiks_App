@@ -1172,20 +1172,10 @@ function getVariantGeneralBreathers() {
   return childrenGeneralBreathers;
 }
 
-export function getSubjectPassStreak(results: SessionResult[], subjectId: string) {
-  const subjectResults = results.filter((result) => result.subjectId === subjectId);
-  let streak = 0;
-
-  for (const result of subjectResults) {
-    if (result.score >= SCORE_THRESHOLD) {
-      streak += 1;
-      continue;
-    }
-
-    break;
-  }
-
-  return streak;
+export function getSubjectSuccessfulSessionCount(results: SessionResult[], subjectId: string) {
+  return results.filter(
+    (result) => result.subjectId === subjectId && result.score >= SCORE_THRESHOLD
+  ).length;
 }
 
 export function shouldOfferBreather(results: SessionResult[], currentResult: SessionResult) {
@@ -1193,15 +1183,15 @@ export function shouldOfferBreather(results: SessionResult[], currentResult: Ses
     return false;
   }
 
-  const streak = getSubjectPassStreak(results, currentResult.subjectId);
-  return streak >= BREATHER_INTERVAL && streak % BREATHER_INTERVAL === 0;
+  const successfulSessionCount = getSubjectSuccessfulSessionCount(results, currentResult.subjectId);
+  return successfulSessionCount >= BREATHER_INTERVAL && successfulSessionCount % BREATHER_INTERVAL === 0;
 }
 
-export function getBreatherContent(subjectId: string, level: number, streak: number, language: AppLanguage = "en") {
+export function getBreatherContent(subjectId: string, level: number, successfulSessionCount: number, language: AppLanguage = "en") {
   const subjectBreathers = getVariantSubjectBreathers();
   const generalBreathers = getVariantGeneralBreathers();
   const candidates = subjectBreathers[subjectId] ?? generalBreathers;
-  const indexSeed = Math.max(level * 2 + streak - 1, 0);
+  const indexSeed = Math.max(level * 2 + successfulSessionCount - 1, 0);
   const chosen = candidates[indexSeed % candidates.length] ?? generalBreathers[0];
   return localizeBreatherContent(chosen, language);
 }

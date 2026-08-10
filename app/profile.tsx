@@ -9,8 +9,9 @@ import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { canShowAds } from "../lib/ads";
+import { getProfileCertificates } from "../lib/certificates";
 import { signOutAccount } from "../lib/firebase";
-import { getLanguageLabel, t } from "../lib/i18n";
+import { getCertificateExcellenceLabel, getCertificateSpeedLabel, getLanguageLabel, t } from "../lib/i18n";
 import { syncRevenueCatIdentity } from "../lib/revenuecat";
 import { canCreateAnotherProfile } from "../lib/subscription";
 import { logoutAccount, readAppState, setCurrentProfile, setSubscriptionTier as storeSubscriptionTier } from "../lib/storage";
@@ -163,6 +164,10 @@ export default function ProfileScreen() {
   const bestScore = results.length > 0 ? `${Math.max(...results.map((result) => result.score))}%` : "0%";
   const language = activeProfile?.language ?? "en";
   const latestPerformance = results[0] ? `${results[0].score}% in ${results[0].subjectName}` : t(language, "noSessionsYet");
+  const certificates = useMemo(
+    () => activeProfile ? getProfileCertificates(activeProfile, results) : [],
+    [activeProfile, results]
+  );
   const [selectedHistoryDay, setSelectedHistoryDay] = useState<string | null>(null);
   const [isHistoryDropdownOpen, setIsHistoryDropdownOpen] = useState(false);
 
@@ -449,6 +454,35 @@ export default function ProfileScreen() {
         <Text style={styles.metricText}>{t(language, "latestScore")}: {latestPerformance}</Text>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{t(language, "myCertificates")}</Text>
+        {certificates.length > 0 ? (
+          <View style={styles.certificateList}>
+            {certificates.map((certificate) => (
+              <View key={certificate.id} style={styles.certificateItem}>
+                <View style={styles.certificateCopy}>
+                  <Text style={styles.certificateSubject}>{certificate.subjectName}</Text>
+                  <Text style={styles.certificateMeta}>{certificate.grade} · {getCertificateExcellenceLabel(language, certificate.excellence)} · {certificate.averageScore}%</Text>
+                  <Text style={styles.certificateMeta}>{getCertificateSpeedLabel(language, certificate.speedAward)}</Text>
+                </View>
+                <PrimaryButton
+                  label={t(language, "viewCertificate")}
+                  variant="secondary"
+                  compact
+                  onPress={() => router.push({
+                    pathname: "/certificate",
+                    params: { profileId: certificate.profileId, subjectId: certificate.subjectId, grade: certificate.grade },
+                  } as never)}
+                  style={styles.certificateViewButton}
+                />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.metricText}>{t(language, "noCertificatesYet")}</Text>
+        )}
+      </View>
+
       {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       {competitionResults.length > 0 ? (
@@ -647,6 +681,38 @@ const styles = StyleSheet.create({
     color: palette.slate,
     lineHeight: 24,
     marginTop: 6,
+  },
+  certificateList: {
+    gap: 12,
+  },
+  certificateItem: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.mist,
+    backgroundColor: palette.paper,
+    padding: 14,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  certificateCopy: {
+    flex: 1,
+    minWidth: 180,
+  },
+  certificateSubject: {
+    color: palette.ink,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  certificateMeta: {
+    color: palette.slate,
+    marginTop: 5,
+  },
+  certificateViewButton: {
+    width: 150,
+    maxWidth: 150,
   },
   copyMetricRow: {
     marginTop: 6,
