@@ -55,19 +55,43 @@ function getRevenueCatConfig(appVariant = "children") {
   return revenueCatPublicKeys[appVariant] ?? revenueCatPublicKeys.children;
 }
 
+function getRevenueCatExpiration(record) {
+  return record?.expires_date ?? record?.expires_at ?? null;
+}
+
+function isRevenueCatRecordActive(record) {
+  if (!record) {
+    return false;
+  }
+
+  const expiresAt = getRevenueCatExpiration(record);
+  if (!expiresAt) {
+    return true;
+  }
+
+  const expirationTime = new Date(expiresAt).getTime();
+  return Number.isFinite(expirationTime) && expirationTime > Date.now();
+}
+
 function parseRevenueCatSubscriptionStatus(payload, appVariant) {
   const subscriber = payload?.subscriber ?? payload;
-  const entitlement = subscriber?.entitlements?.[getRevenueCatConfig(appVariant).entitlement];
-  const expiresAt = entitlement?.expires_date ?? null;
-  const expirationTime = expiresAt ? new Date(expiresAt).getTime() : null;
-  const active = Boolean(
-    entitlement &&
-      (expirationTime === null || (Number.isFinite(expirationTime) && expirationTime > Date.now()))
-  );
+  const entitlements = subscriber?.entitlements ?? {};
+  const subscriptions = subscriber?.subscriptions ?? {};
+  const configuredEntitlement = entitlements[getRevenueCatConfig(appVariant).entitlement];
+  const activeRecords = [
+    ...(isRevenueCatRecordActive(configuredEntitlement) ? [configuredEntitlement] : []),
+    ...Object.values(entitlements).filter(isRevenueCatRecordActive),
+    ...Object.values(subscriptions).filter(isRevenueCatRecordActive),
+  ];
+  const activeRecord = activeRecords[0] ?? null;
+  const datedExpirations = activeRecords
+    .map(getRevenueCatExpiration)
+    .filter(Boolean)
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime());
 
   return {
-    active,
-    expiresAt: active ? expiresAt : null,
+    active: Boolean(activeRecord),
+    expiresAt: activeRecord ? datedExpirations[0] ?? null : null,
   };
 }
 
@@ -77,7 +101,7 @@ async function fetchRevenueCatSubscriber(accountUid, appVariant) {
     `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(accountUid)}`,
     {
       headers: {
-        Authorization: `Bearer ${config.android}`,
+        Authorization: `Bearer ${config.paddle}`,
         "Content-Type": "application/json",
       },
     }

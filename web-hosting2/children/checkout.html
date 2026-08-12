@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiks Uni | Checkout</title>
+  <meta name="description" content="Checkout entry page for Quiks Uni web subscriptions." />
+  <link rel="icon" href="./favicon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./variant-shell.css" />
+  <style>
+    :root { color-scheme: light; }
+    .shell { max-width: 980px; margin: 0 auto; padding: 24px 18px 40px; }
+    .panel {
+      background: rgba(255,255,255,0.94);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: 0 18px 50px rgba(8, 20, 35, 0.18);
+      margin-bottom: 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .brand img { width: 68px; height: 68px; border-radius: 18px; }
+    h1, h2 { margin: 0 0 12px; }
+    p { line-height: 1.7; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+    .button {
+      display: inline-block;
+      padding: 14px 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 700;
+      border: 0;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .button.primary { background: #0b1f33; color: #fff; }
+    .button.secondary { background: #fff; color: #0b1f33; border: 1px solid rgba(11,31,51,0.18); }
+    .checkout-note {
+      margin-top: 14px;
+      color: #20364a;
+      font-weight: 700;
+    }
+    .checkout-note.error {
+      color: #b42318;
+    }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .links a { color: #0b1f33; font-weight: 700; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="variant-header-shell">
+    <header class="variant-header">
+      <div class="variant-header-top">
+        <a class="variant-brand" href="https://uni.quiks.site/" aria-label="Quiks Uni home">
+          <img src="./favicon.png" alt="Quiks Uni logo" />
+          <div>
+            <p class="variant-brand-name">Quiks Uni</p>
+            <p class="variant-brand-tag">Learn fast. Grow steady.</p>
+          </div>
+        </a>
+        <button class="variant-menu-toggle" type="button" aria-expanded="false" aria-controls="variant-nav" aria-label="Open navigation menu"><span class="variant-menu-glyph" aria-hidden="true">&#9776;</span></button>
+      </div>
+      <nav class="variant-nav" id="variant-nav" data-open="false">
+        <a href="https://uni.quiks.site/">Home</a>
+        <a href="https://uni.quiks.site/profile/">Profile</a>
+        <a href="https://uni.quiks.site/classroom/">Classroom</a>
+        <a href="https://uni.quiks.site/competition/">Competition</a>
+        <a href="https://uni.quiks.site/subscription/">Subscription</a>
+        <a href="https://play.google.com/store/apps/details?id=com.quiks.uni">Download App</a>
+        <a href="https://quiks.site/contact.html">Support</a>
+      </nav>
+    </header>
+  </div>
+  <div class="shell">
+    <section class="panel">
+      <div class="brand">
+        <img src="./logo.svg" alt="Quiks Uni logo" />
+        <div>
+          <h1>Quiks Uni Checkout</h1>
+          <p>Secure web billing for Quiks Uni Pro.</p>
+        </div>
+      </div>
+      <p>Quiks Uni subscriptions on the web are billed through Paddle through RevenueCat. Choose a plan below to launch secure checkout.</p>
+      <div class="actions">
+        <button class="button primary" type="button" data-plan="monthly">Monthly plan</button>
+        <button class="button secondary" type="button" data-plan="yearly">Yearly plan</button>
+        <a class="button secondary" href="https://quiks.site/pricing.html">View pricing</a>
+      </div>
+      <p id="checkout-status" class="checkout-note">Paddle checkout opens in an overlay on this page.</p>
+      <div class="links">
+        <a href="https://quiks.site/terms.html">Terms</a>
+        <a href="https://quiks.site/privacy.html">Privacy</a>
+        <a href="https://quiks.site/refund.html">Refund Policy</a>
+        <a href="https://quiks.site/contact.html">Contact</a>
+      </div>
+    </section>
+  </div>
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+  <script>
+    (function () {
+      const menuButton = document.querySelector(".variant-menu-toggle");
+      const menuGlyph = document.querySelector(".variant-menu-glyph");
+      const menu = document.getElementById("variant-nav");
+      if (menuButton && menu) {
+        menuButton.addEventListener("click", function () {
+          const nextOpen = menu.getAttribute("data-open") !== "true";
+          menu.setAttribute("data-open", nextOpen ? "true" : "false");
+          menuButton.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+          menuButton.setAttribute("aria-label", nextOpen ? "Close navigation menu" : "Open navigation menu");
+          if (menuGlyph) {
+            menuGlyph.innerHTML = nextOpen ? "&times;" : "&#9776;";
+          }
+        });
+      }
+
+      const token = "live_58cf05e9abc2e3daa263e2d86b1";
+      const prices = {
+        monthly: "pri_01ktmmh5xf4yn0yn1vwq8pg2rh",
+        yearly: "pri_01ktmmm7cmh5tg4tm93cv8pk5e"
+      };
+      const status = document.getElementById("checkout-status");
+      const buttons = document.querySelectorAll("[data-plan]");
+
+      function setStatus(message, isError) {
+        if (!status) return;
+        status.textContent = message;
+        status.classList.toggle("error", Boolean(isError));
+      }
+
+      if (!window.Paddle) {
+        setStatus("Paddle could not be loaded on this page. Refresh and try again.", true);
+        return;
+      }
+
+      window.Paddle.Environment.set("production");
+      window.Paddle.Initialize({
+        token: token,
+        eventCallback: function (event) {
+          if (!event || !event.name) {
+            return;
+          }
+
+          if (event.name === "checkout.loaded") {
+            setStatus("Secure checkout loaded.");
+            return;
+          }
+
+          if (event.name === "checkout.closed") {
+            setStatus("Checkout closed. Choose a plan to try again.");
+            return;
+          }
+
+          if (event.name === "checkout.error" || event.name === "checkout.payment.error") {
+            const code = event.code ? " (" + event.code + ")" : "";
+            const detail = event.detail ? ": " + event.detail : ".";
+            setStatus("Checkout error" + code + detail, true);
+            console.error("[Paddle checkout error]", event);
+          }
+        }
+      });
+
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          const plan = button.getAttribute("data-plan");
+          const priceId = plan ? prices[plan] : null;
+          if (!priceId) {
+            setStatus("This plan is not configured yet.", true);
+            return;
+          }
+
+          setStatus("Opening secure checkout...");
+          window.Paddle.Checkout.open({
+            items: [{ priceId: priceId, quantity: 1 }],
+            settings: {
+              displayMode: "overlay",
+              theme: "light"
+            }
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

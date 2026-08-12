@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -37,8 +37,10 @@ import type { AppLanguage } from "../types/app";
 
 function GoogleLoginButton({
   onSuccess,
+  onError,
 }: {
   onSuccess: (idToken: string, accessToken?: string) => Promise<void>;
+  onError: (message: string) => void;
 }) {
   const language = "en";
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -52,6 +54,12 @@ function GoogleLoginButton({
         redirectUri: getGoogleAuthRedirectUri(),
       })
     : [null, null, null];
+  const onSuccessRef = useRef(onSuccess);
+  const handledGoogleResponseKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   useEffect(() => {
     if (isNativeFlow) {
@@ -63,12 +71,21 @@ function GoogleLoginButton({
         return;
       }
 
+      const responseParams = "params" in response ? response.params : {};
+      const responseKey = [
+        response.type,
+        responseParams.state ?? "",
+        responseParams.id_token ?? "",
+        responseParams.error ?? "",
+      ].join(":");
+      if (handledGoogleResponseKeyRef.current === responseKey) {
+        return;
+      }
+      handledGoogleResponseKeyRef.current = responseKey;
+
       if (response.type === "error") {
         setGoogleLoading(false);
-        Alert.alert(
-          t(language, "invalidCredentialsTitle"),
-          response.error?.message || response.params.error_description || t(language, "invalidCredentialsMessage")
-        );
+        onError(response.error?.message || response.params.error_description || t(language, "invalidCredentialsMessage"));
         return;
       }
 
@@ -80,22 +97,19 @@ function GoogleLoginButton({
       const accessToken = response.params.access_token;
       if (!idToken) {
         setGoogleLoading(false);
-        Alert.alert(
-          t(language, "invalidCredentialsTitle"),
-          "Google did not return the identity token required to complete sign-in. Please try again."
-        );
+        onError("Google did not return the identity token required to complete sign-in. Please try again.");
         return;
       }
 
       try {
-        await onSuccess(idToken, accessToken);
+        await onSuccessRef.current(idToken, accessToken);
       } finally {
         setGoogleLoading(false);
       }
     };
 
     void completeGoogle();
-  }, [isNativeFlow, onSuccess, response]);
+  }, [isNativeFlow, onError, response]);
 
   return (
     <PrimaryButton
@@ -111,13 +125,13 @@ function GoogleLoginButton({
             await promptAsync?.();
           }
         } catch (error) {
-          Alert.alert(t(language, "invalidCredentialsTitle"), formatGoogleSignInError(error));
+          onError(formatGoogleSignInError(error));
         } finally {
           setGoogleLoading(false);
         }
       }}
       loading={googleLoading}
-      disabled={!isNativeFlow && !request}
+      disabled={Platform.OS !== "web" && !isNativeFlow && !request}
     />
   );
 }
@@ -128,7 +142,15 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authFeedback, setAuthFeedback] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const hasGoogleConfig = hasGoogleSignInConfig();
+
+  const reportAuthError = useCallback((message: string) => {
+    setAuthFeedback({ message, tone: "error" });
+    if (Platform.OS !== "web") {
+      Alert.alert(t(language, "invalidCredentialsTitle"), message);
+    }
+  }, [language]);
 
   useFocusEffect(
     useCallback(() => {
@@ -141,8 +163,10 @@ export default function LoginScreen() {
 
         const firebaseAccount = Platform.OS === "web" ? await waitForFirebaseAuthAccount() : getAuthenticatedAccount();
         if (firebaseAccount) {
-          await setAuthenticatedAccount(firebaseAccount, true);
-          await syncRevenueCatIdentityForAuthentication(firebaseAccount);
+          // Firebase browser persistence has already restored this account.
+          // readAppState above opens its account-scoped cache and starts the
+          // cloud refresh, so do not block the returning user on network I/O.
+          void syncRevenueCatIdentityForAuthentication(firebaseAccount);
         }
         if (firebaseAccount || (Platform.OS !== "web" && state.isAuthenticated)) {
           const nextRoute = getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo);
@@ -154,21 +178,23 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!isFirebaseConfigured()) {
-      Alert.alert(
-        t(language, "authNotConfiguredTitle"),
-        `${t(language, "authNotConfiguredMessage")}\n\n${getFirebaseConfigErrorMessage() ?? "Firebase env not detected in this build."}`
+      reportAuthError(
+        `${t(language, "authNotConfiguredMessage")} ${getFirebaseConfigErrorMessage() ?? "Firebase env not detected in this build."}`
       );
       return;
     }
 
+    setAuthFeedback(null);
     setLoading(true);
     try {
       const account = await signInWithEmailAccount(email, password);
-      await setAuthenticatedAccount(account, true);
-      await syncRevenueCatIdentityForAuthentication(account);
+      await Promise.all([
+        setAuthenticatedAccount(account, true),
+        syncRevenueCatIdentityForAuthentication(account),
+      ]);
       router.replace(getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never);
     } catch (error) {
-      Alert.alert(t(language, "invalidCredentialsTitle"), formatFirebaseError(error));
+      reportAuthError(formatFirebaseError(error));
     } finally {
       setLoading(false);
     }
@@ -176,18 +202,20 @@ export default function LoginScreen() {
 
   const handleForgotPassword = async () => {
     if (!isFirebaseConfigured()) {
-      Alert.alert(
-        t(language, "authNotConfiguredTitle"),
-        `${t(language, "authNotConfiguredMessage")}\n\n${getFirebaseConfigErrorMessage() ?? "Firebase env not detected in this build."}`
+      reportAuthError(
+        `${t(language, "authNotConfiguredMessage")} ${getFirebaseConfigErrorMessage() ?? "Firebase env not detected in this build."}`
       );
       return;
     }
 
     try {
       await sendResetPasswordEmail(email);
-      Alert.alert(t(language, "passwordResetSentTitle"), t(language, "passwordResetSentMessage"));
+      setAuthFeedback({ message: t(language, "passwordResetSentMessage"), tone: "success" });
+      if (Platform.OS !== "web") {
+        Alert.alert(t(language, "passwordResetSentTitle"), t(language, "passwordResetSentMessage"));
+      }
     } catch (error) {
-      Alert.alert(t(language, "invalidCredentialsTitle"), formatFirebaseError(error));
+      reportAuthError(formatFirebaseError(error));
     }
   };
 
@@ -224,19 +252,29 @@ export default function LoginScreen() {
             />
 
             <View style={styles.actionColumn}>
+              {authFeedback ? (
+                <View style={[styles.feedbackCard, authFeedback.tone === "success" && styles.feedbackCardSuccess]}>
+                  <Text style={[styles.feedbackText, authFeedback.tone === "success" && styles.feedbackTextSuccess]}>
+                    {authFeedback.message}
+                  </Text>
+                </View>
+              ) : null}
               <PrimaryButton label={t(language, "signIn")} onPress={handleLogin} loading={loading} />
               {hasGoogleConfig ? (
                 <GoogleLoginButton
+                  onError={reportAuthError}
                   onSuccess={async (idToken, accessToken) => {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
-                      await setAuthenticatedAccount(account, true);
-                      await syncRevenueCatIdentityForAuthentication(account);
+                      await Promise.all([
+                        setAuthenticatedAccount(account, true),
+                        syncRevenueCatIdentityForAuthentication(account),
+                      ]);
                       router.replace(
                         getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never
                       );
-                    } catch {
-                      Alert.alert(t(language, "invalidCredentialsTitle"), t(language, "invalidCredentialsMessage"));
+                    } catch (error) {
+                      reportAuthError(formatFirebaseError(error));
                     }
                   }}
                 />
@@ -319,5 +357,26 @@ const styles = StyleSheet.create({
   actionColumn: {
     marginTop: 20,
     gap: 12,
+  },
+  feedbackCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E0527A",
+    backgroundColor: "#FFF0F4",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  feedbackCardSuccess: {
+    borderColor: "#20A36E",
+    backgroundColor: "#EFFAF5",
+  },
+  feedbackText: {
+    color: "#A3264A",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  feedbackTextSuccess: {
+    color: "#13704D",
   },
 });

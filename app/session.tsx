@@ -7,6 +7,7 @@ import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { cancelCompetitionReminderNotifications, scheduleCompetitionReminderNotifications } from "../lib/notifications";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { MathText } from "../components/MathText";
 import { appVariant } from "../lib/app-variant";
 import { canShowAds } from "../lib/ads";
 import { getDifficultyLabel, t } from "../lib/i18n";
@@ -1364,7 +1365,11 @@ export default function SessionScreen() {
         <Text style={styles.progressText}>
           {t(language, "questionCount", { current: currentIndex + 1, total: questions.length })}
         </Text>
-        <Text style={styles.question}>{currentQuestion?.prompt}</Text>
+        <MathText
+          value={currentQuestion?.prompt}
+          textStyle={styles.question}
+          containerStyle={styles.questionContainer}
+        />
 
         <View style={styles.optionList}>
           {currentQuestion?.options.map((option, optionIndex) => {
@@ -1385,7 +1390,7 @@ export default function SessionScreen() {
                 onPress={() => chooseAnswer(option)}
                 style={[styles.optionButton, highlight]}
               >
-                <Text style={styles.optionText}>{option}</Text>
+                <MathText value={option} textStyle={styles.optionText} />
               </Pressable>
             );
           })}
@@ -1396,7 +1401,11 @@ export default function SessionScreen() {
             <Text style={styles.explanationTitle}>
               {selectedAnswer === currentQuestion?.answer ? t(language, "correct") : t(language, "keepGoing")}
             </Text>
-            <Text style={styles.explanationText}>{currentQuestion?.explanation}</Text>
+            <MathText
+              value={currentQuestion?.explanation}
+              textStyle={styles.explanationText}
+              containerStyle={styles.explanationTextContainer}
+            />
             {mode === "training" ? (
               <View style={styles.explanationActions}>
                 <PrimaryButton label={t(language, "nextQuestion")} onPress={() => advance()} style={styles.explanationActionButton} />
@@ -1809,6 +1818,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     lineHeight: 32,
+  },
+  questionContainer: {
     marginTop: 12,
   },
   optionList: {
@@ -1849,6 +1860,8 @@ const styles = StyleSheet.create({
   explanationText: {
     color: palette.slate,
     lineHeight: 22,
+  },
+  explanationTextContainer: {
     marginTop: 8,
     marginBottom: 14,
   },

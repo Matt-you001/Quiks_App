@@ -6,6 +6,7 @@ import * as Clipboard from "expo-clipboard";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { MathText } from "../components/MathText";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { appVariant } from "../lib/app-variant";
 import { createClassroomInvitationLink, createClassroomInvitationMessage } from "../lib/classroom-invite";
@@ -1542,11 +1543,13 @@ export default function ClassroomScreen() {
                       {acceptedQuestions.length < desiredQuestionCount ? (
                         currentCandidateQuestion ? (
                           <View style={styles.questionCard}>
-                            <Text style={styles.questionPrompt}>{currentCandidateQuestion.prompt}</Text>
+                            <MathText value={currentCandidateQuestion.prompt} textStyle={styles.questionPrompt} />
                             {currentCandidateQuestion.options.map((option, index) => (
-                              <Text key={`${currentCandidateQuestion.id}-option-${index}`} style={styles.optionPreview}>
-                                {index + 1}. {option}
-                              </Text>
+                              <MathText
+                                key={`${currentCandidateQuestion.id}-option-${index}`}
+                                value={`${index + 1}. ${option}`}
+                                textStyle={styles.optionPreview}
+                              />
                             ))}
                             <View style={styles.inlineActions}>
                               <PrimaryButton label={t(language, "accept")} onPress={() => acceptCandidate(currentCandidateQuestion)} style={styles.inlineButton} />
@@ -1568,7 +1571,7 @@ export default function ClassroomScreen() {
                           <Text style={styles.sectionLabel}>{t(language, "reviewLabel")}</Text>
                           {reviewQuestions.map((question) => (
                             <View key={question.id} style={styles.questionCard}>
-                              <Text style={styles.questionPrompt}>{question.prompt}</Text>
+                              <MathText value={question.prompt} textStyle={styles.questionPrompt} />
                               <PrimaryButton label={t(language, "remove")} variant="secondary" onPress={() => removeAcceptedQuestion(question.id)} />
                             </View>
                           ))}

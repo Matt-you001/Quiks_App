@@ -85,9 +85,21 @@ function resolveFirebaseValue(
 ) {
   const variantKey = `EXPO_PUBLIC_${appVariant.id.toUpperCase()}_FIREBASE_${suffix}`;
   const genericKey = `EXPO_PUBLIC_FIREBASE_${suffix}`;
-  return normalizeEnvValue(
-    process.env[variantKey] ?? extra[variantKey] ?? extra[genericKey] ?? process.env[genericKey] ?? fallback
-  );
+  const variantValue = normalizeEnvValue(process.env[variantKey] ?? extra[variantKey]);
+  if (variantValue) {
+    return variantValue;
+  }
+
+  // A single exported web bundle is shared by all hosted variants. Its generic
+  // Expo extras belong to whichever variant Metro compiled last, so accepting
+  // those values on another hostname can connect Children or Teens to Uni's
+  // Firebase project. The checked-in fallback is variant-specific and is the
+  // safe source for hostname-selected web builds.
+  if (Platform.OS === "web") {
+    return fallback;
+  }
+
+  return normalizeEnvValue(extra[genericKey] ?? process.env[genericKey] ?? fallback);
 }
 
 const firebaseConfig = {
@@ -106,17 +118,32 @@ const isConfigured = Boolean(
     firebaseConfig.appId
 );
 
-const firebaseApp = isConfigured ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : null;
+const firebaseAppName = `quiks-${appVariant.id}`;
+const firebaseApp = isConfigured
+  ? getApps().some((candidate) => candidate.name === firebaseAppName)
+    ? getApp(firebaseAppName)
+    : initializeApp(firebaseConfig, firebaseAppName)
+  : null;
 export const firebaseAuth: Auth | null = (() => {
   if (!firebaseApp) {
     return null;
   }
 
+  // Web Auth uses Firebase's durable browser-local persistence. Google obtains
+  // its ID token through Expo AuthSession, then signs into Firebase with that
+  // credential, so the configured per-variant OAuth client remains authoritative.
+  if (Platform.OS === "web") {
+    try {
+      return initializeAuth(firebaseApp, {
+        persistence: browserLocalPersistence,
+      });
+    } catch {
+      return getAuth(firebaseApp);
+    }
+  }
+
   try {
-    const persistence =
-      Platform.OS === "web"
-        ? browserLocalPersistence
-        : rnAuth.getReactNativePersistence?.(AsyncStorage);
+    const persistence = rnAuth.getReactNativePersistence?.(AsyncStorage);
     return initializeAuth(firebaseApp, {
       ...(persistence ? { persistence } : {}),
     });
@@ -180,12 +207,44 @@ export function formatFirebaseError(error: unknown) {
     return "Network request failed. Check your internet connection and try again.";
   }
 
+  if (message.includes("auth/popup-blocked")) {
+    return "Google sign-in was blocked by the browser. Allow pop-ups for this Quiks website and try again.";
+  }
+
+  if (message.includes("auth/popup-closed-by-user")) {
+    return "Google sign-in was closed before it finished. Please try again.";
+  }
+
+  if (message.includes("auth/unauthorized-domain")) {
+    return "This Quiks website domain is not authorized in Firebase Authentication.";
+  }
+
   if (message.includes("auth/email-already-in-use")) {
     return "This email is already registered. Try signing in instead.";
   }
 
   if (message.includes("auth/invalid-credential")) {
-    return "The Firebase credentials for this build are not valid.";
+    return "The email or password is incorrect. Please check both and try again.";
+  }
+
+  if (message.includes("auth/user-not-found") || message.includes("auth/wrong-password")) {
+    return "The email or password is incorrect. Please check both and try again.";
+  }
+
+  if (message.includes("auth/invalid-email")) {
+    return "Enter a valid email address.";
+  }
+
+  if (message.includes("auth/weak-password")) {
+    return "Use a stronger password with at least six characters.";
+  }
+
+  if (message.includes("auth/too-many-requests")) {
+    return "Too many sign-in attempts were made. Wait a little and try again.";
+  }
+
+  if (message.includes("auth/requests-from-referer") || message.includes("API_KEY_HTTP_REFERRER_BLOCKED")) {
+    return "This website address is not permitted by the Firebase API key settings.";
   }
 
   return message;

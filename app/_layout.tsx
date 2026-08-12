@@ -65,8 +65,12 @@ export default function RootLayout() {
       }
 
       if (hydratedAccountUidRef.current !== account.uid) {
-        await setAuthenticatedAccount(account, true);
-        await syncRevenueCatIdentityForAuthentication(account);
+        // A returning web user already has an account-scoped local cache.
+        // Restore the route immediately, then refresh cloud state and plan in
+        // the background. Explicit sign-in still performs the awaited first
+        // cloud merge before it navigates here.
+        await readAppState();
+        void syncRevenueCatIdentityForAuthentication(account);
         hydratedAccountUidRef.current = account.uid;
       }
 

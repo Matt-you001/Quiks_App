@@ -7,7 +7,10 @@ import type { AppAccount, SessionResult, StoredAppState, SubscriptionTier, UserP
 
 const STORAGE_KEY = "quiks_mobile_state_v1";
 const QUESTION_HISTORY_KEY = "quiks_question_history_v1";
-const CLOUD_READ_TIMEOUT_MS = 5000;
+// Authentication should never leave the user waiting on a slow Firestore
+// request. If the first read misses this window, the existing background
+// refresh still merges the cloud profiles as soon as the request completes.
+const CLOUD_READ_TIMEOUT_MS = 2000;
 const CLOUD_WRITE_WAIT_MS = 3000;
 const CLOUD_REFRESH_INTERVAL_MS = 30_000;
 const cloudRefreshInFlight = new Set<string>();

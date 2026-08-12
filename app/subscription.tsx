@@ -23,6 +23,29 @@ import { normalizeSubscriptionPlanPeriod } from "../lib/web-checkout";
 import { getAccountSubscriptionStatus, syncPaddleSubscriptionPurchase } from "../services/ai";
 import type { AppAccount, AppLanguage, SubscriptionTier } from "../types/app";
 
+const PADDLE_SYNC_RETRY_DELAYS_MS = [750, 1500, 3000];
+
+function wait(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function resolvePaddlePurchaseStatus(accountUid: string, transactionId: string) {
+  let status = await syncPaddleSubscriptionPurchase({ accountUid, transactionId });
+  if (status.active) {
+    return status;
+  }
+
+  for (const delay of PADDLE_SYNC_RETRY_DELAYS_MS) {
+    await wait(delay);
+    status = await getAccountSubscriptionStatus({ accountUid });
+    if (status.active) {
+      return status;
+    }
+  }
+
+  return status;
+}
+
 export default function SubscriptionScreen() {
   const purchasesEnabled = areSubscriptionPurchasesEnabled();
   const params = useLocalSearchParams<{ plan?: string; source?: string }>();
@@ -126,12 +149,12 @@ export default function SubscriptionScreen() {
           return;
         }
 
-        const status = await syncPaddleSubscriptionPurchase({
-          accountUid: account.uid,
-          transactionId,
-        });
+        const status = await resolvePaddlePurchaseStatus(account.uid, transactionId);
         await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
         setSubscriptionTierState(status.active ? "pro" : "free");
+        setStoreMessage(
+          status.active ? t(language, "purchaseSuccessMessage") : t(language, "purchasePendingMessage")
+        );
         Alert.alert(
           status.active ? t(language, "purchaseSuccessTitle") : t(language, "purchasePendingTitle"),
           status.active ? t(language, "purchaseSuccessMessage") : t(language, "purchasePendingMessage")

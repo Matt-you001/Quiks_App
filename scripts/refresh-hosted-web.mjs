@@ -20,6 +20,8 @@ const routesByVariant = {
     ["session", "Session"],
     ["results", "Results"],
     ["breather", "Breather"],
+    ["learning-hub", "Learning Hub"],
+    ["certificate", "Certificate"],
   ],
   teens: [
     ["login", "Login"],
@@ -35,6 +37,8 @@ const routesByVariant = {
     ["session", "Session"],
     ["results", "Results"],
     ["breather", "Breather"],
+    ["learning-hub", "Learning Hub"],
+    ["certificate", "Certificate"],
   ],
   uni: [
     ["login", "Login"],
@@ -50,6 +54,8 @@ const routesByVariant = {
     ["session", "Session"],
     ["results", "Results"],
     ["breather", "Breather"],
+    ["learning-hub", "Learning Hub"],
+    ["certificate", "Certificate"],
   ],
 };
 
@@ -73,6 +79,7 @@ function createWrapperHtml(variant, pageTitle, entryScriptName) {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="quiks-variant" content="${variant}" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>${titles[variant]} | ${pageTitle}</title>
@@ -105,7 +112,10 @@ for (const variant of Object.keys(routesByVariant)) {
 
   if (existsSync(targetIndex)) {
     const original = readFileSync(targetIndex, "utf8");
-    const updated = original.replace(
+    const withVariant = /<meta name="quiks-variant"/i.test(original)
+      ? original.replace(/<meta name="quiks-variant" content="[^"]*"\s*\/?>/i, `<meta name="quiks-variant" content="${variant}" />`)
+      : original.replace(/<meta charset="utf-8"\s*\/?>/i, `$&\n    <meta name="quiks-variant" content="${variant}" />`);
+    const updated = withVariant.replace(
       /src="\.\/expo\/static\/js\/web\/entry-.*?\.js"/,
       `src="./expo/static/js/web/${entryScriptName}"`
     );
@@ -116,6 +126,26 @@ for (const variant of Object.keys(routesByVariant)) {
     const routeDir = join(hostingRoot, variant, route);
     mkdirSync(routeDir, { recursive: true });
     writeFileSync(join(routeDir, "index.html"), createWrapperHtml(variant, pageTitle, entryScriptName), "utf8");
+  }
+
+  const hostedWebDir = join(targetExpoDir, "static", "js", "web");
+  const hostedEntries = readdirSync(hostedWebDir).filter((file) => /^entry-.*\.js$/.test(file));
+  if (hostedEntries.length !== 1 || hostedEntries[0] !== entryScriptName) {
+    throw new Error(
+      `${variant} hosting must contain exactly ${entryScriptName}; found ${hostedEntries.join(", ") || "none"}.`
+    );
+  }
+
+  const appPages = [
+    targetIndex,
+    ...routesByVariant[variant].map(([route]) => join(hostingRoot, variant, route, "index.html")),
+  ];
+  for (const appPage of appPages) {
+    const html = readFileSync(appPage, "utf8");
+    const referencedEntries = html.match(/entry-[^"']+\.js/g) ?? [];
+    if (referencedEntries.length !== 1 || referencedEntries[0] !== entryScriptName) {
+      throw new Error(`${appPage} points to a stale or missing web bundle.`);
+    }
   }
 }
 

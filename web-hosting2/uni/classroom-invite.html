@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Open Quiks Uni invitation</title>
+    <style>
+      body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b1f33;font-family:Arial,sans-serif;color:#fff}
+      main{width:min(88vw,420px);padding:32px;border-radius:24px;background:rgba(255,255,255,.14);text-align:center}
+      a{display:block;margin-top:18px;padding:15px;border-radius:14px;background:#fff;color:#0b1f33;font-weight:800;text-decoration:none}
+      p{line-height:1.55}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Classroom invitation</h1>
+      <p>Opening this invitation in Quiks Uni…</p>
+      <a id="open-app" href="#">Open Quiks Uni</a>
+      <a href="https://play.google.com/store/apps/details?id=com.quiks.uni">Download from Google Play</a>
+    </main>
+    <script>
+      const query = new URLSearchParams(location.search);
+      const deepLink = `quiks-uni://classroom-invite?${query.toString()}`;
+      document.getElementById("open-app").href = deepLink;
+      location.replace(deepLink);
+      const fallbackTimer = setTimeout(
+        () => location.replace("https://play.google.com/store/apps/details?id=com.quiks.uni"),
+        1800
+      );
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) clearTimeout(fallbackTimer);
+      });
+      window.addEventListener("pagehide", () => clearTimeout(fallbackTimer));
+    </script>
+  </body>
+</html>

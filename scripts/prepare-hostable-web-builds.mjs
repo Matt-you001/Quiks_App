@@ -45,6 +45,8 @@ const hostedRouteWrappers = {
     { route: "session", title: "Session" },
     { route: "results", title: "Results" },
     { route: "breather", title: "Breather" },
+    { route: "learning-hub", title: "Learning Hub" },
+    { route: "certificate", title: "Certificate" },
   ],
   teens: [
     { route: "login", title: "Login" },
@@ -60,6 +62,8 @@ const hostedRouteWrappers = {
     { route: "session", title: "Session" },
     { route: "results", title: "Results" },
     { route: "breather", title: "Breather" },
+    { route: "learning-hub", title: "Learning Hub" },
+    { route: "certificate", title: "Certificate" },
   ],
   uni: [
     { route: "login", title: "Login" },
@@ -75,6 +79,8 @@ const hostedRouteWrappers = {
     { route: "session", title: "Session" },
     { route: "results", title: "Results" },
     { route: "breather", title: "Breather" },
+    { route: "learning-hub", title: "Learning Hub" },
+    { route: "certificate", title: "Certificate" },
   ],
 };
 
@@ -93,6 +99,7 @@ function createRouteWrapperHtml(variant, title, entryScriptName) {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="quiks-variant" content="${variant}" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>${appTitle} | ${title}</title>
@@ -122,13 +129,15 @@ function writeHostedRouteWrappers(targetDir, variant, entryScriptName) {
 function injectHeadMarkup(html, variant) {
   const assets = variantWebAssets[variant];
   const faviconMarkup = [
+    `<meta name="quiks-variant" content="${variant}" />`,
     `<title>${assets.title}</title>`,
     '<link rel="icon" type="image/svg+xml" href="./logo.svg" />',
     '<link rel="icon" type="image/png" sizes="512x512" href="./favicon.png" />',
     '<link rel="apple-touch-icon" href="./favicon.png" />',
   ].join("");
 
-  let updated = html.replace(/<title>.*?<\/title>/i, faviconMarkup);
+  const withoutVariantMeta = html.replace(/\s*<meta name="quiks-variant" content="[^"]*"\s*\/?>/i, "");
+  let updated = withoutVariantMeta.replace(/<title>.*?<\/title>/i, faviconMarkup);
   if (!/<link rel="icon"/i.test(updated)) {
     updated = updated.replace("</head>", `${faviconMarkup}</head>`);
   }

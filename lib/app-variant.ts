@@ -214,21 +214,33 @@ function normalizeVariant(value: string | undefined): AppVariant {
   return "children";
 }
 
+function readKnownVariant(value: string | null | undefined): AppVariant | undefined {
+  return value === "children" || value === "teens" || value === "uni" ? value : undefined;
+}
+
 function readVariantFromWebLocation(): AppVariant | undefined {
   if (typeof globalThis === "undefined" || !("location" in globalThis) || !globalThis.location) {
     return undefined;
   }
 
   const location = globalThis.location;
-  const queryValue = new URLSearchParams(location.search).get("variant") ?? undefined;
-  if (queryValue) {
-    return normalizeVariant(queryValue);
+  const queryVariant = readKnownVariant(new URLSearchParams(location.search).get("variant"));
+  if (queryVariant) {
+    return queryVariant;
   }
 
   const hostname = location.hostname.toLowerCase();
   const hostFirstSegment = hostname.split(".")[0];
   if (hostFirstSegment === "children" || hostFirstSegment === "teens" || hostFirstSegment === "uni") {
     return hostFirstSegment;
+  }
+
+  const declaredVariant =
+    typeof document !== "undefined"
+      ? readKnownVariant(document.querySelector('meta[name="quiks-variant"]')?.getAttribute("content"))
+      : undefined;
+  if (declaredVariant) {
+    return declaredVariant;
   }
 
   const pathFirstSegment = location.pathname.split("/").filter(Boolean)[0];
