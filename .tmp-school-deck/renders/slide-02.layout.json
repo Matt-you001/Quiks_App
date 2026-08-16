@@ -1,0 +1,1035 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/jkob6g",
+    "id": "jkob6g",
+    "slide": 2,
+    "layoutId": "2810a841-462f-4631-91d3-a572c606edf8",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "2810a841-462f-4631-91d3-a572c606edf8",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ds3298v6",
+      "id": "1",
+      "name": "kicker-2",
+      "bbox": [
+        64,
+        34,
+        420,
+        24
+      ],
+      "geometry": "rect",
+      "text": "THE OPPORTUNITY",
+      "textPreview": "THE OPPORTUNITY",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 14,
+        "typeface": "Arial",
+        "color": "#159A8C",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "THE OPPORTUNITY"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "THE OPPORTUNITY",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Arial",
+            "color": "#159A8C",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "THE OPPORTUNITY",
+              "fontSize": 14,
+              "typeface": "Arial",
+              "color": "#159A8C",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/qpcjytwv",
+      "id": "2",
+      "name": "title-2",
+      "bbox": [
+        64,
+        66,
+        1120,
+        74
+      ],
+      "geometry": "rect",
+      "text": "Learning should continue after the lesson ends",
+      "textPreview": "Learning should continue after the lesson ends",
+      "resolvedFontSize": 38,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 38,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Learning should continue after the lesson ends"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Learning should continue after the lesson ends",
+          "resolvedTextStyle": {
+            "fontSize": 38,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Learning should continue after the lesson ends",
+              "fontSize": 38,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/rqlk7yx0",
+      "id": "3",
+      "name": "page-2",
+      "bbox": [
+        1180,
+        666,
+        36,
+        18
+      ],
+      "geometry": "rect",
+      "text": "02",
+      "textPreview": "02",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "02"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "02",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "02",
+              "fontSize": 12,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0ve14nex",
+      "id": "4",
+      "name": "why-lead",
+      "bbox": [
+        64,
+        178,
+        740,
+        112
+      ],
+      "geometry": "rect",
+      "text": "A school builds excellence when students have the structure and motivation to keep learning between lessons.",
+      "textPreview": "A school builds excellence when students have the structure and motivation to keep learning between lessons.",
+      "resolvedFontSize": 29,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 29,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A school builds excellence when students have the"
+          },
+          {
+            "index": 2,
+            "text": "structure and motivation to keep learning between"
+          },
+          {
+            "index": 3,
+            "text": "lessons."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A school builds excellence when students have the structure and motivation to keep learning between lessons.",
+          "resolvedTextStyle": {
+            "fontSize": 29,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A school builds excellence when students have the structure and motivation to keep learning between lessons.",
+              "fontSize": 29,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/lwn2d8vi",
+      "id": "5",
+      "name": "rule-64-320",
+      "bbox": [
+        64,
+        320,
+        720,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#159A8C",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/etcj2dwr",
+      "id": "6",
+      "name": "why-1-marker",
+      "bbox": [
+        64,
+        365,
+        10,
+        10
+      ],
+      "geometry": "rect",
+      "fillColor": "#159A8C",
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zu5kbidc",
+      "id": "7",
+      "name": "why-1-title",
+      "bbox": [
+        89,
+        358,
+        675,
+        28
+      ],
+      "geometry": "rect",
+      "text": "Continuity",
+      "textPreview": "Continuity",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Continuity"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Continuity",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Continuity",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gza1sjed",
+      "id": "8",
+      "name": "why-1-body",
+      "bbox": [
+        89,
+        389,
+        675,
+        58
+      ],
+      "geometry": "rect",
+      "text": "Teacher-led learning can carry from the classroom into homework, revision and independent study.",
+      "textPreview": "Teacher-led learning can carry from the classroom into homework, revision and independent study.",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Teacher-led learning can carry from the classroom into homework, revision and"
+          },
+          {
+            "index": 2,
+            "text": "independent study."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Teacher-led learning can carry from the classroom into homework, revision and independent study.",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Teacher-led learning can carry from the classroom into homework, revision and independent study.",
+              "fontSize": 17,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/h0ji1ofy",
+      "id": "9",
+      "name": "why-2-marker",
+      "bbox": [
+        64,
+        469,
+        10,
+        10
+      ],
+      "geometry": "rect",
+      "fillColor": "#7C2BC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hgfmt8vu",
+      "id": "10",
+      "name": "why-2-title",
+      "bbox": [
+        89,
+        462,
+        675,
+        28
+      ],
+      "geometry": "rect",
+      "text": "Confidence",
+      "textPreview": "Confidence",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Confidence"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Confidence",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Confidence",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gf6lk3u9",
+      "id": "11",
+      "name": "why-2-body",
+      "bbox": [
+        89,
+        493,
+        675,
+        58
+      ],
+      "geometry": "rect",
+      "text": "Regular, guided practice helps learners confront difficult topics and build stronger study habits.",
+      "textPreview": "Regular, guided practice helps learners confront difficult topics and build stronger study habits.",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Regular, guided practice helps learners confront difficult topics and build stronger study"
+          },
+          {
+            "index": 2,
+            "text": "habits."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Regular, guided practice helps learners confront difficult topics and build stronger study habits.",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Regular, guided practice helps learners confront difficult topics and build stronger study habits.",
+              "fontSize": 17,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vex4rido",
+      "id": "12",
+      "name": "why-3-marker",
+      "bbox": [
+        64,
+        573,
+        10,
+        10
+      ],
+      "geometry": "rect",
+      "fillColor": "#E3A62F",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/udo3idc3",
+      "id": "13",
+      "name": "why-3-title",
+      "bbox": [
+        89,
+        566,
+        675,
+        28
+      ],
+      "geometry": "rect",
+      "text": "School-wide value",
+      "textPreview": "School-wide value",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "School-wide value"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "School-wide value",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "School-wide value",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5kfmxsvq",
+      "id": "14",
+      "name": "why-3-body",
+      "bbox": [
+        89,
+        597,
+        675,
+        58
+      ],
+      "geometry": "rect",
+      "text": "Students progress, teachers strengthen digital practice, and parents gain a more purposeful learning option at home.",
+      "textPreview": "Students progress, teachers strengthen digital practice, and parents gain a more purposeful learning option at home.",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Students progress, teachers strengthen digital practice, and parents gain a more"
+          },
+          {
+            "index": 2,
+            "text": "purposeful learning option at home."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Students progress, teachers strengthen digital practice, and parents gain a more purposeful learning option at home.",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Students progress, teachers strengthen digital practice, and parents gain a more purposeful learning option at home.",
+              "fontSize": 17,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4j65onu5",
+      "id": "15",
+      "name": "why-side-panel",
+      "bbox": [
+        864,
+        178,
+        352,
+        430
+      ],
+      "geometry": "rect",
+      "fillColor": "#0F2130",
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3ix4vid0",
+      "id": "16",
+      "name": "why-side-quote",
+      "bbox": [
+        908,
+        235,
+        265,
+        170
+      ],
+      "geometry": "rect",
+      "text": "Quiks is designed to complement good teaching—not replace it.",
+      "textPreview": "Quiks is designed to complement good teaching—not replace it.",
+      "resolvedFontSize": 28.33,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 32,
+        "typeface": "Arial",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 0.89,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 5,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Quiks is designed"
+          },
+          {
+            "index": 2,
+            "text": "to complement"
+          },
+          {
+            "index": 3,
+            "text": "good"
+          },
+          {
+            "index": 4,
+            "text": "teaching—not"
+          },
+          {
+            "index": 5,
+            "text": "replace it."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Quiks is designed to complement good teaching—not replace it.",
+          "resolvedTextStyle": {
+            "fontSize": 32,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Quiks is designed to complement good teaching—not replace it.",
+              "fontSize": 32,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/iho3mdcf",
+      "id": "17",
+      "name": "why-side-body",
+      "bbox": [
+        908,
+        435,
+        265,
+        116
+      ],
+      "geometry": "rect",
+      "text": "It gives students a guided route to practise, understand and progress while keeping teachers central to the learning process.",
+      "textPreview": "It gives students a guided route to practise, understand and progress while keeping teachers central to the learning process.",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Arial",
+        "color": "#DDE8EE",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "It gives students a guided route"
+          },
+          {
+            "index": 2,
+            "text": "to practise, understand and"
+          },
+          {
+            "index": 3,
+            "text": "progress while keeping teachers"
+          },
+          {
+            "index": 4,
+            "text": "central to the learning process."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "It gives students a guided route to practise, understand and progress while keeping teachers central to the learning process.",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Arial",
+            "color": "#DDE8EE",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "It gives students a guided route to practise, understand and progress while keeping teachers central to the learning process.",
+              "fontSize": 18,
+              "typeface": "Arial",
+              "color": "#DDE8EE",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

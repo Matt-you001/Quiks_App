@@ -14,7 +14,11 @@ Add these values to your local `.env`:
 
 ```env
 OPENAI_API_KEY=your_openai_key_here
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_VERIFIER_MODEL=gpt-5.6-terra
+OPENAI_VERIFIER_REASONING_EFFORT=medium
+QUESTION_CANDIDATE_MULTIPLIER=1.5
+MAX_QUESTION_CANDIDATES=20
 PORT=8787
 
 EXPO_PUBLIC_AI_MODE=live
@@ -22,6 +26,8 @@ EXPO_PUBLIC_AI_API_URL=http://YOUR_COMPUTER_LAN_IP:8787
 ```
 
 Replace `YOUR_COMPUTER_LAN_IP` with the IP address of the machine running the proxy, for example `192.168.1.127`.
+
+The first model generates extra candidates. The verifier independently solves them and only high-confidence, unambiguous questions with an accurate explanation are returned. If verification fails, the app falls back to its reviewed local question bank. Do not expose `OPENAI_API_KEY` in Expo public environment variables.
 
 ## Run the proxy
 

@@ -1,0 +1,1355 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/ubcnq0",
+    "id": "ubcnq0",
+    "slide": 7,
+    "layoutId": "2810a841-462f-4631-91d3-a572c606edf8",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "2810a841-462f-4631-91d3-a572c606edf8",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3mhcvyls",
+      "id": "1",
+      "name": "kicker-7",
+      "bbox": [
+        64,
+        34,
+        420,
+        24
+      ],
+      "geometry": "rect",
+      "text": "SHARED VALUE",
+      "textPreview": "SHARED VALUE",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 14,
+        "typeface": "Arial",
+        "color": "#159A8C",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "SHARED VALUE"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "SHARED VALUE",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Arial",
+            "color": "#159A8C",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "SHARED VALUE",
+              "fontSize": 14,
+              "typeface": "Arial",
+              "color": "#159A8C",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/47qto3md",
+      "id": "2",
+      "name": "title-7",
+      "bbox": [
+        64,
+        66,
+        1120,
+        74
+      ],
+      "geometry": "rect",
+      "text": "One platform supports the whole school community",
+      "textPreview": "One platform supports the whole school community",
+      "resolvedFontSize": 38,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 38,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "One platform supports the whole school community"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "One platform supports the whole school community",
+          "resolvedTextStyle": {
+            "fontSize": 38,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "One platform supports the whole school community",
+              "fontSize": 38,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/58zux83y",
+      "id": "3",
+      "name": "page-7",
+      "bbox": [
+        1180,
+        666,
+        36,
+        18
+      ],
+      "geometry": "rect",
+      "text": "07",
+      "textPreview": "07",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "07"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "07",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "07",
+              "fontSize": 12,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/q98bqd4j",
+      "id": "4",
+      "name": "group-0",
+      "bbox": [
+        64,
+        192,
+        352,
+        420
+      ],
+      "geometry": "rect",
+      "fillColor": "#E7F6F3",
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/rahczilo",
+      "id": "5",
+      "name": "group-name-0",
+      "bbox": [
+        92,
+        230,
+        296,
+        36
+      ],
+      "geometry": "rect",
+      "text": "STUDENTS",
+      "textPreview": "STUDENTS",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#159A8C",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "STUDENTS"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "STUDENTS",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#159A8C",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "STUDENTS",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#159A8C",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sbqdsnm9",
+      "id": "6",
+      "name": "group-marker-0-0",
+      "bbox": [
+        94,
+        318,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#159A8C",
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/dcju183u",
+      "id": "7",
+      "name": "group-text-0-0",
+      "bbox": [
+        120,
+        310,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "Purposeful independent study",
+      "textPreview": "Purposeful independent study",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Purposeful independent"
+          },
+          {
+            "index": 2,
+            "text": "study"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Purposeful independent study",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Purposeful independent study",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/edsvud4f",
+      "id": "8",
+      "name": "group-marker-0-1",
+      "bbox": [
+        94,
+        406,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#159A8C",
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fe1c3il0",
+      "id": "9",
+      "name": "group-text-0-1",
+      "bbox": [
+        120,
+        398,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "Explanation-led revision",
+      "textPreview": "Explanation-led revision",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Explanation-led revision"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Explanation-led revision",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Explanation-led revision",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/nm14fuxc",
+      "id": "10",
+      "name": "group-marker-0-2",
+      "bbox": [
+        94,
+        494,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#159A8C",
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/2l83mpg7",
+      "id": "11",
+      "name": "group-text-0-2",
+      "bbox": [
+        120,
+        486,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "Visible progress and motivation",
+      "textPreview": "Visible progress and motivation",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Visible progress and"
+          },
+          {
+            "index": 2,
+            "text": "motivation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Visible progress and motivation",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Visible progress and motivation",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/pojmh4fi",
+      "id": "12",
+      "name": "group-1",
+      "bbox": [
+        456,
+        192,
+        352,
+        420
+      ],
+      "geometry": "rect",
+      "fillColor": "#EAF4FF",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/onalozyx",
+      "id": "13",
+      "name": "group-name-1",
+      "bbox": [
+        484,
+        230,
+        296,
+        36
+      ],
+      "geometry": "rect",
+      "text": "TEACHERS",
+      "textPreview": "TEACHERS",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#3D8DFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TEACHERS"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TEACHERS",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#3D8DFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "TEACHERS",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#3D8DFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fih4baxg",
+      "id": "14",
+      "name": "group-marker-1-0",
+      "bbox": [
+        486,
+        318,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#3D8DFF",
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/eh83ipgv",
+      "id": "15",
+      "name": "group-text-1-0",
+      "bbox": [
+        512,
+        310,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "Digital class organisation",
+      "textPreview": "Digital class organisation",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Digital class organisation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Digital class organisation",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Digital class organisation",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1kzmdkfm",
+      "id": "16",
+      "name": "group-marker-1-1",
+      "bbox": [
+        486,
+        406,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#3D8DFF",
+      "lineWidth": 0
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0jqlkfy1",
+      "id": "17",
+      "name": "group-text-1-1",
+      "bbox": [
+        512,
+        398,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "Faster activity creation",
+      "textPreview": "Faster activity creation",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Faster activity creation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Faster activity creation",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Faster activity creation",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zel4nexk",
+      "id": "18",
+      "name": "group-marker-1-2",
+      "bbox": [
+        486,
+        494,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#3D8DFF",
+      "lineWidth": 0
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ydc3u9wz",
+      "id": "19",
+      "name": "group-text-1-2",
+      "bbox": [
+        512,
+        486,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "Clearer follow-up on participation",
+      "textPreview": "Clearer follow-up on participation",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Clearer follow-up on"
+          },
+          {
+            "index": 2,
+            "text": "participation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Clearer follow-up on participation",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Clearer follow-up on participation",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 20,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/u9w7md07",
+      "id": "20",
+      "name": "group-2",
+      "bbox": [
+        848,
+        192,
+        352,
+        420
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFF5DA",
+      "lineWidth": 0
+    },
+    {
+      "order": 21,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/va5ofihs",
+      "id": "21",
+      "name": "group-name-2",
+      "bbox": [
+        876,
+        230,
+        296,
+        36
+      ],
+      "geometry": "rect",
+      "text": "PARENTS",
+      "textPreview": "PARENTS",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#E3A62F",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "PARENTS"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "PARENTS",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#E3A62F",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "PARENTS",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#E3A62F",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 22,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wbeponyd",
+      "id": "22",
+      "name": "group-marker-2-0",
+      "bbox": [
+        878,
+        318,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#E3A62F",
+      "lineWidth": 0
+    },
+    {
+      "order": 23,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hc76hszy",
+      "id": "23",
+      "name": "group-text-2-0",
+      "bbox": [
+        904,
+        310,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "A productive home-learning option",
+      "textPreview": "A productive home-learning option",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A productive"
+          },
+          {
+            "index": 2,
+            "text": "home-learning option"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A productive home-learning option",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A productive home-learning option",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 24,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/idg7qxgj",
+      "id": "24",
+      "name": "group-marker-2-1",
+      "bbox": [
+        878,
+        406,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#E3A62F",
+      "lineWidth": 0
+    },
+    {
+      "order": 25,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/jepojih4",
+      "id": "25",
+      "name": "group-text-2-1",
+      "bbox": [
+        904,
+        398,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "Greater continuity with schoolwork",
+      "textPreview": "Greater continuity with schoolwork",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Greater continuity with"
+          },
+          {
+            "index": 2,
+            "text": "schoolwork"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Greater continuity with schoolwork",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Greater continuity with schoolwork",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 26,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4fypsnyp",
+      "id": "26",
+      "name": "group-marker-2-2",
+      "bbox": [
+        878,
+        494,
+        9,
+        9
+      ],
+      "geometry": "rect",
+      "fillColor": "#E3A62F",
+      "lineWidth": 0
+    },
+    {
+      "order": 27,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5g76lszu",
+      "id": "27",
+      "name": "group-text-2-2",
+      "bbox": [
+        904,
+        486,
+        258,
+        54
+      ],
+      "geometry": "rect",
+      "text": "A clearer view of learner progress",
+      "textPreview": "A clearer view of learner progress",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A clearer view of learner"
+          },
+          {
+            "index": 2,
+            "text": "progress"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A clearer view of learner progress",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A clearer view of learner progress",
+              "fontSize": 20,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

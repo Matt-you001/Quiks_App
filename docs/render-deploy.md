@@ -27,8 +27,14 @@ Make sure your OpenAI key is valid and active. For safety, if you pasted a key i
 
 ```text
 OPENAI_API_KEY=your_real_openai_key
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_VERIFIER_MODEL=gpt-5.6-terra
+OPENAI_VERIFIER_REASONING_EFFORT=medium
+QUESTION_CANDIDATE_MULTIPLIER=1.5
+MAX_QUESTION_CANDIDATES=20
 ```
+
+The verifier is intentionally stronger than the generator. A failed or uncertain verification is rejected and replaced in the app from the reviewed local question library.
 
 Render already provides `PORT`, and the blueprint pins it to `10000`.
 

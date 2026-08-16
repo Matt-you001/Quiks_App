@@ -1,0 +1,855 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/5ozj9p",
+    "id": "5ozj9p",
+    "slide": 4,
+    "layoutId": "2810a841-462f-4631-91d3-a572c606edf8",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "2810a841-462f-4631-91d3-a572c606edf8",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/l8fy54fu",
+      "id": "1",
+      "name": "kicker-4",
+      "bbox": [
+        64,
+        34,
+        420,
+        24
+      ],
+      "geometry": "rect",
+      "text": "STUDENT EXPERIENCE",
+      "textPreview": "STUDENT EXPERIENCE",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 14,
+        "typeface": "Arial",
+        "color": "#159A8C",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "STUDENT EXPERIENCE"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "STUDENT EXPERIENCE",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Arial",
+            "color": "#159A8C",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "STUDENT EXPERIENCE",
+              "fontSize": 14,
+              "typeface": "Arial",
+              "color": "#159A8C",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/y54fapg3",
+      "id": "2",
+      "name": "title-4",
+      "bbox": [
+        64,
+        66,
+        1120,
+        74
+      ],
+      "geometry": "rect",
+      "text": "Students get more than questions—they get a pathway",
+      "textPreview": "Students get more than questions—they get a pathway",
+      "resolvedFontSize": 38,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 38,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Students get more than questions—they get a pathway"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Students get more than questions—they get a pathway",
+          "resolvedTextStyle": {
+            "fontSize": 38,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Students get more than questions—they get a pathway",
+              "fontSize": 38,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/z6xg3uxo",
+      "id": "3",
+      "name": "page-4",
+      "bbox": [
+        1180,
+        666,
+        36,
+        18
+      ],
+      "geometry": "rect",
+      "text": "04",
+      "textPreview": "04",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "04"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "04",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "04",
+              "fontSize": 12,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/8b6hgze5",
+      "id": "4",
+      "name": "student-panel-0",
+      "bbox": [
+        64,
+        196,
+        352,
+        410
+      ],
+      "geometry": "rect",
+      "fillColor": "#E7F6F3",
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/9cfy94fq",
+      "id": "5",
+      "name": "student-bar-0",
+      "bbox": [
+        64,
+        196,
+        352,
+        12
+      ],
+      "geometry": "rect",
+      "fillColor": "#159A8C",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/m9ofe9wf",
+      "id": "6",
+      "name": "student-label-0",
+      "bbox": [
+        94,
+        244,
+        292,
+        38
+      ],
+      "geometry": "rect",
+      "text": "PRACTISE",
+      "textPreview": "PRACTISE",
+      "resolvedFontSize": 19,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 19,
+        "typeface": "Arial",
+        "color": "#159A8C",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "PRACTISE"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "PRACTISE",
+          "resolvedTextStyle": {
+            "fontSize": 19,
+            "typeface": "Arial",
+            "color": "#159A8C",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "PRACTISE",
+              "fontSize": 19,
+              "typeface": "Arial",
+              "color": "#159A8C",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7axg7exk",
+      "id": "7",
+      "name": "student-body-0",
+      "bbox": [
+        94,
+        307,
+        292,
+        190
+      ],
+      "geometry": "rect",
+      "text": "Curriculum- and exam-aware questions support focused revision and regular independent study.",
+      "textPreview": "Curriculum- and exam-aware questions support focused revision and regular independent study.",
+      "resolvedFontSize": 23,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 23,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 5,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Curriculum- and"
+          },
+          {
+            "index": 2,
+            "text": "exam-aware questions"
+          },
+          {
+            "index": 3,
+            "text": "support focused revision"
+          },
+          {
+            "index": 4,
+            "text": "and regular independent"
+          },
+          {
+            "index": 5,
+            "text": "study."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Curriculum- and exam-aware questions support focused revision and regular independent study.",
+          "resolvedTextStyle": {
+            "fontSize": 23,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Curriculum- and exam-aware questions support focused revision and regular independent study.",
+              "fontSize": 23,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ofmx4fy1",
+      "id": "8",
+      "name": "student-panel-1",
+      "bbox": [
+        456,
+        196,
+        352,
+        410
+      ],
+      "geometry": "rect",
+      "fillColor": "#EAF4FF",
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/pgvyxkfm",
+      "id": "9",
+      "name": "student-bar-1",
+      "bbox": [
+        456,
+        196,
+        352,
+        12
+      ],
+      "geometry": "rect",
+      "fillColor": "#3D8DFF",
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hor2lovm",
+      "id": "10",
+      "name": "student-label-1",
+      "bbox": [
+        486,
+        244,
+        292,
+        38
+      ],
+      "geometry": "rect",
+      "text": "UNDERSTAND",
+      "textPreview": "UNDERSTAND",
+      "resolvedFontSize": 19,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 19,
+        "typeface": "Arial",
+        "color": "#3D8DFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "UNDERSTAND"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "UNDERSTAND",
+          "resolvedTextStyle": {
+            "fontSize": 19,
+            "typeface": "Arial",
+            "color": "#3D8DFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "UNDERSTAND",
+              "fontSize": 19,
+              "typeface": "Arial",
+              "color": "#3D8DFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gni1c3uh",
+      "id": "11",
+      "name": "student-body-1",
+      "bbox": [
+        486,
+        307,
+        292,
+        190
+      ],
+      "geometry": "rect",
+      "text": "Answer explanations, Learn More and the Learning Hub turn mistakes into opportunities to learn.",
+      "textPreview": "Answer explanations, Learn More and the Learning Hub turn mistakes into opportunities to learn.",
+      "resolvedFontSize": 23,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 23,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 5,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Answer explanations,"
+          },
+          {
+            "index": 2,
+            "text": "Learn More and the"
+          },
+          {
+            "index": 3,
+            "text": "Learning Hub turn"
+          },
+          {
+            "index": 4,
+            "text": "mistakes into"
+          },
+          {
+            "index": 5,
+            "text": "opportunities to learn."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Answer explanations, Learn More and the Learning Hub turn mistakes into opportunities to learn.",
+          "resolvedTextStyle": {
+            "fontSize": 23,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Answer explanations, Learn More and the Learning Hub turn mistakes into opportunities to learn.",
+              "fontSize": 23,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vm9kjydw",
+      "id": "12",
+      "name": "student-panel-2",
+      "bbox": [
+        848,
+        196,
+        352,
+        410
+      ],
+      "geometry": "rect",
+      "fillColor": "#F4EAFB",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ulgjatcb",
+      "id": "13",
+      "name": "student-bar-2",
+      "bbox": [
+        848,
+        196,
+        352,
+        12
+      ],
+      "geometry": "rect",
+      "fillColor": "#7C2BC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5sr2p8vy",
+      "id": "14",
+      "name": "student-label-2",
+      "bbox": [
+        878,
+        244,
+        292,
+        38
+      ],
+      "geometry": "rect",
+      "text": "STAY MOTIVATED",
+      "textPreview": "STAY MOTIVATED",
+      "resolvedFontSize": 19,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 19,
+        "typeface": "Arial",
+        "color": "#7C2BC4",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "STAY MOTIVATED"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "STAY MOTIVATED",
+          "resolvedTextStyle": {
+            "fontSize": 19,
+            "typeface": "Arial",
+            "color": "#7C2BC4",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "STAY MOTIVATED",
+              "fontSize": 19,
+              "typeface": "Arial",
+              "color": "#7C2BC4",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4rilg3ud",
+      "id": "15",
+      "name": "student-body-2",
+      "bbox": [
+        878,
+        307,
+        292,
+        190
+      ],
+      "geometry": "rect",
+      "text": "Levels, certificates, competitions and controlled Breathers reward persistence without losing academic focus.",
+      "textPreview": "Levels, certificates, competitions and controlled Breathers reward persistence without losing academic focus.",
+      "resolvedFontSize": 23,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 23,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 6,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Levels, certificates,"
+          },
+          {
+            "index": 2,
+            "text": "competitions and"
+          },
+          {
+            "index": 3,
+            "text": "controlled Breathers"
+          },
+          {
+            "index": 4,
+            "text": "reward persistence"
+          },
+          {
+            "index": 5,
+            "text": "without losing academic"
+          },
+          {
+            "index": 6,
+            "text": "focus."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Levels, certificates, competitions and controlled Breathers reward persistence without losing academic focus.",
+          "resolvedTextStyle": {
+            "fontSize": 23,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Levels, certificates, competitions and controlled Breathers reward persistence without losing academic focus.",
+              "fontSize": 23,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

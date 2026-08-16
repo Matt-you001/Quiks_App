@@ -1,0 +1,485 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/36pa7v",
+    "id": "36pa7v",
+    "slide": 1,
+    "layoutId": "2810a841-462f-4631-91d3-a572c606edf8",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "2810a841-462f-4631-91d3-a572c606edf8",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "39abfa19-18bf-47ac-9750-6fd1234f6f96",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/769o7alw",
+      "id": "1",
+      "name": "cover-accent-field",
+      "bbox": [
+        772,
+        0,
+        508,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#E7F6F3",
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/87i50fmh",
+      "id": "2",
+      "name": "cover-purple-strip",
+      "bbox": [
+        772,
+        0,
+        20,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#7C2BC4",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "image",
+      "scope": "slide",
+      "aid": "im/cbyto7i5",
+      "id": "3",
+      "bbox": [
+        66,
+        40,
+        370,
+        107
+      ],
+      "alt": "Tech Solution Providers logo",
+      "contentType": "image/png",
+      "imageFit": "contain",
+      "asset": {
+        "assetId": "9bb5af09-850b-4f9a-8f87-20d811c27c2e",
+        "contentType": "image/png",
+        "byteLength": 11698
+      }
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/y1gnu54z",
+      "id": "4",
+      "name": "cover-title",
+      "bbox": [
+        66,
+        207,
+        650,
+        205
+      ],
+      "geometry": "rect",
+      "text": "A smarter learning partnership for your students",
+      "textPreview": "A smarter learning partnership for your students",
+      "resolvedFontSize": 54,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 54,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A smarter learning"
+          },
+          {
+            "index": 2,
+            "text": "partnership for your"
+          },
+          {
+            "index": 3,
+            "text": "students"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A smarter learning partnership for your students",
+          "resolvedTextStyle": {
+            "fontSize": 54,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A smarter learning partnership for your students",
+              "fontSize": 54,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/j2p43alk",
+      "id": "5",
+      "name": "cover-subtitle",
+      "bbox": [
+        70,
+        438,
+        604,
+        95
+      ],
+      "geometry": "rect",
+      "text": "Quiks helps schools extend structured practice, revision and teacher-guided learning beyond the classroom.",
+      "textPreview": "Quiks helps schools extend structured practice, revision and teacher-guided learning beyond the classroom.",
+      "resolvedFontSize": 23,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 23,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Quiks helps schools extend structured practice, revision"
+          },
+          {
+            "index": 2,
+            "text": "and teacher-guided learning beyond the classroom."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Quiks helps schools extend structured practice, revision and teacher-guided learning beyond the classroom.",
+          "resolvedTextStyle": {
+            "fontSize": 23,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Quiks helps schools extend structured practice, revision and teacher-guided learning beyond the classroom.",
+              "fontSize": 23,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/k3y5wfm5",
+      "id": "6",
+      "name": "cover-school",
+      "bbox": [
+        70,
+        590,
+        540,
+        30
+      ],
+      "geometry": "rect",
+      "text": "PROPOSAL TO [SCHOOL NAME]",
+      "textPreview": "PROPOSAL TO [SCHOOL NAME]",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Arial",
+        "color": "#159A8C",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "PROPOSAL TO [SCHOOL NAME]"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "PROPOSAL TO [SCHOOL NAME]",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Arial",
+            "color": "#159A8C",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "PROPOSAL TO [SCHOOL NAME]",
+              "fontSize": 16,
+              "typeface": "Arial",
+              "color": "#159A8C",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/l4rm503q",
+      "id": "7",
+      "name": "cover-tagline",
+      "bbox": [
+        828,
+        536,
+        385,
+        56
+      ],
+      "geometry": "rect",
+      "text": "QUIKS  |  LEARN FAST. GROW STEADILY.",
+      "textPreview": "QUIKS  |  LEARN FAST. GROW STEADILY.",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Arial",
+        "color": "#0F2130",
+        "bold": true,
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "QUIKS  |  LEARN FAST. GROW"
+          },
+          {
+            "index": 2,
+            "text": "STEADILY."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "QUIKS  |  LEARN FAST. GROW STEADILY.",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Arial",
+            "color": "#0F2130",
+            "bold": true,
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "QUIKS  |  LEARN FAST. GROW STEADILY.",
+              "fontSize": 22,
+              "typeface": "Arial",
+              "color": "#0F2130",
+              "bold": true,
+              "alignment": "center"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/axgnql43",
+      "id": "8",
+      "name": "cover-prepared",
+      "bbox": [
+        828,
+        606,
+        385,
+        24
+      ],
+      "geometry": "rect",
+      "text": "Prepared by Tech Solution Providers Ltd",
+      "textPreview": "Prepared by Tech Solution Providers Ltd",
+      "resolvedFontSize": 15,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 15,
+        "typeface": "Arial",
+        "color": "#5F6B76",
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Prepared by Tech Solution Providers Ltd"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Prepared by Tech Solution Providers Ltd",
+          "resolvedTextStyle": {
+            "fontSize": 15,
+            "typeface": "Arial",
+            "color": "#5F6B76",
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Prepared by Tech Solution Providers Ltd",
+              "fontSize": 15,
+              "typeface": "Arial",
+              "color": "#5F6B76",
+              "alignment": "center"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

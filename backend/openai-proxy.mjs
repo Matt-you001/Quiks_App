@@ -23,6 +23,10 @@ import {
 const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
 const openAiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const openAiVerifierModel = process.env.OPENAI_VERIFIER_MODEL || "gpt-5.6-terra";
+const openAiVerifierReasoningEffort = process.env.OPENAI_VERIFIER_REASONING_EFFORT || "medium";
+const questionCandidateMultiplier = readPositiveNumber(process.env.QUESTION_CANDIDATE_MULTIPLIER, 1.5, 1);
+const maxQuestionCandidates = Math.round(readPositiveNumber(process.env.MAX_QUESTION_CANDIDATES, 20, 10));
 const competitionWaiters = new Map();
 const competitionWaitersById = new Map();
 const competitionWaiterByPlayer = new Map();
@@ -50,6 +54,11 @@ const revenueCatPublicKeys = {
     entitlement: process.env.REVENUECAT_UNI_ENTITLEMENT_ID || "entl5ab41c922b",
   },
 };
+
+function readPositiveNumber(value, fallback, minimum) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= minimum ? parsed : fallback;
+}
 
 function getRevenueCatConfig(appVariant = "children") {
   return revenueCatPublicKeys[appVariant] ?? revenueCatPublicKeys.children;
@@ -399,7 +408,14 @@ function extractOutputText(payload) {
   return texts.join("\n");
 }
 
-async function createOpenAiResponse({ schemaName, schema, instructions, input }) {
+async function createOpenAiResponse({
+  schemaName,
+  schema,
+  instructions,
+  input,
+  model = openAiModel,
+  reasoningEffort,
+}) {
   if (!openAiApiKey) {
     throw new Error("OPENAI_API_KEY is not configured on the backend.");
   }
@@ -411,9 +427,10 @@ async function createOpenAiResponse({ schemaName, schema, instructions, input })
       Authorization: `Bearer ${openAiApiKey}`,
     },
     body: JSON.stringify({
-      model: openAiModel,
+      model,
       instructions,
       input,
+      ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
       text: {
         format: {
           type: "json_schema",
@@ -462,6 +479,40 @@ function buildQuestionSchema() {
       },
     },
     required: ["questions"],
+  };
+}
+
+function buildQuestionVerificationSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      results: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            candidateIndex: { type: "integer" },
+            correctOptionIndex: { type: "integer", enum: [-1, 0, 1, 2, 3] },
+            confidence: { type: "string", enum: ["high", "medium", "low"] },
+            isUnambiguous: { type: "boolean" },
+            explanationAccurate: { type: "boolean" },
+            reason: { type: "string" },
+          },
+          required: [
+            "candidateIndex",
+            "correctOptionIndex",
+            "confidence",
+            "isUnambiguous",
+            "explanationAccurate",
+            "reason",
+          ],
+        },
+      },
+    },
+    required: ["results"],
   };
 }
 
@@ -596,8 +647,87 @@ function inferMoneyWordProblemAnswer(prompt) {
   return matchedAny ? total : null;
 }
 
+function greatestCommonDivisor(left, right) {
+  let a = Math.abs(Math.trunc(left));
+  let b = Math.abs(Math.trunc(right));
+  while (b !== 0) {
+    [a, b] = [b, a % b];
+  }
+  return a || 1;
+}
+
+function inferPercentOfAnswer(prompt) {
+  const normalized = normalizeForValidation(prompt);
+  const match = normalized.match(/(?:what is|calculate|find)\s+(-?\d+(?:\.\d+)?)\s*%\s+of\s+(-?\d+(?:\.\d+)?)/i);
+  if (!match) return null;
+  const value = (Number(match[1]) / 100) * Number(match[2]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function inferPercentToFractionAnswer(prompt) {
+  const normalized = normalizeForValidation(prompt);
+  const match = normalized.match(/(?:convert|write|express)\s+(-?\d+(?:\.\d+)?)\s*%\s+(?:as|into)/i);
+  if (!match || !/fraction/i.test(normalized)) return null;
+
+  const percentText = match[1];
+  const decimalPlaces = percentText.includes(".") ? percentText.split(".")[1].length : 0;
+  const scale = 10 ** decimalPlaces;
+  const numerator = Math.round(Number(percentText) * scale);
+  const denominator = 100 * scale;
+  const divisor = greatestCommonDivisor(numerator, denominator);
+  return { numerator: numerator / divisor, denominator: denominator / divisor };
+}
+
+function inferArithmeticExpressionAnswer(prompt) {
+  const normalized = normalizeForValidation(prompt);
+  const match = normalized.match(/^(?:calculate|evaluate|simplify|what is|find the value of)\s*:?[ ]*([0-9+\-*/(). ×÷]+)\??$/i);
+  if (!match) return null;
+  const expression = match[1].replace(/[×x]/gi, "*").replace(/÷/g, "/").trim();
+  if (!/[+\-*/]/.test(expression) || !/^[0-9+\-*/(). ]+$/.test(expression)) return null;
+
+  try {
+    const value = new Function(`"use strict"; return (${expression});`)();
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function inferAverageAnswer(prompt) {
+  const normalized = normalizeForValidation(prompt);
+  const match = normalized.match(/(?:average|arithmetic mean|mean)\s+of\s+([0-9.,\s-]+(?:and\s+-?\d+(?:\.\d+)?)?)/i);
+  if (!match) return null;
+  const values = Array.from(match[1].matchAll(/-?\d+(?:\.\d+)?/g)).map((entry) => Number(entry[0]));
+  if (values.length < 2) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function extractOptionFraction(option) {
+  const normalized = String(option ?? "")
+    .replace(/\\\(/g, "")
+    .replace(/\\\)/g, "")
+    .trim();
+  const latex = normalized.match(/\\frac\s*\{\s*(-?\d+)\s*\}\s*\{\s*(\d+)\s*\}/i);
+  const plain = normalized.match(/(-?\d+)\s*\/\s*(\d+)/);
+  const match = latex ?? plain;
+  if (!match || Number(match[2]) === 0) return null;
+  const numerator = Number(match[1]);
+  const denominator = Number(match[2]);
+  const divisor = greatestCommonDivisor(numerator, denominator);
+  return { numerator: numerator / divisor, denominator: denominator / divisor };
+}
+
 function inferExpectedAnswer(question) {
-  return inferLinearEquationAnswer(question.prompt) ?? inferMoneyWordProblemAnswer(question.prompt);
+  const fraction = inferPercentToFractionAnswer(question.prompt);
+  if (fraction) return { kind: "fraction", value: fraction };
+
+  const number =
+    inferLinearEquationAnswer(question.prompt) ??
+    inferMoneyWordProblemAnswer(question.prompt) ??
+    inferPercentOfAnswer(question.prompt) ??
+    inferArithmeticExpressionAnswer(question.prompt) ??
+    inferAverageAnswer(question.prompt);
+  return number === null ? null : { kind: "number", value: number };
 }
 
 function questionHasConsistentAnswer(question) {
@@ -606,12 +736,17 @@ function questionHasConsistentAnswer(question) {
     return true;
   }
 
-  const selectedNumber = extractOptionNumber(question.answer);
-  if (selectedNumber === null) {
-    return true;
+  if (expectedAnswer.kind === "fraction") {
+    const selectedFraction = extractOptionFraction(question.answer);
+    return (
+      selectedFraction !== null &&
+      selectedFraction.numerator === expectedAnswer.value.numerator &&
+      selectedFraction.denominator === expectedAnswer.value.denominator
+    );
   }
 
-  return Math.abs(selectedNumber - expectedAnswer) < 0.0001;
+  const selectedNumber = extractOptionNumber(question.answer);
+  return selectedNumber !== null && Math.abs(selectedNumber - expectedAnswer.value) < 0.0001;
 }
 
 function validateGeneratedQuestions(questions, expectedCount) {
@@ -620,31 +755,97 @@ function validateGeneratedQuestions(questions, expectedCount) {
   }
 
   const cleaned = questions
+    .map((question, index) => ({
+      id: String(question?.id || `ai-${index + 1}-${Date.now()}`).trim(),
+      prompt: String(question?.prompt ?? "").trim(),
+      options: Array.isArray(question?.options) ? question.options.map((option) => String(option).trim()) : [],
+      answer: String(question?.answer ?? "").trim(),
+      explanation: String(question?.explanation ?? "").trim(),
+    }))
     .filter((question) => {
+      const uniqueOptions = new Set(question.options.map((option) => normalizeForValidation(option).toLowerCase()));
       return (
-        typeof question?.prompt === "string" &&
-        Array.isArray(question?.options) &&
+        question.prompt.length > 0 &&
         question.options.length === 4 &&
-        typeof question?.answer === "string" &&
+        question.options.every((option) => option.length > 0) &&
+        uniqueOptions.size === 4 &&
+        question.answer.length > 0 &&
         question.options.includes(question.answer) &&
-        typeof question?.explanation === "string" &&
+        question.explanation.length > 0 &&
         questionHasConsistentAnswer(question)
       );
     })
-    .slice(0, expectedCount)
-    .map((question, index) => ({
-      id: question.id || `ai-${index + 1}-${Date.now()}`,
-      prompt: question.prompt.trim(),
-      options: question.options.map((option) => String(option).trim()),
-      answer: question.answer.trim(),
-      explanation: question.explanation.trim(),
-    }));
+    .slice(0, expectedCount);
 
   if (cleaned.length === 0) {
     throw new Error("AI returned invalid or inconsistent question data.");
   }
 
   return cleaned;
+}
+
+async function verifyGeneratedQuestions(questions, body) {
+  const candidates = questions.map((question, candidateIndex) => ({
+    candidateIndex,
+    prompt: question.prompt,
+    options: question.options,
+    proposedExplanation: question.explanation,
+  }));
+  const data = await createOpenAiResponse({
+    schemaName: "quiz_question_verification",
+    schema: buildQuestionVerificationSchema(),
+    model: openAiVerifierModel,
+    reasoningEffort: openAiVerifierReasoningEffort,
+    instructions: [
+      "You are an independent educational assessment verifier, not a quiz writer.",
+      "Solve every candidate yourself from the prompt and options before judging the proposed explanation.",
+      "Do not assume that the proposed explanation or any option is correct.",
+      "Set correctOptionIndex to -1 if the question is unsound, outdated, underspecified, has no correct option, or has multiple defensible answers.",
+      "Use high confidence only when the answer is clearly established and appropriate for the supplied learner stage and curriculum.",
+      "Mark explanationAccurate false if the explanation contains a factual, mathematical, logical, or terminology error, even when its final option is correct.",
+      "Return one result for every candidateIndex and do not omit difficult candidates.",
+    ].join(" "),
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: JSON.stringify({
+              context: {
+                subject: body.subject?.name ?? "Unknown",
+                grade: body.grade ?? "Unknown",
+                difficulty: body.difficulty ?? "Unknown",
+                targetExam: body.profile?.targetExam ?? "General study",
+                preferredCurriculum: body.profile?.preferredCurriculum ?? "Not specified",
+                learnerLanguage: body.learnerLanguageLabel ?? "English",
+              },
+              candidates,
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  const results = Array.isArray(data.results) ? data.results : [];
+  const resultByIndex = new Map(results.map((result) => [result.candidateIndex, result]));
+  const accepted = questions.filter((question, candidateIndex) => {
+    const result = resultByIndex.get(candidateIndex);
+    const proposedAnswerIndex = question.options.indexOf(question.answer);
+    return (
+      result?.confidence === "high" &&
+      result.isUnambiguous === true &&
+      result.explanationAccurate === true &&
+      result.correctOptionIndex === proposedAnswerIndex
+    );
+  });
+
+  const rejectedCount = questions.length - accepted.length;
+  if (rejectedCount > 0) {
+    console.warn(`[questions] Rejected ${rejectedCount} of ${questions.length} generated candidates during independent verification.`);
+  }
+  return accepted;
 }
 
 function buildFeedbackSchema() {
@@ -1420,6 +1621,12 @@ function buildLearningHubAnswerSchema() {
 }
 
 async function handleQuestions(body, response) {
+  const requestedCount = Math.max(1, Math.min(Number(body.questionCount ?? 10), 20));
+  const candidateCount = Math.min(
+    maxQuestionCandidates,
+    Math.max(requestedCount + 4, Math.ceil(requestedCount * questionCandidateMultiplier))
+  );
+  const generationBody = { ...body, questionCount: candidateCount };
   const data = await createOpenAiResponse({
     schemaName: "quiz_questions",
     schema: buildQuestionSchema(),
@@ -1446,7 +1653,8 @@ async function handleQuestions(body, response) {
           {
             type: "input_text",
             text: [
-              ...buildQuestionPromptLines(body),
+              ...buildQuestionPromptLines(generationBody),
+              `Generate ${candidateCount} distinct candidates so uncertain or ambiguous items can be rejected before learners see them.`,
             ].join("\n"),
           },
         ],
@@ -1454,8 +1662,14 @@ async function handleQuestions(body, response) {
     ],
   });
 
+  const structurallyValid = validateGeneratedQuestions(data.questions, candidateCount);
+  const verified = await verifyGeneratedQuestions(structurallyValid, body);
+  if (verified.length === 0) {
+    throw new Error("No generated questions passed independent verification.");
+  }
+
   sendJson(response, 200, {
-    questions: validateGeneratedQuestions(data.questions, Number(body.questionCount ?? 10)),
+    questions: verified.slice(0, requestedCount),
     source: "remote",
   });
 }
@@ -2528,6 +2742,8 @@ const server = http.createServer(async (request, response) => {
       ok: true,
       provider: "openai",
       model: openAiModel,
+      verifierModel: openAiVerifierModel,
+      verifierReasoningEffort: openAiVerifierReasoningEffort,
       hasApiKey: Boolean(openAiApiKey),
     });
     return;

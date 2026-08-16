@@ -98,6 +98,8 @@ const apiKey = process.env.EXPO_PUBLIC_AI_API_KEY ?? extra.EXPO_PUBLIC_AI_API_KE
 const aiMode = process.env.EXPO_PUBLIC_AI_MODE ?? extra.EXPO_PUBLIC_AI_MODE ?? "demo";
 const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? extra.EXPO_PUBLIC_GEMINI_API_KEY;
 const geminiModel = process.env.EXPO_PUBLIC_GEMINI_MODEL ?? extra.EXPO_PUBLIC_GEMINI_MODEL ?? "gemini-2.5-flash";
+const geminiVerifierModel =
+  process.env.EXPO_PUBLIC_GEMINI_VERIFIER_MODEL ?? extra.EXPO_PUBLIC_GEMINI_VERIFIER_MODEL ?? geminiModel;
 
 function describeDifficultyRigour(request: QuestionRequest) {
   if (request.difficulty === "Beginner") {
@@ -311,6 +313,29 @@ function buildFallbackQuestionResponse(request: QuestionRequest): QuestionRespon
   };
 }
 
+function fillVerifiedQuestionsFromLocal(
+  request: QuestionRequest,
+  verifiedQuestions: Question[]
+): Question[] {
+  const seenIds = new Set(verifiedQuestions.map((question) => question.id));
+  const seenPrompts = new Set(
+    verifiedQuestions.map((question) => normalizeForValidation(question.prompt).toLowerCase())
+  );
+  const localQuestions = getLocalQuestions({ ...request, questionCount: request.questionCount });
+  const merged = [...verifiedQuestions];
+
+  for (const question of localQuestions) {
+    const normalizedPrompt = normalizeForValidation(question.prompt).toLowerCase();
+    if (seenIds.has(question.id) || seenPrompts.has(normalizedPrompt)) continue;
+    merged.push(question);
+    seenIds.add(question.id);
+    seenPrompts.add(normalizedPrompt);
+    if (merged.length >= request.questionCount) break;
+  }
+
+  return merged.slice(0, request.questionCount);
+}
+
 function normalizeForValidation(value: string) {
   return value
     .replace(/[–—−]/g, "-")
@@ -498,9 +523,11 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
     throw new Error("Gemini API key is not configured.");
   }
 
+  const candidateCount = Math.min(20, Math.max(request.questionCount + 4, Math.ceil(request.questionCount * 1.5)));
+  const generationRequest = { ...request, questionCount: candidateCount };
   const prompt = [
     "Generate a JSON object with a `questions` array for a mobile quiz app.",
-    ...buildPromptLines(request),
+    ...buildPromptLines(generationRequest),
     "Return only valid JSON.",
     "Each question must include: id, prompt, options, answer, explanation.",
     "Each question must have exactly 4 options and one correct answer that matches one option exactly.",
@@ -526,7 +553,7 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
           },
         ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.2,
           response_mime_type: "application/json",
           response_schema: {
             type: "OBJECT",
@@ -574,8 +601,103 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
   }
 
   const parsed = JSON.parse(text) as { questions: Question[] };
+  const candidates = validateQuestions(parsed.questions, candidateCount);
+  const verificationResponse = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiVerifierModel}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: [
+                  "Independently solve and verify these educational multiple-choice candidates.",
+                  "Do not trust the proposed answer or explanation. Reject ambiguity, multiple correct options, factual errors, and incorrect explanations.",
+                  "Use high confidence only when the result is clearly established.",
+                  JSON.stringify(
+                    candidates.map((question, candidateIndex) => ({
+                      candidateIndex,
+                      prompt: question.prompt,
+                      options: question.options,
+                      proposedExplanation: question.explanation,
+                    }))
+                  ),
+                ].join("\n"),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          response_mime_type: "application/json",
+          response_schema: {
+            type: "OBJECT",
+            properties: {
+              results: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    candidateIndex: { type: "INTEGER" },
+                    correctOptionIndex: { type: "INTEGER" },
+                    confidence: { type: "STRING", enum: ["high", "medium", "low"] },
+                    isUnambiguous: { type: "BOOLEAN" },
+                    explanationAccurate: { type: "BOOLEAN" },
+                  },
+                  required: [
+                    "candidateIndex",
+                    "correctOptionIndex",
+                    "confidence",
+                    "isUnambiguous",
+                    "explanationAccurate",
+                  ],
+                },
+              },
+            },
+            required: ["results"],
+          },
+        },
+      }),
+    }
+  );
+
+  if (!verificationResponse.ok) {
+    throw new Error(`Gemini verification failed with status ${verificationResponse.status}`);
+  }
+
+  const verificationPayload = (await verificationResponse.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const verificationText = verificationPayload.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!verificationText) throw new Error("Gemini verifier did not return text content.");
+  const verification = JSON.parse(verificationText) as {
+    results?: Array<{
+      candidateIndex: number;
+      correctOptionIndex: number;
+      confidence: "high" | "medium" | "low";
+      isUnambiguous: boolean;
+      explanationAccurate: boolean;
+    }>;
+  };
+  const resultByIndex = new Map((verification.results ?? []).map((result) => [result.candidateIndex, result]));
+  const verified = candidates.filter((question, candidateIndex) => {
+    const result = resultByIndex.get(candidateIndex);
+    return (
+      result?.confidence === "high" &&
+      result.isUnambiguous === true &&
+      result.explanationAccurate === true &&
+      result.correctOptionIndex === question.options.indexOf(question.answer)
+    );
+  });
+  if (verified.length === 0) throw new Error("No Gemini questions passed independent verification.");
+
   return {
-    questions: validateQuestions(parsed.questions, request.questionCount),
+    questions: fillVerifiedQuestionsFromLocal(request, verified),
     source: "remote",
   };
 }
@@ -588,8 +710,9 @@ export async function generateQuestions(request: QuestionRequest): Promise<Quest
           "/questions",
           withVariantMeta(request) as unknown as Record<string, unknown>
         );
+        const verifiedQuestions = validateQuestions(response.questions, request.questionCount);
         return {
-          questions: validateQuestions(response.questions, request.questionCount),
+          questions: fillVerifiedQuestionsFromLocal(request, verifiedQuestions),
           source: response.source === "local" || response.source === "demo" ? response.source : "remote",
         };
       }

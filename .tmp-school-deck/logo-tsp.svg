@@ -1,0 +1,10 @@
+<svg width="760" height="220" viewBox="0 0 760 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="18" y="18" width="184" height="184" rx="44" fill="#0F2130"/>
+  <path d="M56 81H164" stroke="#1F9D8B" stroke-width="18" stroke-linecap="round"/>
+  <path d="M110 81V153" stroke="white" stroke-width="18" stroke-linecap="round"/>
+  <path d="M56 153H144C158.359 153 170 141.359 170 127C170 112.641 158.359 101 144 101H56" stroke="#8FE2D7" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M246 89H470" stroke="#1F9D8B" stroke-width="6" stroke-linecap="round"/>
+  <text x="246" y="126" fill="#0F2130" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" letter-spacing="1.8">TECH SOLUTION</text>
+  <text x="246" y="162" fill="#61707E" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" letter-spacing="3.8">PROVIDERS</text>
+  <text x="246" y="62" fill="#61707E" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing="4.6">TSP</text>
+</svg>
