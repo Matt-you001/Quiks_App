@@ -338,6 +338,8 @@ export interface ClassroomQuestionCandidateRequest {
   focusMode?: QuestionFocusMode;
   topicId?: string;
   topicLabel?: string;
+  topicIds?: string[];
+  topicLabels?: string[];
   questionCount: number;
   batchCount?: number;
 }
@@ -360,6 +362,8 @@ export interface ClassroomActivitySummary {
   focusMode: QuestionFocusMode;
   topicId?: string;
   topicLabel?: string;
+  topicIds?: string[];
+  topicLabels?: string[];
   usesCustomSubject?: boolean;
   usesCustomTopic?: boolean;
   questionCount: number;
@@ -391,6 +395,8 @@ export interface ClassroomActivityCreateRequest {
   focusMode?: QuestionFocusMode;
   topicId?: string;
   topicLabel?: string;
+  topicIds?: string[];
+  topicLabels?: string[];
   durationMinutes: number;
   availabilityHours: number;
   startInMinutes?: number;

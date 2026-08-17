@@ -243,6 +243,16 @@ function buildActivitySummary(store, activity, profileId) {
     focusMode: activity.focusMode,
     topicId: activity.topicId,
     topicLabel: activity.topicLabel,
+    topicIds: Array.isArray(activity.topicIds)
+      ? activity.topicIds
+      : activity.topicId
+        ? [activity.topicId]
+        : [],
+    topicLabels: Array.isArray(activity.topicLabels)
+      ? activity.topicLabels
+      : activity.topicLabel
+        ? [activity.topicLabel]
+        : [],
     usesCustomSubject: Boolean(activity.usesCustomSubject),
     usesCustomTopic: Boolean(activity.usesCustomTopic),
     questionCount: activity.questionCount,
@@ -573,6 +583,17 @@ export async function createClassroomActivity(payload, appVariant) {
         : startAt + Math.max(1, Number(payload.availabilityHours ?? 24)) * 60 * 60 * 1000;
     const activityId = randomUUID();
 
+    const topicIds = Array.isArray(payload.topicIds)
+      ? payload.topicIds.filter((topicId) => typeof topicId === "string" && topicId.trim())
+      : payload.topicId
+        ? [payload.topicId]
+        : [];
+    const topicLabels = Array.isArray(payload.topicLabels)
+      ? payload.topicLabels.filter((topicLabel) => typeof topicLabel === "string" && topicLabel.trim())
+      : payload.topicLabel
+        ? [payload.topicLabel]
+        : [];
+
     store.activities[activityId] = {
       id: activityId,
       classId: payload.classId,
@@ -585,8 +606,10 @@ export async function createClassroomActivity(payload, appVariant) {
       level: payload.level,
       difficulty: payload.difficulty,
       focusMode: payload.focusMode ?? "general",
-      topicId: payload.topicId,
-      topicLabel: payload.topicLabel,
+      topicId: topicIds[0],
+      topicLabel: topicLabels.join(", ") || undefined,
+      topicIds,
+      topicLabels,
       usesCustomTopic: Boolean(payload.usesCustomTopic),
       durationMinutes,
       startAt,
@@ -667,8 +690,20 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.level = payload.level;
     activity.difficulty = payload.difficulty;
     activity.focusMode = payload.focusMode ?? "general";
-    activity.topicId = payload.topicId;
-    activity.topicLabel = payload.topicLabel;
+    const topicIds = Array.isArray(payload.topicIds)
+      ? payload.topicIds.filter((topicId) => typeof topicId === "string" && topicId.trim())
+      : payload.topicId
+        ? [payload.topicId]
+        : [];
+    const topicLabels = Array.isArray(payload.topicLabels)
+      ? payload.topicLabels.filter((topicLabel) => typeof topicLabel === "string" && topicLabel.trim())
+      : payload.topicLabel
+        ? [payload.topicLabel]
+        : [];
+    activity.topicId = topicIds[0];
+    activity.topicLabel = topicLabels.join(", ") || undefined;
+    activity.topicIds = topicIds;
+    activity.topicLabels = topicLabels;
     activity.usesCustomTopic = Boolean(payload.usesCustomTopic);
     activity.durationMinutes = durationMinutes;
     activity.startAt = startAt;

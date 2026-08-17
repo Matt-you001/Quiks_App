@@ -205,10 +205,28 @@ function describeDifficultyRigour(body) {
   ].join(" ");
 }
 
+function getSelectedTopicLabels(body) {
+  if (Array.isArray(body.topicLabels)) {
+    const labels = body.topicLabels
+      .filter((label) => typeof label === "string" && label.trim())
+      .map((label) => label.trim());
+    if (labels.length > 0) return labels;
+  }
+  return body.topicLabel ? [String(body.topicLabel)] : [];
+}
+
+function describeQuestionFocus(body) {
+  if (body.focusMode !== "topic") return "General mixed practice";
+  const labels = getSelectedTopicLabels(body);
+  if (labels.length > 0) return `Selected topics only (${labels.join("; ")})`;
+  return `Selected topic only (${body.topicId ?? "selected topic"})`;
+}
+
 function describeAcademicStage(body) {
+  const selectedTopicLabels = getSelectedTopicLabels(body);
   const focusLabel =
     body.focusMode === "topic"
-      ? body.topicLabel ?? body.topicId ?? "selected topic"
+      ? selectedTopicLabels.join(", ") || body.topicId || "selected topic"
       : `general ${body.subject?.name ?? "course"} coverage`;
 
   if (body.appVariant === "children") {
@@ -257,7 +275,7 @@ function buildQuestionPromptLines(body) {
     `Difficulty: ${body.difficulty ?? "Beginner"}`,
     `Mode: ${body.mode ?? "quiz"}`,
     `Level: ${body.level ?? 1}`,
-    `Question focus: ${body.focusMode === "topic" ? `Topic only (${body.topicLabel ?? body.topicId ?? "selected topic"})` : "General mixed practice"}`,
+    `Question focus: ${describeQuestionFocus(body)}`,
     `Question count: ${body.questionCount ?? 10}`,
     `App variant: ${body.appVariant ?? "children"}`,
     `Audience: ${body.appAudienceLabel ?? "General learners"}`,
@@ -272,7 +290,7 @@ function buildQuestionPromptLines(body) {
     `Difficulty rigour guidance: ${describeDifficultyRigour(body)}`,
     describeLevelCurriculumFocus(body) ?? "",
     body.focusMode === "topic"
-      ? "Generate questions only from the selected topic. Do not mix in unrelated topics."
+      ? "Generate questions only from the selected topic or topics. Cover every selected topic as evenly as the requested question count permits. Do not mix in unrelated topics."
       : "Use a healthy spread of topics within the subject or course.",
     "Treat the provided grade/band and level as mandatory signals for academic standard.",
     "Treat the selected difficulty as a mandatory signal for reasoning depth inside that academic stage.",
@@ -816,6 +834,7 @@ async function verifyGeneratedQuestions(questions, body) {
                 subject: body.subject?.name ?? "Unknown",
                 grade: body.grade ?? "Unknown",
                 difficulty: body.difficulty ?? "Unknown",
+                topicFocus: describeQuestionFocus(body),
                 targetExam: body.profile?.targetExam ?? "General study",
                 preferredCurriculum: body.profile?.preferredCurriculum ?? "Not specified",
                 learnerLanguage: body.learnerLanguageLabel ?? "English",
@@ -1320,6 +1339,12 @@ function buildCompetitionLeaderboard() {
 }
 
 async function generateQuestionSet(body) {
+  const requestedCount = Math.max(1, Math.min(Number(body.questionCount ?? 10), 20));
+  const candidateCount = Math.min(
+    maxQuestionCandidates,
+    Math.max(requestedCount + 4, Math.ceil(requestedCount * questionCandidateMultiplier))
+  );
+  const generationBody = { ...body, questionCount: candidateCount };
   const data = await createOpenAiResponse({
     schemaName: "competition_questions",
     schema: buildQuestionSchema(),
@@ -1346,10 +1371,10 @@ async function generateQuestionSet(body) {
             type: "input_text",
             text: [
               ...buildQuestionPromptLines({
-                ...body,
+                ...generationBody,
                 mode: "quiz",
-                questionCount: body.questionCount ?? 10,
               }),
+              `Generate ${candidateCount} distinct candidates so uncertain or ambiguous items can be rejected before learners see them.`,
             ].join("\n"),
           },
         ],
@@ -1357,7 +1382,12 @@ async function generateQuestionSet(body) {
     ],
   });
 
-  return data.questions;
+  const structurallyValid = validateGeneratedQuestions(data.questions, candidateCount);
+  const verified = await verifyGeneratedQuestions(structurallyValid, body);
+  if (verified.length === 0) {
+    throw new Error("No generated questions passed independent verification.");
+  }
+  return verified.slice(0, requestedCount);
 }
 
 async function createCompetitionMatch(waiter, challenger) {

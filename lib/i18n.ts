@@ -118,6 +118,8 @@ type TranslationKey =
   | "chooseTopic"
   | "selectTopic"
   | "topicPickerHint"
+  | "selectOneOrMoreTopics"
+  | "selectAtLeastOneTopic"
   | "otherTopic"
   | "enterCustomTopic"
   | "customTopicHint"
@@ -668,6 +670,8 @@ const english: TranslationMap = {
   chooseTopic: "Choose Topic",
   selectTopic: "Select topic",
   topicPickerHint: "Tap to choose from the full topic list.",
+  selectOneOrMoreTopics: "Select one or more topics for this activity.",
+  selectAtLeastOneTopic: "Select at least one topic for this activity.",
   otherTopic: "Other topic",
   enterCustomTopic: "Enter a topic",
   customTopicHint: "Type a topic if it is not listed. We'll check the spelling and whether it belongs in this subject.",
@@ -1162,6 +1166,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     generalHint: "Allgemein mischt Fragen aus verschiedenen Themen in diesem {item}.",
     specializedHint: "Spezialisiert halt die ganze Sitzung innerhalb eines ausgewahlten akademischen Themas.",
     topicHint: "Themenfokus halt die ganze Sitzung innerhalb eines ausgewahlten Themas.",
+    selectOneOrMoreTopics: "Wahle ein oder mehrere Themen fur diese Aktivitat aus.",
+    selectAtLeastOneTopic: "Wahle mindestens ein Thema fur diese Aktivitat aus.",
     chooseTopic: "Thema auswahlen",
     selectTopic: "Thema auswahlen",
     topicPickerHint: "Tippe, um aus der vollstandigen Themenliste zu wahlen.",
@@ -1260,6 +1266,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     custom: "Personnalise",
     subjectLabel: "Matiere",
     topicLabel: "Sujet",
+    selectOneOrMoreTopics: "Selectionnez un ou plusieurs sujets pour cette activite.",
+    selectAtLeastOneTopic: "Selectionnez au moins un sujet pour cette activite.",
     testDate: "Date du test",
     durationSeconds: "Duree (Secondes)",
     startTimeLabel: "Heure de debut",
@@ -1606,6 +1614,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     generalHint: "综合模式会从这个{item}的不同主题中混合出题。",
     specializedHint: "专项模式会把整套练习限定在一个学术主题内。",
     topicHint: "专题练习会把整套练习限定在一个主题内。",
+    selectOneOrMoreTopics: "为此活动选择一个或多个主题。",
+    selectAtLeastOneTopic: "请为此活动至少选择一个主题。",
     chooseTopic: "选择主题",
     selectTopic: "选择主题",
     topicPickerHint: "点击可从完整主题列表中选择。",
@@ -1732,6 +1742,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     generalHint: "الوضع العام يخلط الأسئلة من مواضيع مختلفة داخل هذا {item}.",
     specializedHint: "الوضع المتخصص يجعل الجلسة كلها داخل موضوع أكاديمي واحد.",
     topicHint: "تركيز الموضوع يجعل الجلسة كلها داخل موضوع واحد محدد.",
+    selectOneOrMoreTopics: "اختر موضوعا واحدا أو أكثر لهذا النشاط.",
+    selectAtLeastOneTopic: "اختر موضوعا واحدا على الأقل لهذا النشاط.",
     chooseTopic: "اختر موضوعاً",
     selectTopic: "اختيار الموضوع",
     topicPickerHint: "اضغط لاختيار موضوع من القائمة الكاملة.",
