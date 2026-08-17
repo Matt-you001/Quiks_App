@@ -364,6 +364,7 @@ export interface ClassroomActivitySummary {
   topicLabel?: string;
   topicIds?: string[];
   topicLabels?: string[];
+  customTopicLabel?: string;
   usesCustomSubject?: boolean;
   usesCustomTopic?: boolean;
   questionCount: number;
@@ -397,6 +398,7 @@ export interface ClassroomActivityCreateRequest {
   topicLabel?: string;
   topicIds?: string[];
   topicLabels?: string[];
+  customTopicLabel?: string;
   durationMinutes: number;
   availabilityHours: number;
   startInMinutes?: number;

@@ -666,57 +666,82 @@ export default function ClassroomScreen() {
     }
   };
 
+  const resolveActivityTopicSelection = (alertTitle: string) => {
+    if (focusMode !== "topic") {
+      return { topicIds: [] as string[], topicLabels: [] as string[] };
+    }
+
+    if (!resolvedActivitySubject) return null;
+
+    if (useCustomSubject) {
+      if (!customTopicLabel.trim()) {
+        Alert.alert(alertTitle, t(language, "enterCustomTopicFirst"));
+        return null;
+      }
+      return { topicIds: [] as string[], topicLabels: [customTopicLabel.trim()] };
+    }
+
+    const resolvedTopicIds = [...topicIds];
+    const resolvedTopicLabels = topicIds
+      .map((topicId) => selectedSubject?.topics.find((topic) => topic.id === topicId)?.label)
+      .filter((label): label is string => Boolean(label));
+
+    if (useCustomTopic) {
+      const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customTopicLabel, language);
+      if (freshTopicValidation.status === "empty") {
+        Alert.alert(alertTitle, t(language, "enterCustomTopicFirst"));
+        return null;
+      }
+
+      if (freshTopicValidation.status === "wrong-subject") {
+        Alert.alert(
+          alertTitle,
+          t(language, "customTopicWrongSubject", {
+            topic: freshTopicValidation.input,
+            subject: resolvedActivitySubject?.name ?? selectedSubject?.name ?? "this subject",
+            matchedSubject: freshTopicValidation.matchedSubjectName ?? "another subject",
+          })
+        );
+        return null;
+      }
+
+      if (freshTopicValidation.status === "valid") {
+        if (freshTopicValidation.matchedTopicId && !resolvedTopicIds.includes(freshTopicValidation.matchedTopicId)) {
+          resolvedTopicIds.push(freshTopicValidation.matchedTopicId);
+        }
+        if (
+          freshTopicValidation.matchedTopicLabel &&
+          !resolvedTopicLabels.some(
+            (label) => label.toLowerCase() === freshTopicValidation.matchedTopicLabel?.toLowerCase()
+          )
+        ) {
+          resolvedTopicLabels.push(freshTopicValidation.matchedTopicLabel);
+        }
+      } else {
+        const customLabel = customTopicLabel.trim();
+        if (!resolvedTopicLabels.some((label) => label.toLowerCase() === customLabel.toLowerCase())) {
+          resolvedTopicLabels.push(customLabel);
+        }
+      }
+    }
+
+    if (resolvedTopicIds.length === 0 && resolvedTopicLabels.length === 0) {
+      Alert.alert(alertTitle, t(language, "selectAtLeastOneTopic"));
+      return null;
+    }
+
+    return { topicIds: resolvedTopicIds, topicLabels: resolvedTopicLabels };
+  };
+
   const generateCandidates = async () => {
     if (!profile || !selectedClass || !resolvedActivitySubject) {
       return;
     }
 
-    let requestTopicIds: string[] = [];
-    let requestTopicLabels: string[] = [];
-
-    if (focusMode === "topic") {
-      if (useCustomSubject) {
-        if (!customTopicLabel.trim()) {
-          Alert.alert(t(language, "questionSelectionTitle"), t(language, "enterCustomTopicFirst"));
-          return;
-        }
-        requestTopicLabels = [customTopicLabel.trim()];
-      } else if (useCustomTopic) {
-        const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customTopicLabel, language);
-        if (freshTopicValidation.status === "empty") {
-          Alert.alert(t(language, "questionSelectionTitle"), t(language, "enterCustomTopicFirst"));
-          return;
-        }
-
-        if (freshTopicValidation.status === "wrong-subject") {
-          Alert.alert(
-            t(language, "questionSelectionTitle"),
-            t(language, "customTopicWrongSubject", {
-              topic: freshTopicValidation.input,
-              subject: resolvedActivitySubject.name,
-              matchedSubject: freshTopicValidation.matchedSubjectName ?? "another subject",
-            })
-          );
-          return;
-        }
-
-        if (freshTopicValidation.status === "valid") {
-          requestTopicIds = freshTopicValidation.matchedTopicId ? [freshTopicValidation.matchedTopicId] : [];
-          requestTopicLabels = freshTopicValidation.matchedTopicLabel ? [freshTopicValidation.matchedTopicLabel] : [];
-        } else {
-          requestTopicLabels = [customTopicLabel.trim()];
-        }
-      } else {
-        requestTopicIds = topicIds;
-        requestTopicLabels = topicIds
-          .map((topicId) => selectedSubject?.topics.find((topic) => topic.id === topicId)?.label)
-          .filter((label): label is string => Boolean(label));
-        if (requestTopicIds.length === 0) {
-          Alert.alert(t(language, "questionSelectionTitle"), t(language, "selectAtLeastOneTopic"));
-          return;
-        }
-      }
-    }
+    const topicSelection = resolveActivityTopicSelection(t(language, "questionSelectionTitle"));
+    if (!topicSelection) return;
+    const requestTopicIds = topicSelection.topicIds;
+    const requestTopicLabels = topicSelection.topicLabels;
 
     setCandidateLoading(true);
     setHasStartedQuestionSelection(true);
@@ -831,52 +856,10 @@ export default function ClassroomScreen() {
       return;
     }
 
-    let requestTopicIds: string[] = [];
-    let requestTopicLabels: string[] = [];
-
-    if (focusMode === "topic") {
-      if (useCustomSubject) {
-        if (!customTopicLabel.trim()) {
-          Alert.alert(t(language, "publishAssignmentTitle"), t(language, "enterCustomTopicFirst"));
-          return;
-        }
-        requestTopicLabels = [customTopicLabel.trim()];
-      } else if (useCustomTopic) {
-        const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customTopicLabel, language);
-        if (freshTopicValidation.status === "empty") {
-          Alert.alert(t(language, "publishAssignmentTitle"), t(language, "enterCustomTopicFirst"));
-          return;
-        }
-
-        if (freshTopicValidation.status === "wrong-subject") {
-          Alert.alert(
-            t(language, "publishAssignmentTitle"),
-            t(language, "customTopicWrongSubject", {
-              topic: freshTopicValidation.input,
-              subject: resolvedActivitySubject.name,
-              matchedSubject: freshTopicValidation.matchedSubjectName ?? "another subject",
-            })
-          );
-          return;
-        }
-
-        if (freshTopicValidation.status === "valid") {
-          requestTopicIds = freshTopicValidation.matchedTopicId ? [freshTopicValidation.matchedTopicId] : [];
-          requestTopicLabels = freshTopicValidation.matchedTopicLabel ? [freshTopicValidation.matchedTopicLabel] : [];
-        } else {
-          requestTopicLabels = [customTopicLabel.trim()];
-        }
-      } else {
-        requestTopicIds = topicIds;
-        requestTopicLabels = topicIds
-          .map((topicId) => selectedSubject?.topics.find((topic) => topic.id === topicId)?.label)
-          .filter((label): label is string => Boolean(label));
-        if (requestTopicIds.length === 0) {
-          Alert.alert(t(language, "publishAssignmentTitle"), t(language, "selectAtLeastOneTopic"));
-          return;
-        }
-      }
-    }
+    const topicSelection = resolveActivityTopicSelection(t(language, "publishAssignmentTitle"));
+    if (!topicSelection) return;
+    const requestTopicIds = topicSelection.topicIds;
+    const requestTopicLabels = topicSelection.topicLabels;
 
     const parsedStartAt = activityType === "test" ? parseDateTimeInput(startDate, startTime) : null;
     const parsedEndAt = activityType === "test" ? computedTestEndAt : null;
@@ -934,6 +917,10 @@ export default function ClassroomScreen() {
         topicLabel: focusMode === "topic" ? requestTopicLabels.join(", ") : undefined,
         topicIds: focusMode === "topic" ? requestTopicIds : undefined,
         topicLabels: focusMode === "topic" ? requestTopicLabels : undefined,
+        customTopicLabel:
+          focusMode === "topic" && isUsingCustomTopic && customTopicLabel.trim()
+            ? customTopicLabel.trim()
+            : undefined,
         durationMinutes:
           activityType === "test"
             ? Math.max(1, computedTestDurationMinutes)
@@ -1047,8 +1034,13 @@ export default function ClassroomScreen() {
       if (activity.focusMode === "topic") {
         if (activity.usesCustomTopic) {
           setUseCustomTopic(!activity.usesCustomSubject);
-          setTopicIds(activity.usesCustomSubject ? activity.topicIds ?? (activity.topicId ? [activity.topicId] : []) : []);
-          setCustomTopicLabel(activity.topicLabels?.[0] ?? activity.topicLabel ?? "");
+          setTopicIds(activity.topicIds?.length ? activity.topicIds : activity.topicId ? [activity.topicId] : []);
+          setCustomTopicLabel(
+            activity.customTopicLabel ??
+              activity.topicLabels?.[Math.max(0, activity.topicLabels.length - 1)] ??
+              activity.topicLabel ??
+              ""
+          );
         } else {
           setUseCustomTopic(false);
           setTopicIds(activity.topicIds?.length ? activity.topicIds : activity.topicId ? [activity.topicId] : []);
@@ -1381,23 +1373,21 @@ export default function ClassroomScreen() {
                               <Pressable
                                 key={entry.id}
                                 onPress={() => {
-                                  setUseCustomTopic(false);
-                                  setCustomTopicLabel("");
                                   setTopicIds((current) =>
                                     current.includes(entry.id)
                                       ? current.filter((topicId) => topicId !== entry.id)
                                       : [...current, entry.id]
                                   );
                                 }}
-                                style={[styles.choiceChip, !useCustomTopic && topicIds.includes(entry.id) ? styles.choiceChipActive : null]}
+                                style={[styles.choiceChip, topicIds.includes(entry.id) ? styles.choiceChipActive : null]}
                               >
-                                <Text style={[styles.choiceChipText, !useCustomTopic && topicIds.includes(entry.id) ? styles.choiceChipTextActive : null]}>{entry.label}</Text>
+                                <Text style={[styles.choiceChipText, topicIds.includes(entry.id) ? styles.choiceChipTextActive : null]}>{entry.label}</Text>
                               </Pressable>
                             ))}
                             <Pressable
                               onPress={() => {
-                                setUseCustomTopic(true);
-                                setTopicIds([]);
+                                if (useCustomTopic) setCustomTopicLabel("");
+                                setUseCustomTopic(!useCustomTopic);
                               }}
                               style={[styles.choiceChip, useCustomTopic ? styles.choiceChipActive : null]}
                             >

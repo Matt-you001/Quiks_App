@@ -253,6 +253,7 @@ function buildActivitySummary(store, activity, profileId) {
       : activity.topicLabel
         ? [activity.topicLabel]
         : [],
+    customTopicLabel: activity.customTopicLabel,
     usesCustomSubject: Boolean(activity.usesCustomSubject),
     usesCustomTopic: Boolean(activity.usesCustomTopic),
     questionCount: activity.questionCount,
@@ -610,6 +611,7 @@ export async function createClassroomActivity(payload, appVariant) {
       topicLabel: topicLabels.join(", ") || undefined,
       topicIds,
       topicLabels,
+      customTopicLabel: typeof payload.customTopicLabel === "string" ? payload.customTopicLabel.trim() : undefined,
       usesCustomTopic: Boolean(payload.usesCustomTopic),
       durationMinutes,
       startAt,
@@ -704,6 +706,7 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.topicLabel = topicLabels.join(", ") || undefined;
     activity.topicIds = topicIds;
     activity.topicLabels = topicLabels;
+    activity.customTopicLabel = typeof payload.customTopicLabel === "string" ? payload.customTopicLabel.trim() : undefined;
     activity.usesCustomTopic = Boolean(payload.usesCustomTopic);
     activity.durationMinutes = durationMinutes;
     activity.startAt = startAt;
