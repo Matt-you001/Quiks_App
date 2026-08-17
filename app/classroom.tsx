@@ -52,6 +52,20 @@ function toSubjectId(value: string) {
   return `custom-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "subject"}`;
 }
 
+function parseCustomTopicLabels(value: string) {
+  const seen = new Set<string>();
+  return value
+    .split(/[,;\n]+/)
+    .map((topic) => topic.trim())
+    .filter((topic) => {
+      if (!topic) return false;
+      const key = topic.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 function parseDateTimeInput(dateText: string, timeText: string) {
   if (!dateText.trim() || !timeText.trim()) {
     return null;
@@ -184,16 +198,12 @@ export default function ClassroomScreen() {
         accent: ["#0E5C63", "#7EE2D9"],
         description: "Teacher-defined subject",
         aiPromptHint: `Treat ${name} as a teacher-defined subject or course. Keep the questions aligned to the teacher's chosen grade, level, difficulty, and topic focus.`,
-        topics: customTopicLabel.trim()
-          ? [
-              {
-                id: `custom-topic-${toSubjectId(customTopicLabel)}`,
-                label: customTopicLabel.trim(),
-                description: "Teacher-defined topic",
-                keywords: [customTopicLabel.trim().toLowerCase()],
-              },
-            ]
-          : [],
+        topics: parseCustomTopicLabels(customTopicLabel).map((topicLabel) => ({
+          id: `custom-topic-${toSubjectId(topicLabel)}`,
+          label: topicLabel,
+          description: "Teacher-defined topic",
+          keywords: [topicLabel.toLowerCase()],
+        })),
       };
     }
 
@@ -673,12 +683,14 @@ export default function ClassroomScreen() {
 
     if (!resolvedActivitySubject) return null;
 
+    const customTopicLabels = parseCustomTopicLabels(customTopicLabel);
+
     if (useCustomSubject) {
-      if (!customTopicLabel.trim()) {
+      if (customTopicLabels.length === 0) {
         Alert.alert(alertTitle, t(language, "enterCustomTopicFirst"));
         return null;
       }
-      return { topicIds: [] as string[], topicLabels: [customTopicLabel.trim()] };
+      return { topicIds: [] as string[], topicLabels: customTopicLabels };
     }
 
     const resolvedTopicIds = [...topicIds];
@@ -687,39 +699,38 @@ export default function ClassroomScreen() {
       .filter((label): label is string => Boolean(label));
 
     if (useCustomTopic) {
-      const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customTopicLabel, language);
-      if (freshTopicValidation.status === "empty") {
+      if (customTopicLabels.length === 0) {
         Alert.alert(alertTitle, t(language, "enterCustomTopicFirst"));
         return null;
       }
 
-      if (freshTopicValidation.status === "wrong-subject") {
-        Alert.alert(
-          alertTitle,
-          t(language, "customTopicWrongSubject", {
-            topic: freshTopicValidation.input,
-            subject: resolvedActivitySubject?.name ?? selectedSubject?.name ?? "this subject",
-            matchedSubject: freshTopicValidation.matchedSubjectName ?? "another subject",
-          })
-        );
-        return null;
-      }
+      for (const customLabel of customTopicLabels) {
+        const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customLabel, language);
+        if (freshTopicValidation.status === "wrong-subject") {
+          Alert.alert(
+            alertTitle,
+            t(language, "customTopicWrongSubject", {
+              topic: freshTopicValidation.input,
+              subject: resolvedActivitySubject.name,
+              matchedSubject: freshTopicValidation.matchedSubjectName ?? "another subject",
+            })
+          );
+          return null;
+        }
 
-      if (freshTopicValidation.status === "valid") {
-        if (freshTopicValidation.matchedTopicId && !resolvedTopicIds.includes(freshTopicValidation.matchedTopicId)) {
-          resolvedTopicIds.push(freshTopicValidation.matchedTopicId);
-        }
-        if (
-          freshTopicValidation.matchedTopicLabel &&
-          !resolvedTopicLabels.some(
-            (label) => label.toLowerCase() === freshTopicValidation.matchedTopicLabel?.toLowerCase()
-          )
-        ) {
-          resolvedTopicLabels.push(freshTopicValidation.matchedTopicLabel);
-        }
-      } else {
-        const customLabel = customTopicLabel.trim();
-        if (!resolvedTopicLabels.some((label) => label.toLowerCase() === customLabel.toLowerCase())) {
+        if (freshTopicValidation.status === "valid") {
+          if (freshTopicValidation.matchedTopicId && !resolvedTopicIds.includes(freshTopicValidation.matchedTopicId)) {
+            resolvedTopicIds.push(freshTopicValidation.matchedTopicId);
+          }
+          if (
+            freshTopicValidation.matchedTopicLabel &&
+            !resolvedTopicLabels.some(
+              (label) => label.toLowerCase() === freshTopicValidation.matchedTopicLabel?.toLowerCase()
+            )
+          ) {
+            resolvedTopicLabels.push(freshTopicValidation.matchedTopicLabel);
+          }
+        } else if (!resolvedTopicLabels.some((label) => label.toLowerCase() === customLabel.toLowerCase())) {
           resolvedTopicLabels.push(customLabel);
         }
       }
@@ -919,7 +930,11 @@ export default function ClassroomScreen() {
         topicLabels: focusMode === "topic" ? requestTopicLabels : undefined,
         customTopicLabel:
           focusMode === "topic" && isUsingCustomTopic && customTopicLabel.trim()
-            ? customTopicLabel.trim()
+            ? parseCustomTopicLabels(customTopicLabel).join(", ")
+            : undefined,
+        customTopicLabels:
+          focusMode === "topic" && isUsingCustomTopic
+            ? parseCustomTopicLabels(customTopicLabel)
             : undefined,
         durationMinutes:
           activityType === "test"
@@ -1036,7 +1051,9 @@ export default function ClassroomScreen() {
           setUseCustomTopic(!activity.usesCustomSubject);
           setTopicIds(activity.topicIds?.length ? activity.topicIds : activity.topicId ? [activity.topicId] : []);
           setCustomTopicLabel(
-            activity.customTopicLabel ??
+            activity.customTopicLabels?.length
+              ? activity.customTopicLabels.join(", ")
+              : activity.customTopicLabel ??
               activity.topicLabels?.[Math.max(0, activity.topicLabels.length - 1)] ??
               activity.topicLabel ??
               ""
@@ -1359,13 +1376,19 @@ export default function ClassroomScreen() {
                       <Text style={styles.sectionLabel}>{t(language, "topicLabel")}</Text>
                       <Text style={styles.helperText}>{t(language, "selectOneOrMoreTopics")}</Text>
                       {useCustomSubject ? (
-                        <TextInput
-                          value={customTopicLabel}
-                          onChangeText={setCustomTopicLabel}
-                          placeholder={t(language, "enterCustomTopic")}
-                          placeholderTextColor="#8092A7"
-                          style={styles.input}
-                        />
+                        <>
+                          <TextInput
+                            value={customTopicLabel}
+                            onChangeText={setCustomTopicLabel}
+                            placeholder={t(language, "enterCustomTopics")}
+                            placeholderTextColor="#8092A7"
+                            multiline
+                            numberOfLines={3}
+                            textAlignVertical="top"
+                            style={[styles.input, styles.multilineTopicInput]}
+                          />
+                          <Text style={styles.helperText}>{t(language, "multipleCustomTopicsHint")}</Text>
+                        </>
                       ) : selectedSubject ? (
                         <>
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -1395,13 +1418,19 @@ export default function ClassroomScreen() {
                             </Pressable>
                           </ScrollView>
                           {useCustomTopic ? (
-                            <TextInput
-                              value={customTopicLabel}
-                              onChangeText={setCustomTopicLabel}
-                              placeholder={t(language, "enterCustomTopic")}
-                              placeholderTextColor="#8092A7"
-                              style={styles.input}
-                            />
+                            <>
+                              <TextInput
+                                value={customTopicLabel}
+                                onChangeText={setCustomTopicLabel}
+                                placeholder={t(language, "enterCustomTopics")}
+                                placeholderTextColor="#8092A7"
+                                multiline
+                                numberOfLines={3}
+                                textAlignVertical="top"
+                                style={[styles.input, styles.multilineTopicInput]}
+                              />
+                              <Text style={styles.helperText}>{t(language, "multipleCustomTopicsHint")}</Text>
+                            </>
                           ) : null}
                         </>
                       ) : null}
@@ -1983,6 +2012,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FBFD",
     paddingHorizontal: 14,
     color: palette.ink,
+  },
+  multilineTopicInput: {
+    minHeight: 88,
+    paddingTop: 14,
+    paddingBottom: 14,
   },
   pickerTrigger: {
     minHeight: 50,

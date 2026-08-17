@@ -122,6 +122,8 @@ type TranslationKey =
   | "selectAtLeastOneTopic"
   | "otherTopic"
   | "enterCustomTopic"
+  | "enterCustomTopics"
+  | "multipleCustomTopicsHint"
   | "customTopicHint"
   | "customTopicRecognized"
   | "customTopicSuggestion"
@@ -674,6 +676,8 @@ const english: TranslationMap = {
   selectAtLeastOneTopic: "Select at least one topic for this activity.",
   otherTopic: "Other topic",
   enterCustomTopic: "Enter a topic",
+  enterCustomTopics: "Enter custom topics",
+  multipleCustomTopicsHint: "Separate multiple topics with commas, semicolons, or new lines.",
   customTopicHint: "Type a topic if it is not listed. We'll check the spelling and whether it belongs in this subject.",
   customTopicRecognized: "{topic} is available in {subject}.",
   customTopicSuggestion: "Do you mean {topic} instead of {input}? We'll use {topic} for this session.",
@@ -1168,6 +1172,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     topicHint: "Themenfokus halt die ganze Sitzung innerhalb eines ausgewahlten Themas.",
     selectOneOrMoreTopics: "Wahle ein oder mehrere Themen fur diese Aktivitat aus.",
     selectAtLeastOneTopic: "Wahle mindestens ein Thema fur diese Aktivitat aus.",
+    enterCustomTopics: "Eigene Themen eingeben",
+    multipleCustomTopicsHint: "Trenne mehrere Themen durch Kommas, Semikolons oder neue Zeilen.",
     chooseTopic: "Thema auswahlen",
     selectTopic: "Thema auswahlen",
     topicPickerHint: "Tippe, um aus der vollstandigen Themenliste zu wahlen.",
@@ -1268,6 +1274,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     topicLabel: "Sujet",
     selectOneOrMoreTopics: "Selectionnez un ou plusieurs sujets pour cette activite.",
     selectAtLeastOneTopic: "Selectionnez au moins un sujet pour cette activite.",
+    enterCustomTopics: "Saisissez des sujets personnalises",
+    multipleCustomTopicsHint: "Separez plusieurs sujets par des virgules, des points-virgules ou des retours a la ligne.",
     testDate: "Date du test",
     durationSeconds: "Duree (Secondes)",
     startTimeLabel: "Heure de debut",
@@ -1616,6 +1624,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     topicHint: "专题练习会把整套练习限定在一个主题内。",
     selectOneOrMoreTopics: "为此活动选择一个或多个主题。",
     selectAtLeastOneTopic: "请为此活动至少选择一个主题。",
+    enterCustomTopics: "输入自定义主题",
+    multipleCustomTopicsHint: "多个主题请用逗号、分号或换行分隔。",
     chooseTopic: "选择主题",
     selectTopic: "选择主题",
     topicPickerHint: "点击可从完整主题列表中选择。",
@@ -1744,6 +1754,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     topicHint: "تركيز الموضوع يجعل الجلسة كلها داخل موضوع واحد محدد.",
     selectOneOrMoreTopics: "اختر موضوعا واحدا أو أكثر لهذا النشاط.",
     selectAtLeastOneTopic: "اختر موضوعا واحدا على الأقل لهذا النشاط.",
+    enterCustomTopics: "أدخل الموضوعات المخصصة",
+    multipleCustomTopicsHint: "افصل بين الموضوعات المتعددة بفواصل أو فاصلة منقوطة أو أسطر جديدة.",
     chooseTopic: "اختر موضوعاً",
     selectTopic: "اختيار الموضوع",
     topicPickerHint: "اضغط لاختيار موضوع من القائمة الكاملة.",

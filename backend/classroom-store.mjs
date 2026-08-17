@@ -254,6 +254,11 @@ function buildActivitySummary(store, activity, profileId) {
         ? [activity.topicLabel]
         : [],
     customTopicLabel: activity.customTopicLabel,
+    customTopicLabels: Array.isArray(activity.customTopicLabels)
+      ? activity.customTopicLabels
+      : activity.customTopicLabel
+        ? [activity.customTopicLabel]
+        : [],
     usesCustomSubject: Boolean(activity.usesCustomSubject),
     usesCustomTopic: Boolean(activity.usesCustomTopic),
     questionCount: activity.questionCount,
@@ -612,6 +617,11 @@ export async function createClassroomActivity(payload, appVariant) {
       topicIds,
       topicLabels,
       customTopicLabel: typeof payload.customTopicLabel === "string" ? payload.customTopicLabel.trim() : undefined,
+      customTopicLabels: Array.isArray(payload.customTopicLabels)
+        ? payload.customTopicLabels.filter((topicLabel) => typeof topicLabel === "string" && topicLabel.trim())
+        : typeof payload.customTopicLabel === "string" && payload.customTopicLabel.trim()
+          ? [payload.customTopicLabel.trim()]
+          : [],
       usesCustomTopic: Boolean(payload.usesCustomTopic),
       durationMinutes,
       startAt,
@@ -707,6 +717,11 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.topicIds = topicIds;
     activity.topicLabels = topicLabels;
     activity.customTopicLabel = typeof payload.customTopicLabel === "string" ? payload.customTopicLabel.trim() : undefined;
+    activity.customTopicLabels = Array.isArray(payload.customTopicLabels)
+      ? payload.customTopicLabels.filter((topicLabel) => typeof topicLabel === "string" && topicLabel.trim())
+      : typeof payload.customTopicLabel === "string" && payload.customTopicLabel.trim()
+        ? [payload.customTopicLabel.trim()]
+        : [];
     activity.usesCustomTopic = Boolean(payload.usesCustomTopic);
     activity.durationMinutes = durationMinutes;
     activity.startAt = startAt;
