@@ -117,6 +117,7 @@ export default function ClassroomScreen() {
   const [selectedClassDetails, setSelectedClassDetails] = useState<ClassroomClassDetailsResponse | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [classroomLoadError, setClassroomLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [newClassName, setNewClassName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -409,8 +410,11 @@ export default function ClassroomScreen() {
       setSelectedClassId((current) =>
         nextClasses.classes.some((entry) => entry.classId === current) ? current : nextClasses.classes[0]?.classId ?? null
       );
+      setClassroomLoadError(null);
     } catch (error) {
-      Alert.alert(t(language, "classroomTitle"), error instanceof Error ? error.message : "Unable to load classroom data.");
+      const message = error instanceof Error ? error.message : t(language, "classroomLoadFailed");
+      setClassroomLoadError(message);
+      Alert.alert(t(language, "classroomTitle"), message);
     } finally {
       setLoading(false);
     }
@@ -1201,7 +1205,14 @@ export default function ClassroomScreen() {
 
                   <Text style={styles.sectionLabel}>{t(language, "yourClasses")}</Text>
                   {classes.length === 0 ? (
-                    <Text style={styles.helperText}>{t(language, "noClassesYet")}</Text>
+                    classroomLoadError ? (
+                      <View style={styles.loadErrorCard}>
+                        <Text style={styles.helperText}>{t(language, "classroomLoadFailed")}</Text>
+                        <PrimaryButton label={t(language, "retryLoading")} onPress={loadData} compact />
+                      </View>
+                    ) : (
+                      <Text style={styles.helperText}>{t(language, "noClassesYet")}</Text>
+                    )
                   ) : (
                     classes.map((entry) => (
                       <Pressable
@@ -2017,6 +2028,10 @@ const styles = StyleSheet.create({
     minHeight: 88,
     paddingTop: 14,
     paddingBottom: 14,
+  },
+  loadErrorCard: {
+    gap: 10,
+    alignItems: "flex-start",
   },
   pickerTrigger: {
     minHeight: 50,

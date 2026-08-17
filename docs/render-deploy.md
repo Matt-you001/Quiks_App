@@ -32,9 +32,22 @@ OPENAI_VERIFIER_MODEL=gpt-5.6-terra
 OPENAI_VERIFIER_REASONING_EFFORT=medium
 QUESTION_CANDIDATE_MULTIPLIER=1.5
 MAX_QUESTION_CANDIDATES=20
+CLASSROOM_STORE_PATH=/var/data/classroom-store.json
 ```
 
 The verifier is intentionally stronger than the generator. A failed or uncertain verification is rejected and replaced in the app from the reviewed local question library.
+
+## Persistent classroom records
+
+Classrooms, memberships, activities, questions, and submissions must not be stored on Render's default filesystem because it is erased during restarts and deployments. The Blueprint attaches a 1 GB persistent disk at `/var/data`, and `CLASSROOM_STORE_PATH` writes the classroom database onto that disk.
+
+When applying this update to an existing service, review and approve the new disk in the Render Blueprint change. If the service is not managed through the Blueprint, open the service's **Disks** page and add a disk with:
+
+- Name: `quiks-classroom-data`
+- Mount path: `/var/data`
+- Size: `1 GB`
+
+Then add `CLASSROOM_STORE_PATH=/var/data/classroom-store.json` to the service environment and redeploy. Do not deploy the storage-path variable without attaching the disk, because `/var/data` would remain temporary.
 
 Render already provides `PORT`, and the blueprint pins it to `10000`.
 

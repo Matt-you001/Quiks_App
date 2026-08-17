@@ -391,6 +391,8 @@ type TranslationKey =
   | "roleLabel"
   | "quiksIdLabel"
   | "classroomTitle"
+  | "classroomLoadFailed"
+  | "retryLoading"
   | "classroomProRequired"
   | "classManagement"
   | "className"
@@ -945,6 +947,8 @@ const english: TranslationMap = {
   roleLabel: "Role",
   quiksIdLabel: "Quiks ID",
   classroomTitle: "Classroom",
+  classroomLoadFailed: "Your classrooms could not be loaded. Your saved records have not been deleted.",
+  retryLoading: "Retry loading",
   classroomProRequired: "Classroom is available to paid Pro subscribers. Upgrade or restore your subscription to continue.",
   classManagement: "Class management",
   className: "Class name",
@@ -1242,6 +1246,8 @@ const translations: Record<AppLanguage, TranslationMap> = {
     roleLabel: "Role",
     quiksIdLabel: "ID Quiks",
     classroomTitle: "Classe",
+    classroomLoadFailed: "Vos classes n'ont pas pu etre chargees. Vos donnees enregistrees n'ont pas ete supprimees.",
+    retryLoading: "Reessayer",
     classManagement: "Gestion de classe",
     className: "Nom de la classe",
     createClassAction: "Creer la classe",

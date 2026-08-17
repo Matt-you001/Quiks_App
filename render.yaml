@@ -6,6 +6,10 @@ services:
     buildCommand: npm install
     startCommand: npm run proxy
     autoDeploy: true
+    disk:
+      name: quiks-classroom-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: 22
@@ -21,5 +25,7 @@ services:
         value: 1.5
       - key: MAX_QUESTION_CANDIDATES
         value: 20
+      - key: CLASSROOM_STORE_PATH
+        value: /var/data/classroom-store.json
       - key: OPENAI_API_KEY
         sync: false

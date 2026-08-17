@@ -1,11 +1,17 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const dataDirectory = join(currentDirectory, "data");
-const storePath = join(dataDirectory, "classroom-store.json");
+const configuredStorePath = String(process.env.CLASSROOM_STORE_PATH ?? "").trim();
+const storePath = configuredStorePath
+  ? isAbsolute(configuredStorePath)
+    ? configuredStorePath
+    : resolve(currentDirectory, configuredStorePath)
+  : join(currentDirectory, "data", "classroom-store.json");
+const dataDirectory = dirname(storePath);
+const temporaryStorePath = `${storePath}.tmp`;
 
 const defaultStore = {
   profiles: {},
@@ -44,8 +50,18 @@ async function ensureStore() {
 }
 
 async function persistStore(store) {
-  writeQueue = writeQueue.then(() => writeFile(storePath, JSON.stringify(store, null, 2), "utf8"));
+  writeQueue = writeQueue.catch(() => undefined).then(async () => {
+    await writeFile(temporaryStorePath, JSON.stringify(store, null, 2), "utf8");
+    await rename(temporaryStorePath, storePath);
+  });
   await writeQueue;
+}
+
+export function getClassroomStoreDiagnostics() {
+  return {
+    configured: Boolean(configuredStorePath),
+    persistentPathExpected: storePath.startsWith("/var/data/"),
+  };
 }
 
 async function mutateStore(mutator) {

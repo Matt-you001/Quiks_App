@@ -7,6 +7,7 @@ import {
   createClassroom,
   duplicateActivity,
   getActivityDetails,
+  getClassroomStoreDiagnostics,
   getClassroomDetails,
   inviteStudentToClass,
   listActivitiesForProfile,
@@ -2774,6 +2775,7 @@ const server = http.createServer(async (request, response) => {
       model: openAiModel,
       verifierModel: openAiVerifierModel,
       verifierReasoningEffort: openAiVerifierReasoningEffort,
+      classroomStore: getClassroomStoreDiagnostics(),
       hasApiKey: Boolean(openAiApiKey),
     });
     return;
