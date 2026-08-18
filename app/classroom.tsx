@@ -145,6 +145,7 @@ export default function ClassroomScreen() {
   const [questionOrderMode, setQuestionOrderMode] = useState<ClassroomQuestionOrderMode>("same");
   const [candidateQuestions, setCandidateQuestions] = useState<Question[]>([]);
   const [acceptedQuestions, setAcceptedQuestions] = useState<Question[]>([]);
+  const [candidateLoadError, setCandidateLoadError] = useState<string | null>(null);
   const [isReviewingQuestions, setIsReviewingQuestions] = useState(false);
   const [reviewPage, setReviewPage] = useState(0);
   const [showCustomQuestionForm, setShowCustomQuestionForm] = useState(false);
@@ -183,6 +184,26 @@ export default function ClassroomScreen() {
     () => localizedSubjects.find((subject) => subject.id === subjectId) ?? localizedSubjects[0] ?? null,
     [localizedSubjects, subjectId]
   );
+  const selectedPresetTopicLabels = useMemo(
+    () =>
+      topicIds
+        .map((topicId) => selectedSubject?.topics.find((topic) => topic.id === topicId)?.label)
+        .filter((label): label is string => Boolean(label)),
+    [selectedSubject, topicIds]
+  );
+  const combinedTopicPreview = useMemo(() => {
+    const labels = [
+      ...selectedPresetTopicLabels,
+      ...(useCustomTopic ? parseCustomTopicLabels(customTopicLabel) : []),
+    ];
+    const seen = new Set<string>();
+    return labels.filter((label) => {
+      const key = label.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [customTopicLabel, selectedPresetTopicLabels, useCustomTopic]);
   const isUsingCustomTopic = focusMode === "topic" && (useCustomSubject || useCustomTopic);
   const resolvedActivitySubject = useMemo((): Subject | null => {
     if (useCustomSubject) {
@@ -308,6 +329,7 @@ export default function ClassroomScreen() {
 
     setCandidateQuestions([]);
     setAcceptedQuestions([]);
+    setCandidateLoadError(null);
     setIsReviewingQuestions(false);
     setReviewPage(0);
     setHasStartedQuestionSelection(false);
@@ -698,9 +720,7 @@ export default function ClassroomScreen() {
     }
 
     const resolvedTopicIds = [...topicIds];
-    const resolvedTopicLabels = topicIds
-      .map((topicId) => selectedSubject?.topics.find((topic) => topic.id === topicId)?.label)
-      .filter((label): label is string => Boolean(label));
+    const resolvedTopicLabels = [...selectedPresetTopicLabels];
 
     if (useCustomTopic) {
       if (customTopicLabels.length === 0) {
@@ -750,6 +770,7 @@ export default function ClassroomScreen() {
 
   const generateCandidates = async () => {
     if (!profile || !selectedClass || !resolvedActivitySubject) {
+      setCandidateLoadError(t(language, "unableLoadCandidateQuestions"));
       return;
     }
 
@@ -759,6 +780,7 @@ export default function ClassroomScreen() {
     const requestTopicLabels = topicSelection.topicLabels;
 
     setCandidateLoading(true);
+    setCandidateLoadError(null);
     setHasStartedQuestionSelection(true);
     try {
       const remainingCount = Math.max(1, desiredQuestionCount - acceptedQuestions.length);
@@ -777,6 +799,10 @@ export default function ClassroomScreen() {
         questionCount: desiredQuestionCount,
         batchCount: Math.min(10, remainingCount),
       });
+      if (!Array.isArray(response.questions) || response.questions.length === 0) {
+        throw new Error(t(language, "unableLoadCandidateQuestions"));
+      }
+
       setCandidateQuestions((current) => [
         ...current,
         ...response.questions.map((question, index) => ({
@@ -785,7 +811,10 @@ export default function ClassroomScreen() {
         })),
       ]);
     } catch (error) {
-      Alert.alert(t(language, "questionSelectionTitle"), error instanceof Error ? error.message : t(language, "unableLoadCandidateQuestions"));
+      const message = error instanceof Error ? error.message : t(language, "unableLoadCandidateQuestions");
+      setCandidateLoadError(message);
+      setHasStartedQuestionSelection(false);
+      Alert.alert(t(language, "questionSelectionTitle"), message);
     } finally {
       setCandidateLoading(false);
     }
@@ -1421,7 +1450,7 @@ export default function ClassroomScreen() {
                             <Pressable
                               onPress={() => {
                                 if (useCustomTopic) setCustomTopicLabel("");
-                                setUseCustomTopic(!useCustomTopic);
+                                setUseCustomTopic((current) => !current);
                               }}
                               style={[styles.choiceChip, useCustomTopic ? styles.choiceChipActive : null]}
                             >
@@ -1442,6 +1471,11 @@ export default function ClassroomScreen() {
                               />
                               <Text style={styles.helperText}>{t(language, "multipleCustomTopicsHint")}</Text>
                             </>
+                          ) : null}
+                          {combinedTopicPreview.length > 0 ? (
+                            <Text style={styles.helperText}>
+                              {t(language, "topicFocusLabel", { topic: combinedTopicPreview.join(", ") })}
+                            </Text>
                           ) : null}
                         </>
                       ) : null}
@@ -1609,7 +1643,10 @@ export default function ClassroomScreen() {
                             </View>
                           </View>
                         ) : (
-                          <PrimaryButton label={candidateQuestions.length === 0 ? t(language, "loadQuestionCandidates") : t(language, "loadMoreQuestions")} onPress={generateCandidates} loading={candidateLoading} />
+                          <>
+                            {candidateLoadError ? <Text style={styles.candidateErrorText}>{candidateLoadError}</Text> : null}
+                            <PrimaryButton label={candidateQuestions.length === 0 ? t(language, "loadQuestionCandidates") : t(language, "loadMoreQuestions")} onPress={generateCandidates} loading={candidateLoading} />
+                          </>
                         )
                       ) : (
                         <View style={styles.inlineActions}>
@@ -2089,6 +2126,12 @@ const styles = StyleSheet.create({
   helperText: {
     color: palette.slate,
     lineHeight: 20,
+  },
+  candidateErrorText: {
+    color: "#B42318",
+    fontWeight: "700",
+    lineHeight: 20,
+    textAlign: "center",
   },
   classCard: {
     borderRadius: 18,
