@@ -347,6 +347,9 @@ type TranslationKey =
   | "rematchStarting"
   | "subscription"
   | "manageSubscription"
+  | "manageOrCancelSubscription"
+  | "manageSubscriptionHint"
+  | "subscriptionManagementUnavailable"
   | "currentPlan"
   | "planExpires"
   | "lifetimeAccess"
@@ -903,6 +906,9 @@ const english: TranslationMap = {
   rematchStarting: "Rematch accepted. The next round is starting.",
   subscription: "Subscription",
   manageSubscription: "Manage Subscription",
+  manageOrCancelSubscription: "Manage or Cancel Subscription",
+  manageSubscriptionHint: "Open the secure billing portal to update or cancel your subscription. Cancellation takes effect at the end of your current paid period.",
+  subscriptionManagementUnavailable: "We could not open your subscription management portal. Refresh your subscription status and try again.",
   currentPlan: "Current plan",
   planExpires: "Expires",
   lifetimeAccess: "Lifetime access",

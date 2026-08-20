@@ -102,6 +102,10 @@ function parseRevenueCatSubscriptionStatus(payload, appVariant) {
   return {
     active: Boolean(activeRecord),
     expiresAt: activeRecord ? datedExpirations[0] ?? null : null,
+    managementUrl:
+      activeRecord && typeof subscriber?.management_url === "string" && subscriber.management_url.startsWith("https://")
+        ? subscriber.management_url
+        : null,
   };
 }
 
@@ -439,35 +443,59 @@ async function createOpenAiResponse({
     throw new Error("OPENAI_API_KEY is not configured on the backend.");
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openAiApiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      instructions,
-      input,
-      ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
-      text: {
-        format: {
-          type: "json_schema",
-          name: schemaName,
-          strict: true,
-          schema,
-        },
+  const requestBody = JSON.stringify({
+    model,
+    instructions,
+    input,
+    ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
+    text: {
+      format: {
+        type: "json_schema",
+        name: schemaName,
+        strict: true,
+        schema,
       },
-    }),
+    },
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI request failed with status ${response.status}: ${errorText}`);
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openAiApiKey}`,
+      },
+      body: requestBody,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI request failed with status ${response.status}: ${errorText}`);
+    }
+
+    const payload = await response.json();
+    const outputText = extractOutputText(payload);
+
+    try {
+      return JSON.parse(outputText);
+    } catch (error) {
+      if (attempt >= 2) {
+        throw new Error(
+          `OpenAI returned malformed structured output after retry: ${
+            error instanceof Error ? error.message : "invalid JSON"
+          }`
+        );
+      }
+
+      console.warn(
+        `[openai] Retrying ${schemaName} after malformed structured output: ${
+          error instanceof Error ? error.message : "invalid JSON"
+        }`
+      );
+    }
   }
 
-  const payload = await response.json();
-  return JSON.parse(extractOutputText(payload));
+  throw new Error(`OpenAI did not return usable structured output for ${schemaName}.`);
 }
 
 function buildQuestionSchema() {

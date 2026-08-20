@@ -326,6 +326,7 @@ export interface PaddleSubscriptionSyncRequest extends AccountSubscriptionStatus
 export interface AccountSubscriptionStatusResponse {
   active: boolean;
   expiresAt: string | null;
+  managementUrl: string | null;
 }
 
 export interface ClassroomQuestionCandidateRequest {

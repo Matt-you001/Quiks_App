@@ -58,6 +58,8 @@ export default function SubscriptionScreen() {
   const [storeMessage, setStoreMessage] = useState<string | null>(null);
   const [storeReady, setStoreReady] = useState(false);
   const [account, setAccount] = useState<AppAccount | null>(null);
+  const [managementUrl, setManagementUrl] = useState<string | null>(null);
+  const [openingManagement, setOpeningManagement] = useState(false);
 
   const load = useCallback(async () => {
     const state = await readAppState();
@@ -65,6 +67,7 @@ export default function SubscriptionScreen() {
     setLanguage(nextLanguage);
     setSubscriptionTierState(state.subscriptionTier);
     setAccount(state.account);
+    setManagementUrl(null);
 
     if (!purchasesEnabled) {
       setPlans([]);
@@ -89,6 +92,7 @@ export default function SubscriptionScreen() {
           const status = await getAccountSubscriptionStatus({ accountUid: state.account.uid });
           await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
           setSubscriptionTierState(status.active ? "pro" : "free");
+          setManagementUrl(status.managementUrl);
           setStoreMessage(null);
         } catch {
           setStoreMessage(t(nextLanguage, "subscriptionSyncFailedMessage"));
@@ -152,6 +156,7 @@ export default function SubscriptionScreen() {
         const status = await resolvePaddlePurchaseStatus(account.uid, transactionId);
         await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
         setSubscriptionTierState(status.active ? "pro" : "free");
+        setManagementUrl(status.managementUrl);
         setStoreMessage(
           status.active ? t(language, "purchaseSuccessMessage") : t(language, "purchasePendingMessage")
         );
@@ -195,6 +200,7 @@ export default function SubscriptionScreen() {
         const status = await getAccountSubscriptionStatus({ accountUid: account.uid });
         await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
         setSubscriptionTierState(status.active ? "pro" : "free");
+        setManagementUrl(status.managementUrl);
         Alert.alert(
           status.active ? t(language, "restoreSuccessTitle") : t(language, "restoreFreeTitle"),
           status.active ? t(language, "restoreSuccessMessage") : t(language, "restoreFreeMessage")
@@ -215,6 +221,37 @@ export default function SubscriptionScreen() {
       );
     } finally {
       setRestoring(false);
+    }
+  };
+
+  const manageWebSubscription = async () => {
+    if (Platform.OS !== "web" || !account) {
+      return;
+    }
+
+    setOpeningManagement(true);
+    try {
+      let nextManagementUrl = managementUrl;
+      if (!nextManagementUrl) {
+        const status = await getAccountSubscriptionStatus({ accountUid: account.uid });
+        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+        setSubscriptionTierState(status.active ? "pro" : "free");
+        setManagementUrl(status.managementUrl);
+        nextManagementUrl = status.managementUrl;
+      }
+
+      if (!nextManagementUrl || typeof window === "undefined") {
+        throw new Error(t(language, "subscriptionManagementUnavailable"));
+      }
+
+      window.location.assign(nextManagementUrl);
+    } catch (error) {
+      Alert.alert(
+        t(language, "manageSubscription"),
+        error instanceof Error ? error.message : t(language, "subscriptionManagementUnavailable")
+      );
+    } finally {
+      setOpeningManagement(false);
     }
   };
 
@@ -338,6 +375,17 @@ export default function SubscriptionScreen() {
       <View style={styles.actionColumn}>
         {purchasesEnabled ? (
           <>
+            {Platform.OS === "web" && subscriptionTier === "pro" ? (
+              <View style={styles.managementCard}>
+                <Text style={styles.managementHint}>{t(language, "manageSubscriptionHint")}</Text>
+                <PrimaryButton
+                  label={t(language, "manageOrCancelSubscription")}
+                  variant="secondary"
+                  onPress={manageWebSubscription}
+                  loading={openingManagement}
+                />
+              </View>
+            ) : null}
             <PrimaryButton
               label={t(language, "restorePurchases")}
               variant="secondary"
@@ -405,6 +453,18 @@ const styles = StyleSheet.create({
   actionColumn: {
     marginTop: 18,
     gap: 12,
+  },
+  managementCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: palette.white,
+    padding: 16,
+    gap: 12,
+  },
+  managementHint: {
+    color: palette.slate,
+    lineHeight: 20,
   },
   planList: {
     gap: 12,

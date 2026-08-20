@@ -980,7 +980,22 @@ export async function respondToClassroomMembership(
 export async function generateClassroomQuestionCandidates(
   request: ClassroomQuestionCandidateRequest
 ): Promise<ClassroomQuestionCandidateResponse> {
-  return postJson("/classroom/assignments/candidates", withVariantMeta(request));
+  const body = withVariantMeta(request);
+
+  try {
+    return await postJson("/classroom/assignments/candidates", body);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const isTransientGenerationFailure =
+      /status 5\d\d/i.test(message) ||
+      /unexpected token|malformed structured output|no generated questions passed/i.test(message);
+
+    if (!isTransientGenerationFailure) {
+      throw error;
+    }
+
+    return postJson("/classroom/assignments/candidates", body);
+  }
 }
 
 export async function createClassroomAssignment(
