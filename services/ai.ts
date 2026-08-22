@@ -42,6 +42,8 @@ import type {
   ClassroomLessonNoteMutationResponse,
   ClassroomLessonNoteActivityCreateRequest,
   ClassroomLessonNoteActivityCreateResponse,
+  ClassroomLessonNoteActivityCandidateRequest,
+  ClassroomLessonNoteActivityCandidateResponse,
   ClassroomLessonNoteRefineRequest,
   ClassroomLessonNoteRefineResponse,
   ClassroomLessonNoteUpdateRequest,
@@ -1081,6 +1083,12 @@ export async function createActivityFromClassroomLessonNote(
   request: ClassroomLessonNoteActivityCreateRequest
 ): Promise<ClassroomLessonNoteActivityCreateResponse> {
   return postJson("/classroom/lesson-notes/activity/create", withVariantMeta(request));
+}
+
+export async function generateLessonNoteActivityCandidates(
+  request: ClassroomLessonNoteActivityCandidateRequest
+): Promise<ClassroomLessonNoteActivityCandidateResponse> {
+  return postJson("/classroom/lesson-notes/activity/candidates", withVariantMeta(request));
 }
 
 export async function listClassroomChatMessages(

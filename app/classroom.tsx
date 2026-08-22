@@ -1278,8 +1278,6 @@ export default function ClassroomScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {profile.role === "teacher" ? (
           <View style={styles.createClassPrerequisite}>
-            <Text style={styles.createClassPrerequisiteTitle}>Create a Class</Text>
-            <Text style={styles.helperText}>Create a class before adding activities, lesson notes, or using class chat.</Text>
             <View style={styles.createClassRow}>
               <TextInput
                 value={newClassName}

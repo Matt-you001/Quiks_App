@@ -561,7 +561,7 @@ export interface ClassroomLessonNoteDeleteRequest {
 export interface ClassroomLessonNoteRefineRequest {
   teacherProfile: UserProfile;
   classId: string;
-  title: string;
+  title?: string;
   subject?: string;
   topic?: string;
   content: string;
@@ -600,10 +600,23 @@ export interface ClassroomLessonNoteActivityCreateRequest {
   deadlineAt?: number;
   startAt?: number;
   durationSeconds?: number;
+  questions?: Question[];
 }
 
 export interface ClassroomLessonNoteActivityCreateResponse {
   activity: ClassroomActivitySummary;
+}
+
+export interface ClassroomLessonNoteActivityCandidateRequest {
+  teacherProfile: UserProfile;
+  noteId: string;
+  difficulty: LessonNoteActivityDifficulty;
+  questionCount: number;
+  batchCount?: number;
+}
+
+export interface ClassroomLessonNoteActivityCandidateResponse {
+  questions: Question[];
 }
 
 export interface ClassroomLessonNoteListResponse {

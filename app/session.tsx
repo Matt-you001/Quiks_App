@@ -259,18 +259,19 @@ export default function SessionScreen() {
       return subject;
     }
 
-    if (!activitySubjectName) {
+    if (!activitySubjectName && !isClassroomActivity) {
       return null;
     }
 
+    const fallbackActivityName = activitySubjectName ?? "Classroom activity";
     return {
-      id: params.subjectId ?? `custom-${activitySubjectName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-      name: activitySubjectName,
+      id: params.subjectId ?? `custom-${fallbackActivityName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      name: fallbackActivityName,
       tagline: "Classroom subject",
       icon: "book-open-variant",
       accent: ["#0E5C63", "#7EE2D9"],
       description: "Classroom activity subject",
-      aiPromptHint: `Treat ${activitySubjectName} as the classroom subject for this activity.`,
+      aiPromptHint: `Treat ${fallbackActivityName} as the classroom subject for this activity.`,
       topics: resolvedFocusLabel
         ? [
             {
@@ -282,7 +283,7 @@ export default function SessionScreen() {
           ]
         : [],
     };
-  }, [activitySubjectName, params.subjectId, params.topicId, resolvedFocusLabel, subject]);
+  }, [activitySubjectName, isClassroomActivity, params.subjectId, params.topicId, resolvedFocusLabel, subject]);
 
   useEffect(() => {
     if (!subject) {

@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { PrimaryButton } from "./PrimaryButton";
+import { MathText } from "./MathText";
 import {
   createClassroomLessonNote,
   createActivityFromClassroomLessonNote,
   deleteClassroomLessonNote,
   getClassroomLessonNoteAttachment,
+  generateLessonNoteActivityCandidates,
   listClassroomLessonNotes,
   refineClassroomLessonNote,
   updateClassroomLessonNote,
@@ -21,6 +24,7 @@ import type {
   LessonNoteStudentAccess,
   LessonNoteActivityDifficulty,
   ClassroomActivityType,
+  Question,
   UserProfile,
 } from "../types/app";
 
@@ -32,7 +36,7 @@ interface Props {
 }
 
 const refinementOptions: Array<{ id: LessonNoteRefinementLevel; label: string; hint: string }> = [
-  { id: "none", label: "As prepared", hint: "Publish your original note without AI changes." },
+  { id: "none", label: "As prepared", hint: "Publish your original note without changes." },
   { id: "minimal", label: "Minimal", hint: "Correct errors and make small clarity improvements." },
   { id: "rich", label: "Rich", hint: "Make the supplied content fuller, clearer, and more complete." },
   { id: "deep", label: "Deep", hint: "Add examples and lightweight pictorial learning diagrams." },
@@ -65,6 +69,38 @@ function getDefaultDeadlineDate() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   return toLocalDateValue(tomorrow);
+}
+
+function cleanNoteText(value: string) {
+  return value
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/_([^_\n]+)_/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "• ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function derivedNoteTitle(subject: string, topic: string) {
+  return [subject.trim(), topic.trim()].filter(Boolean).join(": ") || "Lesson Note";
+}
+
+function addMonths(date: Date, count: number) {
+  return new Date(date.getFullYear(), date.getMonth() + count, 1);
+}
+
+function illustrationIcon(value: string) {
+  const text = value.toLowerCase();
+  if (/plant|leaf|photosynth/.test(text)) return "leaf";
+  if (/human|body|person|male|female/.test(text)) return "human-male-female";
+  if (/cell|micro|bacter|amoeba/.test(text)) return "hexagon-multiple-outline";
+  if (/water|rain|liquid/.test(text)) return "water";
+  if (/earth|world|global/.test(text)) return "earth";
+  if (/number|math|fraction|calculate/.test(text)) return "calculator-variant-outline";
+  return "lightbulb-on-outline";
 }
 
 function parseLocalDateTime(dateValue: string, timeValue: string) {
@@ -102,11 +138,14 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
   const [illustrations, setIllustrations] = useState<ClassroomLessonNote["illustrations"]>([]);
   const [attachment, setAttachment] = useState<LessonNoteAttachmentInput | undefined>();
   const [reviewReady, setReviewReady] = useState(false);
+  const [refinementDropdownOpen, setRefinementDropdownOpen] = useState(false);
   const [studentAccess, setStudentAccess] = useState<LessonNoteStudentAccess>("read_only");
   const [error, setError] = useState<string | null>(null);
+  const [viewingNoteId, setViewingNoteId] = useState<string | null>(null);
   const [activityNoteId, setActivityNoteId] = useState<string | null>(null);
   const [noteActivityType, setNoteActivityType] = useState<ClassroomActivityType>("assignment");
   const [noteActivityDifficulty, setNoteActivityDifficulty] = useState<LessonNoteActivityDifficulty>("easy");
+  const [difficultyDropdownOpen, setDifficultyDropdownOpen] = useState(false);
   const [noteActivityQuestionCount, setNoteActivityQuestionCount] = useState("5");
   const [noteActivityDeadlineDate, setNoteActivityDeadlineDate] = useState(getDefaultDeadlineDate);
   const [noteActivityDeadlineTime, setNoteActivityDeadlineTime] = useState("18:00");
@@ -114,6 +153,12 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
   const [noteActivityTestStartTime, setNoteActivityTestStartTime] = useState("09:00");
   const [noteActivityTestDurationSeconds, setNoteActivityTestDurationSeconds] = useState("600");
   const [creatingActivity, setCreatingActivity] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState<"assignment" | "test" | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [candidateQuestions, setCandidateQuestions] = useState<Question[]>([]);
+  const [acceptedQuestions, setAcceptedQuestions] = useState<Question[]>([]);
+  const [candidateLoading, setCandidateLoading] = useState(false);
+  const [reviewingAccepted, setReviewingAccepted] = useState(false);
   const noteActivityTestStartAt = useMemo(
     () => parseLocalDateTime(noteActivityTestDate, noteActivityTestStartTime),
     [noteActivityTestDate, noteActivityTestStartTime]
@@ -124,6 +169,16 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
       ? noteActivityTestStartAt + duration * 1000
       : null;
   }, [noteActivityTestDurationSeconds, noteActivityTestStartAt]);
+  const calendarDays = useMemo(() => {
+    const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    const start = new Date(first);
+    start.setDate(1 - first.getDay());
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      return { date, value: toLocalDateValue(date), inMonth: date.getMonth() === calendarMonth.getMonth() };
+    });
+  }, [calendarMonth]);
 
   const loadNotes = useCallback(async () => {
     try {
@@ -149,6 +204,7 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
     setIllustrations([]);
     setAttachment(undefined);
     setReviewReady(false);
+    setRefinementDropdownOpen(false);
     setStudentAccess("read_only");
   };
 
@@ -188,15 +244,15 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
   };
 
   const refineNote = async () => {
-    if (!title.trim() || !content.trim() || refinementLevel === "none") {
-      Alert.alert("Note details needed", "Enter a title and lesson-note content, then select Minimal, Rich, or Deep refinement.");
+    if (!content.trim() || refinementLevel === "none") {
+      Alert.alert("Note details needed", "Enter the lesson-note content, then select Minimal, Rich, or Deep refinement.");
       return;
     }
     setWorking(true);
     try {
-      const refined = await refineClassroomLessonNote({ teacherProfile: profile, classId, title, subject, topic, content, refinementLevel });
-      setTitle(refined.title);
-      setContent(refined.content);
+      const refined = await refineClassroomLessonNote({ teacherProfile: profile, classId, title: title || derivedNoteTitle(subject, topic), subject, topic, content, refinementLevel });
+      setTitle(cleanNoteText(refined.title));
+      setContent(cleanNoteText(refined.content));
       setIllustrations(refined.illustrations);
       setReviewReady(true);
       Alert.alert("Refinement ready", "Review and edit the refined lesson note before publishing it.");
@@ -212,21 +268,22 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
       Alert.alert("Readable content needed", "Read Only notes must include content that students can read inside Quiks. Paste the note content before publishing.");
       return;
     }
-    const resolvedContent = content.trim() || (attachment ? `Attached lesson note: ${attachment.name}` : "");
-    if (!title.trim() || !resolvedContent) {
-      Alert.alert("Note details needed", "Enter a title and note content, or attach a lesson-note file.");
+    const resolvedContent = cleanNoteText(content.trim()) || (attachment ? `Attached lesson note: ${attachment.name}` : "");
+    const resolvedTitle = cleanNoteText(title.trim() || derivedNoteTitle(subject, topic));
+    if (!resolvedContent) {
+      Alert.alert("Note details needed", "Enter note content, or attach a lesson-note file.");
       return;
     }
     setWorking(true);
     try {
       if (editingNoteId) {
-        await updateClassroomLessonNote({ teacherProfile: profile, noteId: editingNoteId, title, subject, topic, content: resolvedContent, illustrations, refinementLevel, status, studentAccess, attachment });
+        await updateClassroomLessonNote({ teacherProfile: profile, noteId: editingNoteId, title: resolvedTitle, subject, topic, content: resolvedContent, illustrations, refinementLevel, status, studentAccess, attachment });
       } else {
-        await createClassroomLessonNote({ teacherProfile: profile, classId, title, subject, topic, content: resolvedContent, illustrations, refinementLevel, status, studentAccess, attachment });
+        await createClassroomLessonNote({ teacherProfile: profile, classId, title: resolvedTitle, subject, topic, content: resolvedContent, illustrations, refinementLevel, status, studentAccess, attachment });
       }
       resetForm();
       await loadNotes();
-      Alert.alert(status === "published" ? "Lesson note published" : "Draft saved", status === "published" ? "Students in this class can now view and download it." : "Only you can see this draft.");
+      Alert.alert(status === "published" ? "Lesson note published" : "Draft saved", status === "published" ? (studentAccess === "allow_download" ? "Students can now read and download it." : "Students can now read it in Quiks.") : "Only you can see this draft.");
     } catch (caught) {
       Alert.alert("Could not save note", caught instanceof Error ? caught.message : "Please try again.");
     } finally {
@@ -287,6 +344,28 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
     }
   };
 
+  const downloadLessonNote = async (note: ClassroomLessonNote) => {
+    try {
+      const fileName = `${note.title.replace(/[^a-zA-Z0-9._-]+/g, "-") || "lesson-note"}.txt`;
+      const noteText = [note.title, note.subject, note.topic, "", cleanNoteText(note.content)].filter(Boolean).join("\n");
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(new Blob([noteText], { type: "text/plain;charset=utf-8" }));
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const path = `${FileSystem.cacheDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(path, noteText, { encoding: FileSystem.EncodingType.UTF8 });
+        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path, { mimeType: "text/plain", dialogTitle: `Save ${note.title}` });
+        else await Linking.openURL(Platform.OS === "android" ? await FileSystem.getContentUriAsync(path) : path);
+      }
+    } catch (caught) {
+      Alert.alert("Download failed", caught instanceof Error ? caught.message : "The lesson note could not be downloaded.");
+    }
+  };
+
   const openActivityCreator = (note: ClassroomLessonNote) => {
     setActivityNoteId((current) => current === note.noteId ? null : note.noteId);
     setNoteActivityType("assignment");
@@ -297,6 +376,39 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
     setNoteActivityTestDate(getDefaultDeadlineDate());
     setNoteActivityTestStartTime("09:00");
     setNoteActivityTestDurationSeconds("600");
+    setDifficultyDropdownOpen(false);
+    setCandidateQuestions([]);
+    setAcceptedQuestions([]);
+    setReviewingAccepted(false);
+  };
+
+  const loadNoteActivityCandidates = async (note: ClassroomLessonNote) => {
+    const requested = Number(noteActivityQuestionCount);
+    if (!Number.isInteger(requested) || requested < 1 || requested > 20) {
+      Alert.alert("Question count needed", "Enter between 1 and 20 questions.");
+      return;
+    }
+    setCandidateLoading(true);
+    try {
+      const response = await generateLessonNoteActivityCandidates({
+        teacherProfile: profile,
+        noteId: note.noteId,
+        difficulty: noteActivityDifficulty,
+        questionCount: requested,
+        batchCount: Math.min(6, Math.max(1, requested - acceptedQuestions.length)),
+      });
+      setCandidateQuestions((current) => [...current, ...response.questions.map((question, index) => ({ ...question, id: `${question.id}-${Date.now()}-${index}` }))]);
+    } catch (caught) {
+      Alert.alert("Questions not generated", caught instanceof Error ? caught.message : "Please try again.");
+    } finally {
+      setCandidateLoading(false);
+    }
+  };
+
+  const acceptNoteQuestion = (question: Question) => {
+    const desired = Math.max(1, Number(noteActivityQuestionCount) || 1);
+    setAcceptedQuestions((current) => current.length >= desired ? current : [...current, question]);
+    setCandidateQuestions((current) => current.filter((item) => item.id !== question.id));
   };
 
   const createNoteActivity = async (note: ClassroomLessonNote) => {
@@ -306,6 +418,10 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
     const durationSeconds = Number(noteActivityTestDurationSeconds);
     if (!Number.isInteger(requestedQuestionTotal) || requestedQuestionTotal < 1 || requestedQuestionTotal > 20) {
       Alert.alert("Question count needed", "Enter between 1 and 20 questions.");
+      return;
+    }
+    if (acceptedQuestions.length < questionTotal) {
+      Alert.alert("Review questions first", `Generate and accept ${questionTotal} questions before publishing this activity.`);
       return;
     }
     if (noteActivityType === "assignment" && (!deadlineAt || deadlineAt <= Date.now())) {
@@ -339,15 +455,30 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
         deadlineAt: noteActivityType === "assignment" ? deadlineAt ?? undefined : undefined,
         startAt: noteActivityType === "test" ? noteActivityTestStartAt ?? undefined : undefined,
         durationSeconds: noteActivityType === "test" ? durationSeconds : undefined,
+        questions: acceptedQuestions.slice(0, questionTotal),
       });
       setActivityNoteId(null);
       await onActivityCreated?.();
-      Alert.alert("Activity created", `${note.title} ${noteActivityType === "test" ? "Test" : "Assignment"} has been published to ${className}.`);
+      Alert.alert("Activity created", `${note.title} ${noteActivityType === "test" ? "Test" : "Assignment"} has been published. Open Class Activities and select View to inspect it.`);
     } catch (caught) {
       Alert.alert("Activity not created", caught instanceof Error ? caught.message : "Please try again.");
     } finally {
       setCreatingActivity(false);
     }
+  };
+
+  const openDateCalendar = (target: "assignment" | "test") => {
+    const value = target === "assignment" ? noteActivityDeadlineDate : noteActivityTestDate;
+    const parsed = value ? new Date(`${value}T00:00:00`) : new Date();
+    const base = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    setCalendarMonth(new Date(base.getFullYear(), base.getMonth(), 1));
+    setCalendarTarget(target);
+  };
+
+  const selectCalendarDate = (value: string) => {
+    if (calendarTarget === "assignment") setNoteActivityDeadlineDate(value);
+    if (calendarTarget === "test") setNoteActivityTestDate(value);
+    setCalendarTarget(null);
   };
 
   return (
@@ -358,7 +489,6 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
       {isTeacher ? (
         <View style={styles.editorCard}>
           <Text style={styles.subtitle}>{editingNoteId ? "Edit lesson note" : "Prepare a lesson note"}</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="Lesson-note title" placeholderTextColor="#8092A7" style={styles.input} />
           <View style={styles.twoColumn}>
             <TextInput value={subject} onChangeText={setSubject} placeholder="Subject" placeholderTextColor="#8092A7" style={[styles.input, styles.flexInput]} />
             <TextInput value={topic} onChangeText={setTopic} placeholder="Topic" placeholderTextColor="#8092A7" style={[styles.input, styles.flexInput]} />
@@ -369,16 +499,25 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
           {attachment ? <Text style={styles.attachmentMeta}>{attachment.name} · {bytesToLabel(attachment.size)}</Text> : null}
 
           <Text style={styles.label}>Refinement level</Text>
-          <View style={styles.optionGrid}>
-            {refinementOptions.map((option) => (
-              <Pressable key={option.id} onPress={() => { setRefinementLevel(option.id); setReviewReady(option.id === "none"); }} style={[styles.option, refinementLevel === option.id ? styles.optionActive : null]}>
-                <Text style={styles.optionTitle}>{option.label}</Text>
-                <Text style={styles.optionHint}>{option.hint}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <Pressable style={styles.dropdownTrigger} onPress={() => setRefinementDropdownOpen((current) => !current)}>
+            <View style={styles.dropdownTextWrap}>
+              <Text style={styles.optionTitle}>{refinementOptions.find((option) => option.id === refinementLevel)?.label}</Text>
+              <Text style={styles.optionHint}>{refinementOptions.find((option) => option.id === refinementLevel)?.hint}</Text>
+            </View>
+            <MaterialIcons name={refinementDropdownOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={24} color={palette.navy} />
+          </Pressable>
+          {refinementDropdownOpen ? (
+            <View style={styles.dropdownMenu}>
+              {refinementOptions.map((option) => (
+                <Pressable key={option.id} style={styles.dropdownOption} onPress={() => { setRefinementLevel(option.id); setReviewReady(false); setRefinementDropdownOpen(false); }}>
+                  <Text style={styles.optionTitle}>{option.label}</Text><Text style={styles.optionHint}>{option.hint}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           {refinementLevel !== "none" ? <PrimaryButton label="Refine and review" onPress={() => void refineNote()} loading={working} /> : null}
-          {reviewReady || refinementLevel === "none" || editingNoteId ? (
+          {refinementLevel === "none" && !reviewReady ? <PrimaryButton label="Review note" onPress={() => content.trim() || attachment ? setReviewReady(true) : Alert.alert("Note details needed", "Enter or upload lesson-note content first.")} /> : null}
+          {reviewReady || editingNoteId ? (
             <>
               <Text style={styles.label}>Student permission</Text>
               <View style={styles.actionRow}>
@@ -408,18 +547,29 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
             </View>
             <Text style={styles.date}>{new Date(note.updatedAt).toLocaleDateString()}</Text>
           </View>
-          <Text style={styles.noteContent}>{note.content}</Text>
+          <PrimaryButton label={viewingNoteId === note.noteId ? "Close note" : "View note"} variant="secondary" onPress={() => setViewingNoteId((current) => current === note.noteId ? null : note.noteId)} compact />
+          {viewingNoteId === note.noteId ? (
+          <>
+          <Text style={styles.noteContent}>{cleanNoteText(note.content)}</Text>
           {(note.illustrations ?? []).map((illustration, index) => (
             <View key={`${note.noteId}-illustration-${index}`} style={styles.illustration}>
-              <Text style={styles.illustrationTitle}>◈ {illustration.title}</Text>
-              <View style={styles.diagramRow}>
-                {illustration.points.map((point) => <View key={point} style={styles.diagramPoint}><Text style={styles.diagramText}>{point}</Text></View>)}
+              <View style={styles.illustrationHeading}>
+                <MaterialCommunityIcons name={illustrationIcon(illustration.title)} size={30} color={palette.aqua} />
+                <Text style={styles.illustrationTitle}>{illustration.title}</Text>
+              </View>
+              <View style={styles.diagramColumn}>
+                {illustration.points.map((point, pointIndex) => <View key={point} style={styles.diagramStep}>
+                  <View style={styles.diagramIcon}><MaterialCommunityIcons name={illustrationIcon(point)} size={24} color="#FFFFFF" /></View>
+                  <Text style={styles.diagramText}>{cleanNoteText(point)}</Text>
+                  {pointIndex < illustration.points.length - 1 ? <MaterialIcons name="arrow-downward" size={20} color={palette.aqua} style={styles.diagramArrow} /> : null}
+                </View>)}
               </View>
               <Text style={styles.caption}>{illustration.caption}</Text>
             </View>
           ))}
-          {note.attachmentName && (isTeacher || note.studentAccess === "allow_download") ? <PrimaryButton label={`Download ${note.attachmentName}`} variant="secondary" onPress={() => void downloadAttachment(note)} compact /> : null}
-          {note.attachmentName && !isTeacher && note.studentAccess === "read_only" ? <Text style={styles.readOnlyLabel}>Read Only · Download disabled by the teacher</Text> : null}
+          {(isTeacher || note.studentAccess === "allow_download") ? <PrimaryButton label="Download lesson note" variant="secondary" onPress={() => void downloadLessonNote(note)} compact /> : null}
+          {note.attachmentName && (isTeacher || note.studentAccess === "allow_download") ? <PrimaryButton label={`Download original attachment (${note.attachmentName})`} variant="ghost" onPress={() => void downloadAttachment(note)} compact /> : null}
+          {!isTeacher && note.studentAccess === "read_only" ? <Text style={styles.readOnlyLabel}>Read Only · Download disabled by the teacher</Text> : null}
           {isTeacher ? (
             <>
               <View style={styles.actionRow}>
@@ -437,18 +587,15 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
                     <PrimaryButton label="Test" variant={noteActivityType === "test" ? "primary" : "secondary"} onPress={() => setNoteActivityType("test")} style={styles.actionButton} />
                   </View>
                   <Text style={styles.label}>Difficulty level</Text>
-                  <View style={styles.actionRow}>
-                    {(["easy", "hard", "very_hard"] as const).map((difficulty) => (
-                      <PrimaryButton
-                        key={difficulty}
-                        label={difficulty === "easy" ? "Easy" : difficulty === "hard" ? "Hard" : "Very Hard"}
-                        variant={noteActivityDifficulty === difficulty ? "primary" : "secondary"}
-                        onPress={() => setNoteActivityDifficulty(difficulty)}
-                        style={styles.actionButton}
-                        compact
-                      />
-                    ))}
-                  </View>
+                  <Pressable style={styles.dropdownTrigger} onPress={() => setDifficultyDropdownOpen((current) => !current)}>
+                    <Text style={styles.optionTitle}>{noteActivityDifficulty === "easy" ? "Easy" : noteActivityDifficulty === "hard" ? "Hard" : "Very Hard"}</Text>
+                    <MaterialIcons name={difficultyDropdownOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={24} color={palette.navy} />
+                  </Pressable>
+                  {difficultyDropdownOpen ? <View style={styles.dropdownMenu}>{(["easy", "hard", "very_hard"] as const).map((difficulty) => (
+                    <Pressable key={difficulty} style={styles.dropdownOption} onPress={() => { setNoteActivityDifficulty(difficulty); setDifficultyDropdownOpen(false); setCandidateQuestions([]); setAcceptedQuestions([]); }}>
+                      <Text style={styles.optionTitle}>{difficulty === "easy" ? "Easy" : difficulty === "hard" ? "Hard" : "Very Hard"}</Text>
+                    </Pressable>
+                  ))}</View> : null}
                   <Text style={styles.label}>Number of questions</Text>
                   <TextInput value={noteActivityQuestionCount} onChangeText={setNoteActivityQuestionCount} keyboardType="number-pad" placeholder="1 to 20" placeholderTextColor="#8092A7" style={styles.input} />
                   {noteActivityType === "test" ? (
@@ -456,7 +603,7 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
                       <View style={styles.twoColumn}>
                         <View style={styles.fieldColumn}>
                           <Text style={styles.label}>Test date</Text>
-                          <TextInput value={noteActivityTestDate} onChangeText={setNoteActivityTestDate} placeholder="YYYY-MM-DD" placeholderTextColor="#8092A7" style={styles.input} />
+                          <Pressable style={styles.dateTrigger} onPress={() => openDateCalendar("test")}><Text style={styles.dateTriggerText}>{noteActivityTestDate}</Text><MaterialIcons name="calendar-month" size={22} color={palette.aqua} /></Pressable>
                         </View>
                         <View style={styles.fieldColumn}>
                           <Text style={styles.label}>Duration (seconds)</Text>
@@ -478,21 +625,58 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
                     <>
                       <Text style={styles.label}>Submission deadline</Text>
                       <View style={styles.twoColumn}>
-                        <TextInput value={noteActivityDeadlineDate} onChangeText={setNoteActivityDeadlineDate} placeholder="YYYY-MM-DD" placeholderTextColor="#8092A7" style={[styles.input, styles.flexInput]} />
+                        <Pressable style={[styles.dateTrigger, styles.flexInput]} onPress={() => openDateCalendar("assignment")}><Text style={styles.dateTriggerText}>{noteActivityDeadlineDate}</Text><MaterialIcons name="calendar-month" size={22} color={palette.aqua} /></Pressable>
                         <TextInput value={noteActivityDeadlineTime} onChangeText={setNoteActivityDeadlineTime} placeholder="HH:MM" placeholderTextColor="#8092A7" style={[styles.input, styles.flexInput]} />
                       </View>
                     </>
                   )}
+                  <Text style={styles.label}>Question review ({acceptedQuestions.length}/{Math.max(1, Number(noteActivityQuestionCount) || 1)})</Text>
+                  {candidateQuestions[0] ? (
+                    <View style={styles.questionCard}>
+                      <MathText value={candidateQuestions[0].prompt} textStyle={styles.questionPrompt} />
+                      {candidateQuestions[0].options.map((option, index) => <MathText key={`${candidateQuestions[0].id}-${index}`} value={`${index + 1}. ${option}`} textStyle={styles.questionOption} />)}
+                      <Text style={styles.answerText}>Answer: {candidateQuestions[0].answer}</Text>
+                      <Text style={styles.optionHint}>{candidateQuestions[0].explanation}</Text>
+                      <View style={styles.actionRow}>
+                        <PrimaryButton label="Accept" onPress={() => acceptNoteQuestion(candidateQuestions[0])} style={styles.actionButton} compact />
+                        <PrimaryButton label="Skip" variant="secondary" onPress={() => setCandidateQuestions((current) => current.slice(1))} style={styles.actionButton} compact />
+                      </View>
+                    </View>
+                  ) : acceptedQuestions.length < Math.max(1, Number(noteActivityQuestionCount) || 1) ? (
+                    <PrimaryButton label={acceptedQuestions.length ? "Load more questions" : "Generate questions"} onPress={() => void loadNoteActivityCandidates(note)} loading={candidateLoading} />
+                  ) : null}
+                  {acceptedQuestions.length ? <PrimaryButton label={reviewingAccepted ? "Hide accepted questions" : "View accepted questions"} variant="secondary" onPress={() => setReviewingAccepted((current) => !current)} /> : null}
+                  {reviewingAccepted ? acceptedQuestions.map((question, index) => <View key={question.id} style={styles.acceptedQuestion}><MathText value={`${index + 1}. ${question.prompt}`} textStyle={styles.questionPrompt} /><PrimaryButton label="Remove" variant="ghost" onPress={() => setAcceptedQuestions((current) => current.filter((item) => item.id !== question.id))} compact /></View>) : null}
                   <View style={styles.actionRow}>
-                    <PrimaryButton label={`Create ${noteActivityType === "test" ? "Test" : "Assignment"}`} onPress={() => void createNoteActivity(note)} loading={creatingActivity} style={styles.actionButton} />
+                    <PrimaryButton label={`Publish ${noteActivityType === "test" ? "Test" : "Assignment"}`} onPress={() => void createNoteActivity(note)} loading={creatingActivity} disabled={acceptedQuestions.length < Math.max(1, Number(noteActivityQuestionCount) || 1)} style={styles.actionButton} />
                     <PrimaryButton label="Cancel" variant="ghost" onPress={() => setActivityNoteId(null)} style={styles.actionButton} />
                   </View>
                 </View>
               ) : null}
             </>
           ) : null}
+          </>
+          ) : null}
         </View>
       ))}
+      <Modal visible={calendarTarget !== null} transparent animationType="fade" onRequestClose={() => setCalendarTarget(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setCalendarTarget(null)}>
+          <Pressable style={styles.calendarCard} onPress={() => undefined}>
+            <View style={styles.calendarHeader}>
+              <Pressable onPress={() => setCalendarMonth((current) => addMonths(current, -1))} disabled={calendarMonth <= new Date(new Date().getFullYear(), new Date().getMonth(), 1)}><MaterialIcons name="chevron-left" size={28} color={palette.navy} /></Pressable>
+              <Text style={styles.subtitle}>{calendarMonth.toLocaleString(undefined, { month: "long", year: "numeric" })}</Text>
+              <Pressable onPress={() => setCalendarMonth((current) => addMonths(current, 1))}><MaterialIcons name="chevron-right" size={28} color={palette.navy} /></Pressable>
+            </View>
+            <View style={styles.weekRow}>{["S", "M", "T", "W", "T", "F", "S"].map((day, index) => <Text key={`${day}-${index}`} style={styles.weekDay}>{day}</Text>)}</View>
+            <View style={styles.calendarGrid}>{calendarDays.map(({ date, value, inMonth }) => {
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              const disabled = date.getTime() < today.getTime() || !inMonth;
+              return <Pressable key={value} disabled={disabled} onPress={() => selectCalendarDate(value)} style={[styles.calendarDay, disabled ? styles.calendarDayDisabled : null]}><Text style={[styles.calendarDayText, disabled ? styles.calendarDayTextDisabled : null]}>{date.getDate()}</Text></Pressable>;
+            })}</View>
+            <PrimaryButton label="Cancel" variant="ghost" onPress={() => setCalendarTarget(null)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -518,6 +702,10 @@ const styles = StyleSheet.create({
   optionActive: { borderColor: palette.aqua, backgroundColor: "#EAFBF8" },
   optionTitle: { color: palette.navy, fontWeight: "900" },
   optionHint: { color: "#5D7484", fontSize: 12, lineHeight: 17, marginTop: 3 },
+  dropdownTrigger: { minHeight: 54, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CEDCE6", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
+  dropdownTextWrap: { flex: 1 },
+  dropdownMenu: { borderWidth: 1, borderColor: "#CEDCE6", borderRadius: 14, overflow: "hidden", backgroundColor: "#FFFFFF" },
+  dropdownOption: { padding: 13, borderBottomWidth: 1, borderBottomColor: "#E5EDF2" },
   attachmentMeta: { color: "#536B7B", fontSize: 12 },
   readOnlyLabel: { color: "#7A5C00", fontSize: 12, fontWeight: "800", backgroundColor: "#FFF7D6", borderRadius: 12, padding: 10 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
@@ -530,9 +718,29 @@ const styles = StyleSheet.create({
   date: { color: "#718696", fontSize: 12 },
   noteContent: { color: "#263E4D", fontSize: 15, lineHeight: 23 },
   illustration: { backgroundColor: "#EFF8FA", borderRadius: 16, padding: 14, gap: 10 },
-  illustrationTitle: { color: palette.navy, fontWeight: "900", textAlign: "center" },
-  diagramRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8 },
-  diagramPoint: { backgroundColor: palette.aqua, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-  diagramText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  illustrationHeading: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
+  illustrationTitle: { flexShrink: 1, color: palette.navy, fontWeight: "900", textAlign: "center" },
+  diagramColumn: { alignItems: "center", gap: 2 },
+  diagramStep: { width: "100%", alignItems: "center" },
+  diagramIcon: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: palette.aqua, marginBottom: 6 },
+  diagramText: { color: palette.navy, fontSize: 13, lineHeight: 18, fontWeight: "800", textAlign: "center", maxWidth: 300 },
+  diagramArrow: { marginVertical: 4 },
   caption: { color: "#506878", fontSize: 13, lineHeight: 18, textAlign: "center" },
+  dateTrigger: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, backgroundColor: "#FFFFFF", borderColor: "#D7E3EC", borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
+  dateTriggerText: { color: palette.navy, fontSize: 15 },
+  questionCard: { borderWidth: 1, borderColor: "#CFE0E8", borderRadius: 16, backgroundColor: "#FFFFFF", padding: 14, gap: 8 },
+  questionPrompt: { color: palette.navy, fontSize: 15, lineHeight: 21, fontWeight: "800" },
+  questionOption: { color: "#334E5E", fontSize: 14, lineHeight: 20 },
+  answerText: { color: palette.aqua, fontWeight: "900" },
+  acceptedQuestion: { borderWidth: 1, borderColor: "#D8E5EB", borderRadius: 14, padding: 12, gap: 8, backgroundColor: "#FFFFFF" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(2, 20, 31, 0.58)", alignItems: "center", justifyContent: "center", padding: 18 },
+  calendarCard: { width: "100%", maxWidth: 430, backgroundColor: "#FFFFFF", borderRadius: 22, padding: 18, gap: 14 },
+  calendarHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  weekRow: { flexDirection: "row" },
+  weekDay: { width: "14.285%", textAlign: "center", color: "#607888", fontWeight: "800" },
+  calendarGrid: { flexDirection: "row", flexWrap: "wrap" },
+  calendarDay: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center", borderRadius: 999 },
+  calendarDayDisabled: { opacity: 0.25 },
+  calendarDayText: { color: palette.navy, fontWeight: "800" },
+  calendarDayTextDisabled: { color: "#8092A7" },
 });

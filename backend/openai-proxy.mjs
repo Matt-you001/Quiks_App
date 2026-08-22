@@ -2799,9 +2799,26 @@ function buildLessonNoteRefinementSchema() {
   };
 }
 
+function cleanLessonNoteText(value) {
+  return String(value ?? "")
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/_([^_\n]+)_/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "• ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function lessonNoteDerivedTitle(body) {
+  return String(body.title || [body.subject, body.topic].filter(Boolean).join(": ") || "Lesson Note").trim();
+}
+
 async function handleLessonNoteRefine(body, response) {
-  if (!body.teacherProfile?.id || !body.classId || !body.title?.trim() || !body.content?.trim()) {
-    sendJson(response, 400, { error: "Teacher, class, title, and lesson-note content are required." });
+  if (!body.teacherProfile?.id || !body.classId || !body.content?.trim()) {
+    sendJson(response, 400, { error: "Teacher, class, and lesson-note content are required." });
     return;
   }
   const level = ["minimal", "rich", "deep"].includes(body.refinementLevel) ? body.refinementLevel : "minimal";
@@ -2816,12 +2833,13 @@ async function handleLessonNoteRefine(body, response) {
     instructions: [
       "You are an expert classroom lesson-note editor.",
       "Preserve the teacher's meaning and never invent unverifiable claims.",
-      "Return a polished note with clear headings and readable paragraphs.",
+      "Return polished plain text with clear section headings and readable paragraphs.",
+      "Do not use Markdown symbols such as #, *, _, backticks, or Markdown links in the title or content.",
       "For minimal and rich refinement return an empty illustrations array. For deep refinement return practical visual diagram plans that the app can render as pictorial learning cards.",
       levelGuidance,
     ].join(" "),
     input: [{ role: "user", content: [{ type: "input_text", text: [
-      `Title: ${body.title}`,
+      `Title: ${lessonNoteDerivedTitle(body)}`,
       `Subject: ${body.subject || "Not specified"}`,
       `Topic: ${body.topic || "Not specified"}`,
       `Refinement: ${level}`,
@@ -2829,7 +2847,46 @@ async function handleLessonNoteRefine(body, response) {
       `Teacher's lesson note:\n${body.content}`,
     ].join("\n") }] }],
   });
-  sendJson(response, 200, data);
+  sendJson(response, 200, {
+    ...data,
+    title: cleanLessonNoteText(data.title || lessonNoteDerivedTitle(body)),
+    content: cleanLessonNoteText(data.content),
+  });
+}
+
+async function resolveLessonNoteActivityContext(body) {
+  const difficultyMap = { easy: "Beginner", hard: "Advanced", very_hard: "Expert" };
+  const difficulty = difficultyMap[body.difficulty] ?? "Beginner";
+  const note = await getLessonNoteForTeacher(body.teacherProfile, body.noteId, body.appVariant ?? "children");
+  const subjectName = note.subject || "Lesson Note";
+  const topicLabel = note.topic || note.title;
+  const subject = {
+    id: `lesson-note-${subjectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "subject"}`,
+    name: subjectName,
+    tagline: "Teacher lesson note",
+    icon: "book-open-variant",
+    accent: ["#0E5C63", "#7EE2D9"],
+    description: `Questions based on ${note.title}`,
+    aiPromptHint: "Use the supplied teacher lesson note as the exclusive source for this activity. Preserve its terminology and intended academic level.",
+    topics: [{ id: "lesson-note-topic", label: topicLabel, description: `Content from ${note.title}`, keywords: [topicLabel.toLowerCase()] }],
+  };
+  return { note, subject, topicLabel, difficulty };
+}
+
+async function handleLessonNoteActivityCandidates(body, response) {
+  if (!body.teacherProfile?.id || !body.noteId) {
+    sendJson(response, 400, { error: "Teacher and lesson note are required." });
+    return;
+  }
+  const requestedCount = Math.max(1, Math.min(Number(body.questionCount ?? 5), 20));
+  const batchCount = Math.max(1, Math.min(Number(body.batchCount ?? 3), requestedCount, 6));
+  const { note, subject, topicLabel, difficulty } = await resolveLessonNoteActivityContext(body);
+  const questions = await generateQuestionSet({
+    ...body, subject, grade: "Class lesson", level: 1, difficulty, focusMode: "topic",
+    topicId: "lesson-note-topic", topicLabel, questionCount: batchCount,
+    profile: body.teacherProfile, lessonNoteTitle: note.title, lessonNoteContent: note.content,
+  });
+  sendJson(response, 200, { questions });
 }
 
 async function handleLessonNoteCreate(body, response) {
@@ -2899,34 +2956,12 @@ async function handleLessonNoteActivityCreate(body, response) {
     return;
   }
   const requestedCount = Math.max(1, Math.min(Number(body.questionCount ?? 5), 20));
-  const difficultyMap = { easy: "Beginner", hard: "Advanced", very_hard: "Expert" };
-  const difficulty = difficultyMap[body.difficulty] ?? "Beginner";
-  const note = await getLessonNoteForTeacher(body.teacherProfile, body.noteId, body.appVariant ?? "children");
-  const subjectName = note.subject || "Lesson Note";
-  const topicLabel = note.topic || note.title;
-  const subject = {
-    id: `lesson-note-${subjectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "subject"}`,
-    name: subjectName,
-    tagline: "Teacher lesson note",
-    icon: "book-open-variant",
-    accent: ["#0E5C63", "#7EE2D9"],
-    description: `Questions based on ${note.title}`,
-    aiPromptHint: `Use the supplied teacher lesson note as the exclusive source for this activity. Preserve its terminology and intended academic level.`,
-    topics: [{ id: "lesson-note-topic", label: topicLabel, description: `Content from ${note.title}`, keywords: [topicLabel.toLowerCase()] }],
-  };
-  const questions = await generateQuestionSet({
-    ...body,
-    subject,
-    grade: "Class lesson",
-    level: 1,
-    difficulty,
-    focusMode: "topic",
-    topicId: "lesson-note-topic",
-    topicLabel,
-    questionCount: requestedCount,
-    profile: body.teacherProfile,
-    lessonNoteTitle: note.title,
-    lessonNoteContent: note.content,
+  const { note, subject, topicLabel, difficulty } = await resolveLessonNoteActivityContext(body);
+  const suppliedQuestions = Array.isArray(body.questions) ? body.questions.slice(0, requestedCount) : [];
+  const questions = suppliedQuestions.length >= requestedCount ? suppliedQuestions : await generateQuestionSet({
+    ...body, subject, grade: "Class lesson", level: 1, difficulty, focusMode: "topic",
+    topicId: "lesson-note-topic", topicLabel, questionCount: requestedCount,
+    profile: body.teacherProfile, lessonNoteTitle: note.title, lessonNoteContent: note.content,
   });
   if (questions.length < requestedCount) {
     throw new Error(`Only ${questions.length} verified questions could be produced. Please try again.`);
@@ -3297,6 +3332,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/lesson-notes/activity/create") {
       await handleLessonNoteActivityCreate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/activity/candidates") {
+      await handleLessonNoteActivityCandidates(body, response);
       return;
     }
 

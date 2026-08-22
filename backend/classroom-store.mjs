@@ -209,6 +209,19 @@ function validateLessonNoteAttachment(attachment) {
   if (attachment.dataBase64.length > 7_500_000) throw new Error("The lesson-note attachment must be 5 MB or smaller.");
 }
 
+function cleanStoredLessonNoteText(value) {
+  return String(value ?? "")
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/_([^_\n]+)_/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "• ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function hashString(value) {
   let hash = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -728,8 +741,8 @@ export async function createLessonNote(payload, appVariant) {
     store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
     const classroom = store.classrooms[payload.classId];
     ensureTeacherOwnsClass(classroom, teacherProfile.id);
-    const title = String(payload.title ?? "").trim();
-    const content = String(payload.content ?? "").trim();
+    const title = String(payload.title || [payload.subject, payload.topic].filter(Boolean).join(": ") || "Lesson Note").trim();
+    const content = cleanStoredLessonNoteText(payload.content);
     if (!title || !content) throw new Error("Lesson-note title and content are required.");
     if (content.length > 50000) throw new Error("Lesson-note content can contain up to 50,000 characters.");
     const attachment = payload.attachment;
@@ -772,7 +785,7 @@ export async function updateLessonNote(payload, appVariant) {
     if (typeof payload.title === "string") note.title = payload.title.trim();
     if (typeof payload.subject === "string") note.subject = payload.subject.trim();
     if (typeof payload.topic === "string") note.topic = payload.topic.trim();
-    if (typeof payload.content === "string") note.content = payload.content.trim();
+    if (typeof payload.content === "string") note.content = cleanStoredLessonNoteText(payload.content);
     if (Array.isArray(payload.illustrations)) note.illustrations = payload.illustrations;
     if (payload.attachment?.dataBase64) {
       validateLessonNoteAttachment(payload.attachment);
