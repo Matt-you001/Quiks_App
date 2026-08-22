@@ -589,6 +589,23 @@ export interface ClassroomLessonNoteMutationResponse {
   note: ClassroomLessonNote;
 }
 
+export type LessonNoteActivityDifficulty = "easy" | "hard" | "very_hard";
+
+export interface ClassroomLessonNoteActivityCreateRequest {
+  teacherProfile: UserProfile;
+  noteId: string;
+  type: ClassroomActivityType;
+  difficulty: LessonNoteActivityDifficulty;
+  questionCount: number;
+  deadlineAt?: number;
+  startAt?: number;
+  durationSeconds?: number;
+}
+
+export interface ClassroomLessonNoteActivityCreateResponse {
+  activity: ClassroomActivitySummary;
+}
+
 export interface ClassroomLessonNoteListResponse {
   notes: ClassroomLessonNote[];
 }

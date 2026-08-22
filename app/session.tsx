@@ -1008,7 +1008,7 @@ export default function SessionScreen() {
     });
   };
 
-  if (!subject) {
+  if (!effectiveSubject) {
     return (
       <AppBackground>
         <View style={styles.panel}>
@@ -1099,7 +1099,7 @@ export default function SessionScreen() {
               {isTopicDropdownOpen ? (
                 <View style={styles.dropdownMenu}>
                   <ScrollView nestedScrollEnabled style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
-                    {subject.topics.map((topic) => (
+                    {effectiveSubject.topics.map((topic) => (
                       <Pressable
                         key={topic.id}
                         onPress={() => {
@@ -1155,7 +1155,7 @@ export default function SessionScreen() {
                           })
                         : t(language, "customTopicRecognized", {
                             topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
-                            subject: subject.name,
+                            subject: effectiveSubject.name,
                           })
                         : customTopicValidation?.status === "custom"
                           ? t(language, "customTopicAccepted", {
@@ -1164,13 +1164,13 @@ export default function SessionScreen() {
                       : customTopicValidation?.status === "wrong-subject"
                         ? t(language, "customTopicWrongSubject", {
                             topic: customTopicValidation.matchedTopicLabel ?? customTopicValidation.input,
-                            subject: subject.name,
-                            matchedSubject: customTopicValidation.matchedSubjectName ?? subject.name,
+                            subject: effectiveSubject.name,
+                            matchedSubject: customTopicValidation.matchedSubjectName ?? effectiveSubject.name,
                           })
                         : customTopicValidation?.status === "unknown"
                           ? t(language, "customTopicUnknown", {
                               topic: customTopicValidation.input,
-                              subject: subject.name,
+                              subject: effectiveSubject.name,
                             })
                           : t(language, "customTopicHint")}
                   </Text>
@@ -1415,7 +1415,7 @@ export default function SessionScreen() {
                   onPress={() => router.push({
                     pathname: "/learning-hub" as never,
                     params: {
-                      subjectId: subject.id,
+                      subjectId: effectiveSubject.id,
                       subjectName: resolvedSubjectName,
                       topicName: activityTopicLabel ?? resolvedTopicLabel ?? selectedTopic?.label ?? "Concept behind this answer",
                       grade,

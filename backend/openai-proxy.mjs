@@ -12,6 +12,7 @@ import {
   duplicateActivity,
   getActivityDetails,
   getLessonNoteAttachment,
+  getLessonNoteForTeacher,
   getClassroomStoreDiagnostics,
   getClassroomDetails,
   inviteStudentToClass,
@@ -302,6 +303,13 @@ function buildQuestionPromptLines(body) {
     `Variant guidance: ${body.appGuidance ?? ""}`,
     `Academic stage guidance: ${describeAcademicStage(body)}`,
     `Difficulty rigour guidance: ${describeDifficultyRigour(body)}`,
+    ...(body.lessonNoteContent
+      ? [
+          "Source rule: Every question must be answerable directly from the supplied lesson note. Do not test facts or topics outside it.",
+          `Source lesson note title: ${body.lessonNoteTitle ?? "Lesson note"}`,
+          `Source lesson note content:\n${String(body.lessonNoteContent).slice(0, 30000)}`,
+        ]
+      : []),
     describeLevelCurriculumFocus(body) ?? "",
     body.focusMode === "topic"
       ? "Generate questions only from the selected topic or topics. Cover every selected topic as evenly as the requested question count permits. Do not mix in unrelated topics."
@@ -865,6 +873,7 @@ async function verifyGeneratedQuestions(questions, body) {
       "Set correctOptionIndex to -1 if the question is unsound, outdated, underspecified, has no correct option, or has multiple defensible answers.",
       "Use high confidence only when the answer is clearly established and appropriate for the supplied learner stage and curriculum.",
       "Mark explanationAccurate false if the explanation contains a factual, mathematical, logical, or terminology error, even when its final option is correct.",
+      "When a lessonNoteSource is supplied, reject any candidate whose answer cannot be supported directly by that source.",
       "Return one result for every candidateIndex and do not omit difficult candidates.",
     ].join(" "),
     input: [
@@ -882,6 +891,7 @@ async function verifyGeneratedQuestions(questions, body) {
                 targetExam: body.profile?.targetExam ?? "General study",
                 preferredCurriculum: body.profile?.preferredCurriculum ?? "Not specified",
                 learnerLanguage: body.learnerLanguageLabel ?? "English",
+                lessonNoteSource: body.lessonNoteContent ? String(body.lessonNoteContent).slice(0, 30000) : undefined,
               },
               candidates,
             }),
@@ -2862,6 +2872,93 @@ async function handleLessonNoteDelete(body, response) {
   sendJson(response, 200, await deleteLessonNote(body.teacherProfile, body.noteId, body.appVariant ?? "children"));
 }
 
+async function handleLessonNoteActivityCreate(body, response) {
+  if (!body.teacherProfile?.id || !body.noteId || !["test", "assignment"].includes(body.type)) {
+    sendJson(response, 400, { error: "Teacher, lesson note, and activity type are required." });
+    return;
+  }
+  const isTest = body.type === "test";
+  const deadlineAt = Number(body.deadlineAt);
+  const startAt = Number(body.startAt);
+  const durationSeconds = Number(body.durationSeconds);
+  if (!isTest && (!Number.isFinite(deadlineAt) || deadlineAt <= Date.now())) {
+    sendJson(response, 400, { error: "Choose a submission deadline in the future." });
+    return;
+  }
+  if (isTest && (!Number.isFinite(startAt) || startAt <= Date.now())) {
+    sendJson(response, 400, { error: "Choose a future test date and start time." });
+    return;
+  }
+  if (isTest && (!Number.isFinite(durationSeconds) || durationSeconds <= 0)) {
+    sendJson(response, 400, { error: "Enter a valid test duration in seconds." });
+    return;
+  }
+  const testEndAt = isTest ? startAt + durationSeconds * 1000 : null;
+  if (isTest && new Date(startAt).toDateString() !== new Date(testEndAt).toDateString()) {
+    sendJson(response, 400, { error: "The test must start and end on the same date." });
+    return;
+  }
+  const requestedCount = Math.max(1, Math.min(Number(body.questionCount ?? 5), 20));
+  const difficultyMap = { easy: "Beginner", hard: "Advanced", very_hard: "Expert" };
+  const difficulty = difficultyMap[body.difficulty] ?? "Beginner";
+  const note = await getLessonNoteForTeacher(body.teacherProfile, body.noteId, body.appVariant ?? "children");
+  const subjectName = note.subject || "Lesson Note";
+  const topicLabel = note.topic || note.title;
+  const subject = {
+    id: `lesson-note-${subjectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "subject"}`,
+    name: subjectName,
+    tagline: "Teacher lesson note",
+    icon: "book-open-variant",
+    accent: ["#0E5C63", "#7EE2D9"],
+    description: `Questions based on ${note.title}`,
+    aiPromptHint: `Use the supplied teacher lesson note as the exclusive source for this activity. Preserve its terminology and intended academic level.`,
+    topics: [{ id: "lesson-note-topic", label: topicLabel, description: `Content from ${note.title}`, keywords: [topicLabel.toLowerCase()] }],
+  };
+  const questions = await generateQuestionSet({
+    ...body,
+    subject,
+    grade: "Class lesson",
+    level: 1,
+    difficulty,
+    focusMode: "topic",
+    topicId: "lesson-note-topic",
+    topicLabel,
+    questionCount: requestedCount,
+    profile: body.teacherProfile,
+    lessonNoteTitle: note.title,
+    lessonNoteContent: note.content,
+  });
+  if (questions.length < requestedCount) {
+    throw new Error(`Only ${questions.length} verified questions could be produced. Please try again.`);
+  }
+  const now = Date.now();
+  const activityStartAt = isTest ? startAt : now;
+  const activityEndAt = isTest ? testEndAt : deadlineAt;
+  const activity = await createClassroomActivity({
+    teacherProfile: body.teacherProfile,
+    classId: note.classId,
+    type: body.type,
+    title: `${note.title} ${body.type === "test" ? "Test" : "Assignment"}`,
+    subject,
+    grade: "Class lesson",
+    level: 1,
+    difficulty,
+    focusMode: "topic",
+    topicId: "lesson-note-topic",
+    topicLabel,
+    topicIds: ["lesson-note-topic"],
+    topicLabels: [topicLabel],
+    durationMinutes: isTest ? Math.max(1, Math.ceil(durationSeconds / 60)) : Math.max(5, Math.ceil((deadlineAt - now) / 60000)),
+    availabilityHours: isTest ? 24 : Math.max(1, Math.ceil((deadlineAt - now) / 3600000)),
+    startAt: activityStartAt,
+    endAt: activityEndAt,
+    resultVisibility: "private",
+    questionOrderMode: "shuffled",
+    questions,
+  }, body.appVariant ?? "children");
+  sendJson(response, 200, { activity });
+}
+
 async function handleClassChatList(body, response) {
   if (!body.profile?.id || !body.classId) {
     sendJson(response, 400, { error: "Profile and class are required." });
@@ -3195,6 +3292,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/lesson-notes/delete") {
       await handleLessonNoteDelete(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/activity/create") {
+      await handleLessonNoteActivityCreate(body, response);
       return;
     }
 

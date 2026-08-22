@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -6,6 +6,7 @@ import * as Sharing from "expo-sharing";
 import { PrimaryButton } from "./PrimaryButton";
 import {
   createClassroomLessonNote,
+  createActivityFromClassroomLessonNote,
   deleteClassroomLessonNote,
   getClassroomLessonNoteAttachment,
   listClassroomLessonNotes,
@@ -18,6 +19,8 @@ import type {
   LessonNoteAttachmentInput,
   LessonNoteRefinementLevel,
   LessonNoteStudentAccess,
+  LessonNoteActivityDifficulty,
+  ClassroomActivityType,
   UserProfile,
 } from "../types/app";
 
@@ -25,6 +28,7 @@ interface Props {
   profile: UserProfile;
   classId: string;
   className: string;
+  onActivityCreated?: () => void | Promise<void>;
 }
 
 const refinementOptions: Array<{ id: LessonNoteRefinementLevel; label: string; hint: string }> = [
@@ -50,7 +54,41 @@ function bytesToLabel(bytes?: number) {
   return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function ClassroomLessonNotes({ profile, classId, className }: Props) {
+function toLocalDateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultDeadlineDate() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return toLocalDateValue(tomorrow);
+}
+
+function parseLocalDateTime(dateValue: string, timeValue: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || !/^\d{2}:\d{2}$/.test(timeValue)) return null;
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const [hour, minute] = timeValue.split(":").map(Number);
+  const parsed = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day ||
+    parsed.getHours() !== hour ||
+    parsed.getMinutes() !== minute
+  ) return null;
+  return parsed.getTime();
+}
+
+function formatTimeWithSeconds(timestamp: number | null) {
+  if (!timestamp) return "Set start time and duration";
+  const date = new Date(timestamp);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
+}
+
+export function ClassroomLessonNotes({ profile, classId, className, onActivityCreated }: Props) {
   const isTeacher = profile.role === "teacher";
   const [notes, setNotes] = useState<ClassroomLessonNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +104,26 @@ export function ClassroomLessonNotes({ profile, classId, className }: Props) {
   const [reviewReady, setReviewReady] = useState(false);
   const [studentAccess, setStudentAccess] = useState<LessonNoteStudentAccess>("read_only");
   const [error, setError] = useState<string | null>(null);
+  const [activityNoteId, setActivityNoteId] = useState<string | null>(null);
+  const [noteActivityType, setNoteActivityType] = useState<ClassroomActivityType>("assignment");
+  const [noteActivityDifficulty, setNoteActivityDifficulty] = useState<LessonNoteActivityDifficulty>("easy");
+  const [noteActivityQuestionCount, setNoteActivityQuestionCount] = useState("5");
+  const [noteActivityDeadlineDate, setNoteActivityDeadlineDate] = useState(getDefaultDeadlineDate);
+  const [noteActivityDeadlineTime, setNoteActivityDeadlineTime] = useState("18:00");
+  const [noteActivityTestDate, setNoteActivityTestDate] = useState(getDefaultDeadlineDate);
+  const [noteActivityTestStartTime, setNoteActivityTestStartTime] = useState("09:00");
+  const [noteActivityTestDurationSeconds, setNoteActivityTestDurationSeconds] = useState("600");
+  const [creatingActivity, setCreatingActivity] = useState(false);
+  const noteActivityTestStartAt = useMemo(
+    () => parseLocalDateTime(noteActivityTestDate, noteActivityTestStartTime),
+    [noteActivityTestDate, noteActivityTestStartTime]
+  );
+  const noteActivityTestEndAt = useMemo(() => {
+    const duration = Number(noteActivityTestDurationSeconds);
+    return noteActivityTestStartAt && Number.isFinite(duration) && duration > 0
+      ? noteActivityTestStartAt + duration * 1000
+      : null;
+  }, [noteActivityTestDurationSeconds, noteActivityTestStartAt]);
 
   const loadNotes = useCallback(async () => {
     try {
@@ -229,6 +287,69 @@ export function ClassroomLessonNotes({ profile, classId, className }: Props) {
     }
   };
 
+  const openActivityCreator = (note: ClassroomLessonNote) => {
+    setActivityNoteId((current) => current === note.noteId ? null : note.noteId);
+    setNoteActivityType("assignment");
+    setNoteActivityDifficulty("easy");
+    setNoteActivityQuestionCount("5");
+    setNoteActivityDeadlineDate(getDefaultDeadlineDate());
+    setNoteActivityDeadlineTime("18:00");
+    setNoteActivityTestDate(getDefaultDeadlineDate());
+    setNoteActivityTestStartTime("09:00");
+    setNoteActivityTestDurationSeconds("600");
+  };
+
+  const createNoteActivity = async (note: ClassroomLessonNote) => {
+    const requestedQuestionTotal = Number(noteActivityQuestionCount);
+    const questionTotal = Math.max(1, Math.min(requestedQuestionTotal, 20));
+    const deadlineAt = parseLocalDateTime(noteActivityDeadlineDate, noteActivityDeadlineTime);
+    const durationSeconds = Number(noteActivityTestDurationSeconds);
+    if (!Number.isInteger(requestedQuestionTotal) || requestedQuestionTotal < 1 || requestedQuestionTotal > 20) {
+      Alert.alert("Question count needed", "Enter between 1 and 20 questions.");
+      return;
+    }
+    if (noteActivityType === "assignment" && (!deadlineAt || deadlineAt <= Date.now())) {
+      Alert.alert("Invalid deadline", "Enter a future deadline using YYYY-MM-DD and HH:MM.");
+      return;
+    }
+    if (noteActivityType === "test" && (!noteActivityTestStartAt || noteActivityTestStartAt <= Date.now())) {
+      Alert.alert("Invalid test start", "Choose a future test date and start time.");
+      return;
+    }
+    if (noteActivityType === "test" && (!Number.isFinite(durationSeconds) || durationSeconds <= 0)) {
+      Alert.alert("Invalid duration", "Enter the test duration in seconds.");
+      return;
+    }
+    if (
+      noteActivityType === "test" &&
+      noteActivityTestEndAt &&
+      toLocalDateValue(new Date(noteActivityTestEndAt)) !== noteActivityTestDate
+    ) {
+      Alert.alert("Invalid test duration", "The test must start and end on the same date.");
+      return;
+    }
+    setCreatingActivity(true);
+    try {
+      await createActivityFromClassroomLessonNote({
+        teacherProfile: profile,
+        noteId: note.noteId,
+        type: noteActivityType,
+        difficulty: noteActivityDifficulty,
+        questionCount: questionTotal,
+        deadlineAt: noteActivityType === "assignment" ? deadlineAt ?? undefined : undefined,
+        startAt: noteActivityType === "test" ? noteActivityTestStartAt ?? undefined : undefined,
+        durationSeconds: noteActivityType === "test" ? durationSeconds : undefined,
+      });
+      setActivityNoteId(null);
+      await onActivityCreated?.();
+      Alert.alert("Activity created", `${note.title} ${noteActivityType === "test" ? "Test" : "Assignment"} has been published to ${className}.`);
+    } catch (caught) {
+      Alert.alert("Activity not created", caught instanceof Error ? caught.message : "Please try again.");
+    } finally {
+      setCreatingActivity(false);
+    }
+  };
+
   return (
     <View style={styles.sectionCard}>
       <Text style={styles.title}>Lesson Notes</Text>
@@ -300,10 +421,75 @@ export function ClassroomLessonNotes({ profile, classId, className }: Props) {
           {note.attachmentName && (isTeacher || note.studentAccess === "allow_download") ? <PrimaryButton label={`Download ${note.attachmentName}`} variant="secondary" onPress={() => void downloadAttachment(note)} compact /> : null}
           {note.attachmentName && !isTeacher && note.studentAccess === "read_only" ? <Text style={styles.readOnlyLabel}>Read Only · Download disabled by the teacher</Text> : null}
           {isTeacher ? (
-            <View style={styles.actionRow}>
-              <PrimaryButton label="Edit" variant="secondary" onPress={() => editNote(note)} style={styles.actionButton} compact />
-              <PrimaryButton label="Delete" variant="ghost" onPress={() => removeNote(note)} style={styles.actionButton} compact />
-            </View>
+            <>
+              <View style={styles.actionRow}>
+                <PrimaryButton label="Create Activity" onPress={() => openActivityCreator(note)} style={styles.actionButton} compact />
+                <PrimaryButton label="Edit" variant="secondary" onPress={() => editNote(note)} style={styles.actionButton} compact />
+                <PrimaryButton label="Delete" variant="ghost" onPress={() => removeNote(note)} style={styles.actionButton} compact />
+              </View>
+              {activityNoteId === note.noteId ? (
+                <View style={styles.activityCreator}>
+                  <Text style={styles.subtitle}>Create activity from this lesson note</Text>
+                  <Text style={styles.optionHint}>Subject: {note.subject || "Lesson Note"} · Topic: {note.topic || note.title}. AI questions will use the note content as their source.</Text>
+                  <Text style={styles.label}>Activity type</Text>
+                  <View style={styles.actionRow}>
+                    <PrimaryButton label="Assignment" variant={noteActivityType === "assignment" ? "primary" : "secondary"} onPress={() => setNoteActivityType("assignment")} style={styles.actionButton} />
+                    <PrimaryButton label="Test" variant={noteActivityType === "test" ? "primary" : "secondary"} onPress={() => setNoteActivityType("test")} style={styles.actionButton} />
+                  </View>
+                  <Text style={styles.label}>Difficulty level</Text>
+                  <View style={styles.actionRow}>
+                    {(["easy", "hard", "very_hard"] as const).map((difficulty) => (
+                      <PrimaryButton
+                        key={difficulty}
+                        label={difficulty === "easy" ? "Easy" : difficulty === "hard" ? "Hard" : "Very Hard"}
+                        variant={noteActivityDifficulty === difficulty ? "primary" : "secondary"}
+                        onPress={() => setNoteActivityDifficulty(difficulty)}
+                        style={styles.actionButton}
+                        compact
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.label}>Number of questions</Text>
+                  <TextInput value={noteActivityQuestionCount} onChangeText={setNoteActivityQuestionCount} keyboardType="number-pad" placeholder="1 to 20" placeholderTextColor="#8092A7" style={styles.input} />
+                  {noteActivityType === "test" ? (
+                    <>
+                      <View style={styles.twoColumn}>
+                        <View style={styles.fieldColumn}>
+                          <Text style={styles.label}>Test date</Text>
+                          <TextInput value={noteActivityTestDate} onChangeText={setNoteActivityTestDate} placeholder="YYYY-MM-DD" placeholderTextColor="#8092A7" style={styles.input} />
+                        </View>
+                        <View style={styles.fieldColumn}>
+                          <Text style={styles.label}>Duration (seconds)</Text>
+                          <TextInput value={noteActivityTestDurationSeconds} onChangeText={setNoteActivityTestDurationSeconds} keyboardType="number-pad" placeholder="600" placeholderTextColor="#8092A7" style={styles.input} />
+                        </View>
+                      </View>
+                      <View style={styles.twoColumn}>
+                        <View style={styles.fieldColumn}>
+                          <Text style={styles.label}>Start time</Text>
+                          <TextInput value={noteActivityTestStartTime} onChangeText={setNoteActivityTestStartTime} placeholder="HH:MM" placeholderTextColor="#8092A7" style={styles.input} />
+                        </View>
+                        <View style={styles.fieldColumn}>
+                          <Text style={styles.label}>End time</Text>
+                          <View style={styles.readOnlyField}><Text style={styles.readOnlyValue}>{formatTimeWithSeconds(noteActivityTestEndAt)}</Text></View>
+                        </View>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.label}>Submission deadline</Text>
+                      <View style={styles.twoColumn}>
+                        <TextInput value={noteActivityDeadlineDate} onChangeText={setNoteActivityDeadlineDate} placeholder="YYYY-MM-DD" placeholderTextColor="#8092A7" style={[styles.input, styles.flexInput]} />
+                        <TextInput value={noteActivityDeadlineTime} onChangeText={setNoteActivityDeadlineTime} placeholder="HH:MM" placeholderTextColor="#8092A7" style={[styles.input, styles.flexInput]} />
+                      </View>
+                    </>
+                  )}
+                  <View style={styles.actionRow}>
+                    <PrimaryButton label={`Create ${noteActivityType === "test" ? "Test" : "Assignment"}`} onPress={() => void createNoteActivity(note)} loading={creatingActivity} style={styles.actionButton} />
+                    <PrimaryButton label="Cancel" variant="ghost" onPress={() => setActivityNoteId(null)} style={styles.actionButton} />
+                  </View>
+                </View>
+              ) : null}
+            </>
           ) : null}
         </View>
       ))}
@@ -323,6 +509,9 @@ const styles = StyleSheet.create({
   contentInput: { minHeight: 180 },
   twoColumn: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   flexInput: { flexGrow: 1, flexBasis: 220 },
+  fieldColumn: { flexGrow: 1, flexBasis: 220, gap: 6 },
+  readOnlyField: { minHeight: 48, justifyContent: "center", backgroundColor: "#E7EFF4", borderColor: "#D0DDE6", borderWidth: 1, borderRadius: 14, paddingHorizontal: 14 },
+  readOnlyValue: { color: palette.navy, fontSize: 15, fontWeight: "800" },
   label: { color: palette.navy, fontWeight: "800", marginTop: 4 },
   optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   option: { flexGrow: 1, flexBasis: 180, borderWidth: 1, borderColor: "#CEDCE6", backgroundColor: "#FFFFFF", borderRadius: 14, padding: 12 },
@@ -334,6 +523,7 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   actionButton: { flexGrow: 1, flexBasis: 150 },
   noteCard: { borderWidth: 1, borderColor: "#DCE7EE", borderRadius: 20, padding: 16, gap: 12, backgroundColor: "#FFFFFF" },
+  activityCreator: { backgroundColor: "#F1F8FA", borderRadius: 18, padding: 14, gap: 10, borderWidth: 1, borderColor: "#D8E8ED" },
   noteHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   noteHeaderText: { flex: 1 },
   noteMeta: { color: palette.aqua, fontSize: 12, fontWeight: "800", marginTop: 3 },

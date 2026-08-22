@@ -951,6 +951,11 @@ export default function ClassroomScreen() {
       return;
     }
 
+    if (activityType === "test" && parsedStartAt && parsedStartAt <= Date.now()) {
+      Alert.alert(t(language, "publishTestTitle"), "Test start time must be in the future.");
+      return;
+    }
+
     if (activityType === "test" && !parsedEndAt) {
       Alert.alert(t(language, "publishTestTitle"), t(language, "enterValidDurationSeconds"));
       return;
@@ -1271,6 +1276,22 @@ export default function ClassroomScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {profile.role === "teacher" ? (
+          <View style={styles.createClassPrerequisite}>
+            <Text style={styles.createClassPrerequisiteTitle}>Create a Class</Text>
+            <Text style={styles.helperText}>Create a class before adding activities, lesson notes, or using class chat.</Text>
+            <View style={styles.createClassRow}>
+              <TextInput
+                value={newClassName}
+                onChangeText={setNewClassName}
+                placeholder={t(language, "className")}
+                placeholderTextColor="#8092A7"
+                style={[styles.input, styles.createClassInput]}
+              />
+              <PrimaryButton label={t(language, "createClassAction")} onPress={createClass} loading={saving} style={styles.createClassButton} />
+            </View>
+          </View>
+        ) : null}
         <View style={styles.classroomTabs}>
           {([
             ["activities", "Class Activities", "assignment"],
@@ -1294,15 +1315,6 @@ export default function ClassroomScreen() {
               </Pressable>
               {managementExpanded ? (
                 <>
-                  <TextInput
-                    value={newClassName}
-                    onChangeText={setNewClassName}
-                    placeholder={t(language, "className")}
-                    placeholderTextColor="#8092A7"
-                    style={styles.input}
-                  />
-                  <PrimaryButton label={t(language, "createClassAction")} onPress={createClass} loading={saving} />
-
                   <Text style={styles.sectionLabel}>{t(language, "yourClasses")}</Text>
                   {classes.length === 0 ? (
                     classroomLoadError ? (
@@ -1880,14 +1892,21 @@ export default function ClassroomScreen() {
           </>
         ) : selectedClass ? (
           classroomPage === "notes" ? (
-            <ClassroomLessonNotes profile={profile} classId={selectedClass.classId} className={selectedClass.className} />
+            <ClassroomLessonNotes
+              profile={profile}
+              classId={selectedClass.classId}
+              className={selectedClass.className}
+              onActivityCreated={async () => {
+                await refreshClassroomData();
+                setClassroomPage("activities");
+              }}
+            />
           ) : (
             <ClassroomChat profile={profile} classId={selectedClass.classId} className={selectedClass.className} />
           )
         ) : (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Select a class first</Text>
-            <Text style={styles.helperText}>Open Class Activities, then create, join, or select a class before using this page.</Text>
+            <Text style={styles.cardTitle}>{profile.role === "teacher" ? "First create a class" : "First join a class"}</Text>
             <PrimaryButton label="Open Class Activities" onPress={() => setClassroomPage("activities")} />
           </View>
         )}
@@ -2105,6 +2124,18 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 8,
   },
+  createClassPrerequisite: {
+    marginTop: 18,
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderRadius: 22,
+    padding: 16,
+    gap: 8,
+    ...shadows.card,
+  },
+  createClassPrerequisiteTitle: { color: palette.navy, fontSize: 20, fontWeight: "900" },
+  createClassRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 },
+  createClassInput: { flexGrow: 1, flexBasis: 220, marginTop: 0 },
+  createClassButton: { flexGrow: 0, minWidth: 150 },
   classroomTab: {
     flexGrow: 1,
     flexBasis: 96,

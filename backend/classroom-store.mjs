@@ -731,6 +731,7 @@ export async function createLessonNote(payload, appVariant) {
     const title = String(payload.title ?? "").trim();
     const content = String(payload.content ?? "").trim();
     if (!title || !content) throw new Error("Lesson-note title and content are required.");
+    if (content.length > 50000) throw new Error("Lesson-note content can contain up to 50,000 characters.");
     const attachment = payload.attachment;
     validateLessonNoteAttachment(attachment);
     const noteId = randomUUID();
@@ -788,6 +789,7 @@ export async function updateLessonNote(payload, appVariant) {
     if (payload.studentAccess === "read_only" || payload.studentAccess === "allow_download") note.studentAccess = payload.studentAccess;
     note.updatedAt = Date.now();
     if (!note.title || !note.content) throw new Error("Lesson-note title and content are required.");
+    if (note.content.length > 50000) throw new Error("Lesson-note content can contain up to 50,000 characters.");
     return buildLessonNoteSummary(note);
   });
 }
@@ -799,6 +801,16 @@ export async function listLessonNotes(profile, classId, appVariant) {
     ensureProfileCanAccessClass(store, classroom, profile.id);
     const isTeacher = classroom.teacherProfileId === profile.id;
     return getSortedLessonNotes(store, classId).filter((note) => isTeacher || note.status === "published");
+  });
+}
+
+export async function getLessonNoteForTeacher(teacherProfile, noteId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const note = store.lessonNotes[noteId];
+    if (!note) throw new Error("Lesson note not found.");
+    ensureTeacherOwnsClass(store.classrooms[note.classId], teacherProfile.id);
+    return buildLessonNoteSummary(note);
   });
 }
 

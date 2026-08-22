@@ -40,6 +40,8 @@ import type {
   ClassroomLessonNoteListRequest,
   ClassroomLessonNoteListResponse,
   ClassroomLessonNoteMutationResponse,
+  ClassroomLessonNoteActivityCreateRequest,
+  ClassroomLessonNoteActivityCreateResponse,
   ClassroomLessonNoteRefineRequest,
   ClassroomLessonNoteRefineResponse,
   ClassroomLessonNoteUpdateRequest,
@@ -1073,6 +1075,12 @@ export async function deleteClassroomLessonNote(
   request: ClassroomLessonNoteDeleteRequest
 ): Promise<ClassroomDeleteResponse> {
   return postJson("/classroom/lesson-notes/delete", withVariantMeta(request));
+}
+
+export async function createActivityFromClassroomLessonNote(
+  request: ClassroomLessonNoteActivityCreateRequest
+): Promise<ClassroomLessonNoteActivityCreateResponse> {
+  return postJson("/classroom/lesson-notes/activity/create", withVariantMeta(request));
 }
 
 export async function listClassroomChatMessages(
