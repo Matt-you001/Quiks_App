@@ -3,21 +3,30 @@ import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
 import {
   acceptClassInviteLink,
+  createLessonNote,
   createClassroomActivity,
   createClassroom,
+  deleteClassroom,
+  deleteClassroomActivity,
+  deleteLessonNote,
   duplicateActivity,
   getActivityDetails,
+  getLessonNoteAttachment,
   getClassroomStoreDiagnostics,
   getClassroomDetails,
   inviteStudentToClass,
   listActivitiesForProfile,
+  listClassChatMessages,
   listClassroomsForProfile,
+  listLessonNotes,
   removeClassroomMember,
   requestJoinClass,
   respondToMembershipRequest,
   submitActivity,
+  sendClassChatMessage,
   updateClassroomActivity,
   updateClassroomName,
+  updateLessonNote,
   upsertClassroomProfile,
 } from "./classroom-store.mjs";
 
@@ -323,7 +332,13 @@ function getClientErrorStatus(error) {
     return null;
   }
 
-  if (message.includes("not allowed") || message.includes("only students can request") || message.includes("only teachers can")) {
+  if (
+    message.includes("not allowed") ||
+    message.includes("only students can request") ||
+    message.includes("only teachers can") ||
+    message.includes("not an active member") ||
+    message.includes("read-only")
+  ) {
     return 403;
   }
 
@@ -2628,6 +2643,14 @@ async function handleClassroomUpdate(body, response) {
   sendJson(response, 200, payload);
 }
 
+async function handleClassroomDelete(body, response) {
+  if (!body.teacherProfile?.id || !body.classId) {
+    sendJson(response, 400, { error: "Teacher profile and class are required." });
+    return;
+  }
+  sendJson(response, 200, await deleteClassroom(body.teacherProfile, body.classId, body.appVariant ?? "children"));
+}
+
 async function handleClassroomJoin(body, response) {
   if (!body.studentProfile?.id || !body.classCode?.trim()) {
     sendJson(response, 400, { error: "Student profile and class code are required." });
@@ -2731,6 +2754,128 @@ async function handleAssignmentDuplicate(body, response) {
 
   const activity = await duplicateActivity(body.teacherProfile, body.activityId, body.appVariant ?? "children");
   sendJson(response, 200, { activity });
+}
+
+async function handleAssignmentDelete(body, response) {
+  if (!body.teacherProfile?.id || !body.activityId) {
+    sendJson(response, 400, { error: "Teacher profile and activity are required." });
+    return;
+  }
+  sendJson(response, 200, await deleteClassroomActivity(body.teacherProfile, body.activityId, body.appVariant ?? "children"));
+}
+
+function buildLessonNoteRefinementSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      title: { type: "string" },
+      content: { type: "string" },
+      illustrations: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string" },
+            caption: { type: "string" },
+            points: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
+          },
+          required: ["title", "caption", "points"],
+        },
+      },
+    },
+    required: ["title", "content", "illustrations"],
+  };
+}
+
+async function handleLessonNoteRefine(body, response) {
+  if (!body.teacherProfile?.id || !body.classId || !body.title?.trim() || !body.content?.trim()) {
+    sendJson(response, 400, { error: "Teacher, class, title, and lesson-note content are required." });
+    return;
+  }
+  const level = ["minimal", "rich", "deep"].includes(body.refinementLevel) ? body.refinementLevel : "minimal";
+  const levelGuidance = level === "minimal"
+    ? "Correct spelling, grammar, factual slips, and formatting. Make only small additions needed for clarity."
+    : level === "rich"
+      ? "Develop the supplied material into a richer, well-structured, complete lesson note while preserving the teacher's intent. Add useful explanations and examples."
+      : "Deeply develop the note into a complete, engaging lesson. Add examples and 1 to 3 lightweight visual illustration plans represented as titled diagrams with a caption and labelled points.";
+  const data = await createOpenAiResponse({
+    schemaName: "classroom_lesson_note_refinement",
+    schema: buildLessonNoteRefinementSchema(),
+    instructions: [
+      "You are an expert classroom lesson-note editor.",
+      "Preserve the teacher's meaning and never invent unverifiable claims.",
+      "Return a polished note with clear headings and readable paragraphs.",
+      "For minimal and rich refinement return an empty illustrations array. For deep refinement return practical visual diagram plans that the app can render as pictorial learning cards.",
+      levelGuidance,
+    ].join(" "),
+    input: [{ role: "user", content: [{ type: "input_text", text: [
+      `Title: ${body.title}`,
+      `Subject: ${body.subject || "Not specified"}`,
+      `Topic: ${body.topic || "Not specified"}`,
+      `Refinement: ${level}`,
+      `App variant: ${body.appVariant ?? "children"}`,
+      `Teacher's lesson note:\n${body.content}`,
+    ].join("\n") }] }],
+  });
+  sendJson(response, 200, data);
+}
+
+async function handleLessonNoteCreate(body, response) {
+  if (!body.teacherProfile?.id || !body.classId) {
+    sendJson(response, 400, { error: "Teacher profile and class are required." });
+    return;
+  }
+  sendJson(response, 200, { note: await createLessonNote(body, body.appVariant ?? "children") });
+}
+
+async function handleLessonNoteUpdate(body, response) {
+  if (!body.teacherProfile?.id || !body.noteId) {
+    sendJson(response, 400, { error: "Teacher profile and lesson note are required." });
+    return;
+  }
+  sendJson(response, 200, { note: await updateLessonNote(body, body.appVariant ?? "children") });
+}
+
+async function handleLessonNoteList(body, response) {
+  if (!body.profile?.id || !body.classId) {
+    sendJson(response, 400, { error: "Profile and class are required." });
+    return;
+  }
+  sendJson(response, 200, { notes: await listLessonNotes(body.profile, body.classId, body.appVariant ?? "children") });
+}
+
+async function handleLessonNoteAttachment(body, response) {
+  if (!body.profile?.id || !body.noteId) {
+    sendJson(response, 400, { error: "Profile and lesson note are required." });
+    return;
+  }
+  sendJson(response, 200, await getLessonNoteAttachment(body.profile, body.noteId, body.appVariant ?? "children"));
+}
+
+async function handleLessonNoteDelete(body, response) {
+  if (!body.teacherProfile?.id || !body.noteId) {
+    sendJson(response, 400, { error: "Teacher profile and lesson note are required." });
+    return;
+  }
+  sendJson(response, 200, await deleteLessonNote(body.teacherProfile, body.noteId, body.appVariant ?? "children"));
+}
+
+async function handleClassChatList(body, response) {
+  if (!body.profile?.id || !body.classId) {
+    sendJson(response, 400, { error: "Profile and class are required." });
+    return;
+  }
+  sendJson(response, 200, { messages: await listClassChatMessages(body.profile, body.classId, body.appVariant ?? "children") });
+}
+
+async function handleClassChatSend(body, response) {
+  if (!body.profile?.id || !body.classId || !body.text?.trim()) {
+    sendJson(response, 400, { error: "Profile, class, and message are required." });
+    return;
+  }
+  sendJson(response, 200, { message: await sendClassChatMessage(body.profile, body.classId, body.text, body.appVariant ?? "children") });
 }
 
 async function handleAssignmentUpdate(body, response) {
@@ -2972,6 +3117,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/classroom/classes/delete") {
+      await handleClassroomDelete(body, response);
+      return;
+    }
+
     if (url.pathname === "/classroom/classes/join") {
       await handleClassroomJoin(body, response);
       return;
@@ -3009,6 +3159,52 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/assignments/duplicate") {
       await handleAssignmentDuplicate(body, response);
+      return;
+    }
+
+
+    if (url.pathname === "/classroom/assignments/delete") {
+      await handleAssignmentDelete(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/refine") {
+      await handleLessonNoteRefine(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/create") {
+      await handleLessonNoteCreate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/update") {
+      await handleLessonNoteUpdate(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/list") {
+      await handleLessonNoteList(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/attachment") {
+      await handleLessonNoteAttachment(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/lesson-notes/delete") {
+      await handleLessonNoteDelete(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/chat/list") {
+      await handleClassChatList(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/chat/send") {
+      await handleClassChatSend(body, response);
       return;
     }
 

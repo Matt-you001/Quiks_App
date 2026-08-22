@@ -281,6 +281,11 @@ export interface ClassroomClassUpdateRequest {
   className: string;
 }
 
+export interface ClassroomClassDeleteRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+}
+
 export interface ClassroomClassMemberRemoveRequest {
   teacherProfile: UserProfile;
   classId: string;
@@ -421,6 +426,11 @@ export interface ClassroomActivityDuplicateRequest {
   activityId: string;
 }
 
+export interface ClassroomActivityDeleteRequest {
+  teacherProfile: UserProfile;
+  activityId: string;
+}
+
 export interface ClassroomActivityUpdateRequest extends ClassroomActivityCreateRequest {
   activityId: string;
 }
@@ -470,6 +480,148 @@ export interface ClassroomActivitySubmitRequest {
 export interface ClassroomActivitySubmitResponse {
   activity: ClassroomActivitySummary;
   submission: ClassroomSubmissionSummary;
+}
+
+export type LessonNoteRefinementLevel = "none" | "minimal" | "rich" | "deep";
+export type LessonNoteStudentAccess = "read_only" | "allow_download";
+
+export interface LessonNoteIllustration {
+  title: string;
+  caption: string;
+  points: string[];
+}
+
+export interface LessonNoteAttachmentInput {
+  name: string;
+  mimeType: string;
+  size: number;
+  dataBase64: string;
+}
+
+export interface ClassroomLessonNote {
+  noteId: string;
+  classId: string;
+  title: string;
+  subject?: string;
+  topic?: string;
+  originalContent: string;
+  content: string;
+  illustrations: LessonNoteIllustration[];
+  refinementLevel: LessonNoteRefinementLevel;
+  status: "draft" | "published";
+  studentAccess: LessonNoteStudentAccess;
+  teacherProfileId: string;
+  teacherName: string;
+  attachmentName?: string;
+  attachmentMimeType?: string;
+  attachmentSize?: number;
+  createdAt: number;
+  updatedAt: number;
+  publishedAt?: number;
+}
+
+export interface ClassroomLessonNoteCreateRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+  title: string;
+  subject?: string;
+  topic?: string;
+  content: string;
+  illustrations?: LessonNoteIllustration[];
+  refinementLevel: LessonNoteRefinementLevel;
+  status: "draft" | "published";
+  studentAccess: LessonNoteStudentAccess;
+  attachment?: LessonNoteAttachmentInput;
+}
+
+export interface ClassroomLessonNoteUpdateRequest {
+  teacherProfile: UserProfile;
+  noteId: string;
+  title?: string;
+  subject?: string;
+  topic?: string;
+  content?: string;
+  illustrations?: LessonNoteIllustration[];
+  refinementLevel?: LessonNoteRefinementLevel;
+  status?: "draft" | "published";
+  studentAccess?: LessonNoteStudentAccess;
+  attachment?: LessonNoteAttachmentInput;
+}
+
+export interface ClassroomLessonNoteListRequest {
+  profile: UserProfile;
+  classId: string;
+}
+
+export interface ClassroomLessonNoteDeleteRequest {
+  teacherProfile: UserProfile;
+  noteId: string;
+}
+
+export interface ClassroomLessonNoteRefineRequest {
+  teacherProfile: UserProfile;
+  classId: string;
+  title: string;
+  subject?: string;
+  topic?: string;
+  content: string;
+  refinementLevel: Exclude<LessonNoteRefinementLevel, "none">;
+}
+
+export interface ClassroomLessonNoteRefineResponse {
+  title: string;
+  content: string;
+  illustrations: LessonNoteIllustration[];
+}
+
+export interface ClassroomLessonNoteAttachmentRequest {
+  profile: UserProfile;
+  noteId: string;
+}
+
+export interface ClassroomLessonNoteAttachmentResponse {
+  name: string;
+  mimeType: string;
+  dataBase64: string;
+}
+
+export interface ClassroomLessonNoteMutationResponse {
+  note: ClassroomLessonNote;
+}
+
+export interface ClassroomLessonNoteListResponse {
+  notes: ClassroomLessonNote[];
+}
+
+export interface ClassroomChatMessage {
+  messageId: string;
+  classId: string;
+  senderProfileId: string;
+  senderName: string;
+  senderRole: "teacher" | "student";
+  text: string;
+  createdAt: number;
+}
+
+export interface ClassroomChatListRequest {
+  profile: UserProfile;
+  classId: string;
+}
+
+export interface ClassroomChatSendRequest extends ClassroomChatListRequest {
+  text: string;
+}
+
+export interface ClassroomChatListResponse {
+  messages: ClassroomChatMessage[];
+}
+
+export interface ClassroomChatSendResponse {
+  message: ClassroomChatMessage;
+}
+
+export interface ClassroomDeleteResponse {
+  message: string;
 }
 
 export interface BreatherRequest {

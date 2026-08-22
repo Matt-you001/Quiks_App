@@ -9,6 +9,7 @@ import type {
   AccountSubscriptionStatusResponse,
   ClassroomActivityCreateRequest,
   ClassroomActivityCreateResponse,
+  ClassroomActivityDeleteRequest,
   ClassroomActivityDetailsRequest,
   ClassroomActivityDetailsResponse,
   ClassroomActivityDuplicateRequest,
@@ -19,6 +20,7 @@ import type {
   ClassroomActivitySubmitResponse,
   ClassroomClassCreateRequest,
   ClassroomClassCreateResponse,
+  ClassroomClassDeleteRequest,
   ClassroomClassDetailsRequest,
   ClassroomClassDetailsResponse,
   ClassroomClassListRequest,
@@ -30,6 +32,21 @@ import type {
   ClassroomJoinClassRequest,
   ClassroomMembershipDecisionRequest,
   ClassroomMembershipMutationResponse,
+  ClassroomDeleteResponse,
+  ClassroomLessonNoteAttachmentRequest,
+  ClassroomLessonNoteAttachmentResponse,
+  ClassroomLessonNoteCreateRequest,
+  ClassroomLessonNoteDeleteRequest,
+  ClassroomLessonNoteListRequest,
+  ClassroomLessonNoteListResponse,
+  ClassroomLessonNoteMutationResponse,
+  ClassroomLessonNoteRefineRequest,
+  ClassroomLessonNoteRefineResponse,
+  ClassroomLessonNoteUpdateRequest,
+  ClassroomChatListRequest,
+  ClassroomChatListResponse,
+  ClassroomChatSendRequest,
+  ClassroomChatSendResponse,
   ClassroomProfileSyncRequest,
   ClassroomQuestionCandidateRequest,
   ClassroomQuestionCandidateResponse,
@@ -947,6 +964,12 @@ export async function updateClassroomClass(
   return postJson("/classroom/classes/update", withVariantMeta(request));
 }
 
+export async function deleteClassroomClass(
+  request: ClassroomClassDeleteRequest
+): Promise<ClassroomDeleteResponse> {
+  return postJson("/classroom/classes/delete", withVariantMeta(request));
+}
+
 export async function removeClassroomMember(
   request: ClassroomClassMemberRemoveRequest
 ): Promise<ClassroomMembershipMutationResponse> {
@@ -1008,6 +1031,60 @@ export async function duplicateClassroomActivity(
   request: ClassroomActivityDuplicateRequest
 ): Promise<ClassroomActivityCreateResponse> {
   return postJson("/classroom/assignments/duplicate", withVariantMeta(request));
+}
+
+export async function deleteClassroomActivity(
+  request: ClassroomActivityDeleteRequest
+): Promise<ClassroomDeleteResponse> {
+  return postJson("/classroom/assignments/delete", withVariantMeta(request));
+}
+
+export async function refineClassroomLessonNote(
+  request: ClassroomLessonNoteRefineRequest
+): Promise<ClassroomLessonNoteRefineResponse> {
+  return postJson("/classroom/lesson-notes/refine", withVariantMeta(request));
+}
+
+export async function createClassroomLessonNote(
+  request: ClassroomLessonNoteCreateRequest
+): Promise<ClassroomLessonNoteMutationResponse> {
+  return postJson("/classroom/lesson-notes/create", withVariantMeta(request));
+}
+
+export async function updateClassroomLessonNote(
+  request: ClassroomLessonNoteUpdateRequest
+): Promise<ClassroomLessonNoteMutationResponse> {
+  return postJson("/classroom/lesson-notes/update", withVariantMeta(request));
+}
+
+export async function listClassroomLessonNotes(
+  request: ClassroomLessonNoteListRequest
+): Promise<ClassroomLessonNoteListResponse> {
+  return postJson("/classroom/lesson-notes/list", withVariantMeta(request));
+}
+
+export async function getClassroomLessonNoteAttachment(
+  request: ClassroomLessonNoteAttachmentRequest
+): Promise<ClassroomLessonNoteAttachmentResponse> {
+  return postJson("/classroom/lesson-notes/attachment", withVariantMeta(request));
+}
+
+export async function deleteClassroomLessonNote(
+  request: ClassroomLessonNoteDeleteRequest
+): Promise<ClassroomDeleteResponse> {
+  return postJson("/classroom/lesson-notes/delete", withVariantMeta(request));
+}
+
+export async function listClassroomChatMessages(
+  request: ClassroomChatListRequest
+): Promise<ClassroomChatListResponse> {
+  return postJson("/classroom/chat/list", withVariantMeta(request));
+}
+
+export async function sendClassroomChatMessage(
+  request: ClassroomChatSendRequest
+): Promise<ClassroomChatSendResponse> {
+  return postJson("/classroom/chat/send", withVariantMeta(request));
 }
 
 export async function updateClassroomActivity(

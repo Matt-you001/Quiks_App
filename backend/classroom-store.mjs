@@ -19,6 +19,8 @@ const defaultStore = {
   memberships: {},
   activities: {},
   submissions: {},
+  lessonNotes: {},
+  chatMessages: {},
 };
 
 let storeCache = null;
@@ -168,6 +170,43 @@ function ensureTeacherOwnsClass(classroom, teacherProfileId) {
   if (!classroom || classroom.teacherProfileId !== teacherProfileId) {
     throw new Error("Teacher is not allowed to manage this class.");
   }
+}
+
+function ensureProfileCanAccessClass(store, classroom, profileId) {
+  if (!classroom) throw new Error("Class not found.");
+  if (classroom.teacherProfileId === profileId || getActiveMembership(store, classroom.id, profileId)) return;
+  throw new Error("This profile is not an active member of the class.");
+}
+
+function buildLessonNoteSummary(note) {
+  const { attachmentDataBase64: _attachmentDataBase64, ...summary } = note;
+  return summary;
+}
+
+function getSortedLessonNotes(store, classId) {
+  return Object.values(store.lessonNotes)
+    .filter((note) => note.classId === classId)
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .map(buildLessonNoteSummary);
+}
+
+function getSortedChatMessages(store, classId) {
+  return Object.values(store.chatMessages)
+    .filter((message) => message.classId === classId)
+    .sort((left, right) => left.createdAt - right.createdAt)
+    .slice(-300);
+}
+
+function validateLessonNoteAttachment(attachment) {
+  if (!attachment?.dataBase64) return;
+  const allowedTypes = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+  ]);
+  if (!allowedTypes.has(String(attachment.mimeType ?? ""))) throw new Error("Upload a PDF, Word, or text lesson-note file.");
+  if (attachment.dataBase64.length > 7_500_000) throw new Error("The lesson-note attachment must be 5 MB or smaller.");
 }
 
 function hashString(value) {
@@ -519,6 +558,22 @@ export async function updateClassroomName(teacherProfile, classId, className, ap
   });
 }
 
+export async function deleteClassroom(teacherProfile, classId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const classroom = store.classrooms[classId];
+    ensureTeacherOwnsClass(classroom, teacherProfile.id);
+    const activityIds = new Set(Object.values(store.activities).filter((item) => item.classId === classId).map((item) => item.id));
+    Object.keys(store.memberships).forEach((id) => { if (store.memberships[id].classId === classId) delete store.memberships[id]; });
+    Object.keys(store.activities).forEach((id) => { if (activityIds.has(id)) delete store.activities[id]; });
+    Object.keys(store.submissions).forEach((id) => { if (activityIds.has(store.submissions[id].activityId)) delete store.submissions[id]; });
+    Object.keys(store.lessonNotes).forEach((id) => { if (store.lessonNotes[id].classId === classId) delete store.lessonNotes[id]; });
+    Object.keys(store.chatMessages).forEach((id) => { if (store.chatMessages[id].classId === classId) delete store.chatMessages[id]; });
+    delete store.classrooms[classId];
+    return { message: `${classroom.className} was deleted.` };
+  });
+}
+
 export async function removeClassroomMember(teacherProfile, classId, membershipId, appVariant) {
   return mutateStore(async (store) => {
     store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
@@ -652,6 +707,149 @@ export async function createClassroomActivity(payload, appVariant) {
     };
 
     return buildActivitySummary(store, store.activities[activityId], payload.teacherProfile.id);
+  });
+}
+
+export async function deleteClassroomActivity(teacherProfile, activityId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const activity = store.activities[activityId];
+    if (!activity) throw new Error("Activity not found.");
+    ensureTeacherOwnsClass(store.classrooms[activity.classId], teacherProfile.id);
+    Object.keys(store.submissions).forEach((id) => { if (store.submissions[id].activityId === activityId) delete store.submissions[id]; });
+    delete store.activities[activityId];
+    return { message: `${activity.title} was deleted.` };
+  });
+}
+
+export async function createLessonNote(payload, appVariant) {
+  return mutateStore(async (store) => {
+    const { teacherProfile } = payload;
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const classroom = store.classrooms[payload.classId];
+    ensureTeacherOwnsClass(classroom, teacherProfile.id);
+    const title = String(payload.title ?? "").trim();
+    const content = String(payload.content ?? "").trim();
+    if (!title || !content) throw new Error("Lesson-note title and content are required.");
+    const attachment = payload.attachment;
+    validateLessonNoteAttachment(attachment);
+    const noteId = randomUUID();
+    const now = Date.now();
+    store.lessonNotes[noteId] = {
+      noteId,
+      classId: payload.classId,
+      title,
+      subject: String(payload.subject ?? "").trim(),
+      topic: String(payload.topic ?? "").trim(),
+      originalContent: content,
+      content,
+      illustrations: Array.isArray(payload.illustrations) ? payload.illustrations : [],
+      refinementLevel: payload.refinementLevel ?? "none",
+      status: payload.status === "published" ? "published" : "draft",
+      studentAccess: payload.studentAccess === "read_only" ? "read_only" : "allow_download",
+      teacherProfileId: teacherProfile.id,
+      teacherName: teacherProfile.name,
+      attachmentName: attachment?.name ? String(attachment.name) : undefined,
+      attachmentMimeType: attachment?.mimeType ? String(attachment.mimeType) : undefined,
+      attachmentSize: Number(attachment?.size ?? 0) || undefined,
+      attachmentDataBase64: attachment?.dataBase64 ? String(attachment.dataBase64) : undefined,
+      createdAt: now,
+      updatedAt: now,
+      publishedAt: payload.status === "published" ? now : undefined,
+    };
+    return buildLessonNoteSummary(store.lessonNotes[noteId]);
+  });
+}
+
+export async function updateLessonNote(payload, appVariant) {
+  return mutateStore(async (store) => {
+    const { teacherProfile } = payload;
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const note = store.lessonNotes[payload.noteId];
+    if (!note) throw new Error("Lesson note not found.");
+    ensureTeacherOwnsClass(store.classrooms[note.classId], teacherProfile.id);
+    if (typeof payload.title === "string") note.title = payload.title.trim();
+    if (typeof payload.subject === "string") note.subject = payload.subject.trim();
+    if (typeof payload.topic === "string") note.topic = payload.topic.trim();
+    if (typeof payload.content === "string") note.content = payload.content.trim();
+    if (Array.isArray(payload.illustrations)) note.illustrations = payload.illustrations;
+    if (payload.attachment?.dataBase64) {
+      validateLessonNoteAttachment(payload.attachment);
+      note.attachmentName = String(payload.attachment.name ?? "lesson-note");
+      note.attachmentMimeType = String(payload.attachment.mimeType ?? "application/octet-stream");
+      note.attachmentSize = Number(payload.attachment.size ?? 0) || undefined;
+      note.attachmentDataBase64 = String(payload.attachment.dataBase64);
+    }
+    if (["none", "minimal", "rich", "deep"].includes(payload.refinementLevel)) note.refinementLevel = payload.refinementLevel;
+    if (payload.status === "draft" || payload.status === "published") {
+      note.status = payload.status;
+      if (payload.status === "published" && !note.publishedAt) note.publishedAt = Date.now();
+    }
+    if (payload.studentAccess === "read_only" || payload.studentAccess === "allow_download") note.studentAccess = payload.studentAccess;
+    note.updatedAt = Date.now();
+    if (!note.title || !note.content) throw new Error("Lesson-note title and content are required.");
+    return buildLessonNoteSummary(note);
+  });
+}
+
+export async function listLessonNotes(profile, classId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
+    const classroom = store.classrooms[classId];
+    ensureProfileCanAccessClass(store, classroom, profile.id);
+    const isTeacher = classroom.teacherProfileId === profile.id;
+    return getSortedLessonNotes(store, classId).filter((note) => isTeacher || note.status === "published");
+  });
+}
+
+export async function getLessonNoteAttachment(profile, noteId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
+    const note = store.lessonNotes[noteId];
+    if (!note) throw new Error("Lesson note not found.");
+    const classroom = store.classrooms[note.classId];
+    ensureProfileCanAccessClass(store, classroom, profile.id);
+    if (classroom.teacherProfileId !== profile.id && note.status !== "published") throw new Error("This lesson note is not available yet.");
+    if (classroom.teacherProfileId !== profile.id && note.studentAccess === "read_only") throw new Error("The teacher made this lesson note read-only.");
+    if (!note.attachmentDataBase64) throw new Error("This lesson note has no attachment.");
+    return { name: note.attachmentName ?? "lesson-note", mimeType: note.attachmentMimeType ?? "application/octet-stream", dataBase64: note.attachmentDataBase64 };
+  });
+}
+
+export async function deleteLessonNote(teacherProfile, noteId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const note = store.lessonNotes[noteId];
+    if (!note) throw new Error("Lesson note not found.");
+    ensureTeacherOwnsClass(store.classrooms[note.classId], teacherProfile.id);
+    delete store.lessonNotes[noteId];
+    return { message: `${note.title} was deleted.` };
+  });
+}
+
+export async function listClassChatMessages(profile, classId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
+    ensureProfileCanAccessClass(store, store.classrooms[classId], profile.id);
+    return getSortedChatMessages(store, classId);
+  });
+}
+
+export async function sendClassChatMessage(profile, classId, text, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
+    ensureProfileCanAccessClass(store, store.classrooms[classId], profile.id);
+    const messageText = String(text ?? "").trim();
+    if (!messageText) throw new Error("Type a message before sending.");
+    if (messageText.length > 2000) throw new Error("Messages can contain up to 2,000 characters.");
+    const messageId = randomUUID();
+    store.chatMessages[messageId] = { messageId, classId, senderProfileId: profile.id, senderName: profile.name, senderRole: normalizeRole(profile.role), text: messageText, createdAt: Date.now() };
+    const excessMessages = Object.values(store.chatMessages)
+      .filter((message) => message.classId === classId)
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .slice(0, -500);
+    excessMessages.forEach((message) => delete store.chatMessages[message.messageId]);
+    return cloneValue(store.chatMessages[messageId]);
   });
 }
 

@@ -8,6 +8,8 @@ import { BackIconButton } from "../components/BackIconButton";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { MathText } from "../components/MathText";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
+import { ClassroomLessonNotes } from "../components/ClassroomLessonNotes";
+import { ClassroomChat } from "../components/ClassroomChat";
 import { appVariant } from "../lib/app-variant";
 import { createClassroomInvitationLink, createClassroomInvitationMessage } from "../lib/classroom-invite";
 import { getDifficultyLabel, t } from "../lib/i18n";
@@ -17,6 +19,8 @@ import { palette, shadows } from "../lib/theme";
 import {
   createClassroomAssignment,
   createClassroomClass,
+  deleteClassroomActivity,
+  deleteClassroomClass,
   duplicateClassroomActivity,
   generateClassroomQuestionCandidates,
   getClassroomActivityDetails,
@@ -108,6 +112,17 @@ function canEditScheduledActivity(activity: ClassroomActivitySummary) {
   return activity.startAt - Date.now() > 5 * 60 * 1000;
 }
 
+function confirmDestructiveAction(title: string, message: string, onConfirm: () => void) {
+  if (Platform.OS === "web") {
+    if (globalThis.confirm(`${title}\n\n${message}`)) onConfirm();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 export default function ClassroomScreen() {
   const params = useLocalSearchParams<{ joinCode?: string }>();
   const hydratingActivityRef = useRef(false);
@@ -166,6 +181,7 @@ export default function ClassroomScreen() {
   const [activityDetailsExpanded, setActivityDetailsExpanded] = useState(true);
   const [premiumBlocked, setPremiumBlocked] = useState(false);
   const [showInviteLinkOptions, setShowInviteLinkOptions] = useState(false);
+  const [classroomPage, setClassroomPage] = useState<"activities" | "notes" | "chat">("activities");
 
   const language = profile?.language ?? "en";
   const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0")), []);
@@ -612,6 +628,27 @@ export default function ClassroomScreen() {
     }
   };
 
+  const removeClass = (classroom: ClassroomSummary) => {
+    if (!profile) return;
+    confirmDestructiveAction(
+      "Delete class?",
+      `This permanently deletes “${classroom.className}”, its members, tests, assignments, submissions, lesson notes, and chat history.`,
+      () => void (async () => {
+        setClassActionLoading(true);
+        try {
+          await deleteClassroomClass({ teacherProfile: profile, classId: classroom.classId });
+          if (selectedClassId === classroom.classId) setSelectedClassId(null);
+          setClassroomPage("activities");
+          await refreshClassroomData();
+        } catch (error) {
+          Alert.alert("Could not delete class", error instanceof Error ? error.message : "Please try again.");
+        } finally {
+          setClassActionLoading(false);
+        }
+      })()
+    );
+  };
+
   const requestJoin = async () => {
     if (!profile || !joinCode.trim()) {
       Alert.alert(t(language, "classroomTitle"), t(language, "enterClassCodeFirst"));
@@ -1028,6 +1065,26 @@ export default function ClassroomScreen() {
     }
   };
 
+  const removeActivity = (activity: ClassroomActivitySummary) => {
+    if (!profile) return;
+    confirmDestructiveAction(
+      `Delete ${activity.type}?`,
+      `“${activity.title}” and all submitted results for it will be permanently deleted.`,
+      () => void (async () => {
+        setClassActionLoading(true);
+        try {
+          await deleteClassroomActivity({ teacherProfile: profile, activityId: activity.activityId });
+          if (editingActivityId === activity.activityId) resetActivityBuilder();
+          await refreshClassroomData();
+        } catch (error) {
+          Alert.alert("Could not delete activity", error instanceof Error ? error.message : "Please try again.");
+        } finally {
+          setClassActionLoading(false);
+        }
+      })()
+    );
+  };
+
   const editActivity = async (activity: ClassroomActivitySummary) => {
     if (!profile) {
       return;
@@ -1214,6 +1271,20 @@ export default function ClassroomScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.classroomTabs}>
+          {([
+            ["activities", "Class Activities", "assignment"],
+            ["notes", "Lesson Notes", "menu-book"],
+            ["chat", "Class Chat", "chat"],
+          ] as const).map(([page, label, icon]) => (
+            <Pressable key={page} onPress={() => setClassroomPage(page)} style={[styles.classroomTab, classroomPage === page ? styles.classroomTabActive : null]}>
+              <MaterialIcons name={icon} size={19} color={classroomPage === page ? "#FFFFFF" : palette.navy} />
+              <Text style={[styles.classroomTabText, classroomPage === page ? styles.classroomTabTextActive : null]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {classroomPage === "activities" ? (
+          <>
         {profile.role === "teacher" ? (
           <>
             <View style={styles.card}>
@@ -1257,6 +1328,7 @@ export default function ClassroomScreen() {
                           </Pressable>
                         </View>
                         <Text style={styles.classMeta}>{t(language, "membersLabel")}: {entry.memberCount}</Text>
+                        <PrimaryButton label="Delete class" variant="ghost" onPress={() => removeClass(entry)} compact disabled={classActionLoading} />
                       </Pressable>
                     ))
                   )}
@@ -1771,6 +1843,14 @@ export default function ClassroomScreen() {
                       style={styles.activityActionButton}
                       compact
                     />
+                    <PrimaryButton
+                      label="Delete"
+                      variant="ghost"
+                      onPress={() => removeActivity(activity)}
+                      loading={classActionLoading}
+                      style={styles.activityActionButton}
+                      compact
+                    />
                   </View>
                 ) : (
                   <PrimaryButton
@@ -1797,7 +1877,20 @@ export default function ClassroomScreen() {
             ))
           )}
         </View>
-
+          </>
+        ) : selectedClass ? (
+          classroomPage === "notes" ? (
+            <ClassroomLessonNotes profile={profile} classId={selectedClass.classId} className={selectedClass.className} />
+          ) : (
+            <ClassroomChat profile={profile} classId={selectedClass.classId} className={selectedClass.className} />
+          )
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Select a class first</Text>
+            <Text style={styles.helperText}>Open Class Activities, then create, join, or select a class before using this page.</Text>
+            <PrimaryButton label="Open Class Activities" onPress={() => setClassroomPage("activities")} />
+          </View>
+        )}
       </ScrollView>
       <Modal
         visible={showInviteLinkOptions}
@@ -2003,6 +2096,29 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 36,
   },
+  classroomTabs: {
+    marginTop: 18,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 22,
+    padding: 8,
+  },
+  classroomTab: {
+    flexGrow: 1,
+    flexBasis: 96,
+    minHeight: 48,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  classroomTabActive: { backgroundColor: palette.aqua },
+  classroomTabText: { color: palette.navy, fontWeight: "900", fontSize: 14 },
+  classroomTabTextActive: { color: "#FFFFFF" },
   centerCard: {
     marginTop: 36,
     backgroundColor: palette.white,
