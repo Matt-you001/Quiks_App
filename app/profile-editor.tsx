@@ -116,10 +116,19 @@ export default function ProfileEditorScreen() {
       quiksId: editingProfile?.quiksId ?? createQuiksId(form.name.trim(), form.role),
     };
 
-    await upsertProfile(profile);
-    await syncRemotePushRegistration();
-    setSaving(false);
-    router.replace(isEditMode ? "/profile" : "/");
+    try {
+      await upsertProfile(profile);
+      await syncRemotePushRegistration();
+      router.replace(isEditMode ? "/profile" : "/");
+    } catch (error) {
+      console.warn("Profile cloud sync failed.", error);
+      Alert.alert(
+        "Profile sync failed",
+        "The profile was saved on this device, but it could not be synced to your account. Check your connection and try saving again."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

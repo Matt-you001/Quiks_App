@@ -144,7 +144,7 @@ export default function HomeScreen() {
   const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
 
   const loadData = useCallback(async () => {
-    const state = await readAppState();
+    const state = await readAppState({ awaitCloudRefresh: Platform.OS !== "web" });
     const webCheckout = readWebCheckoutIntentFromLocation();
     const classroomJoinCode = readClassroomInvitationCodeFromLocation();
     if (!state.isAuthenticated) {

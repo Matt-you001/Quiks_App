@@ -320,9 +320,7 @@ function syncCloudStateInBackground(accountUid: string, normalized: StoredAppSta
 
 async function saveCloudStateWithTimeout(accountUid: string, normalized: StoredAppState) {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const savePromise = saveCloudState(accountUid, normalized).catch((error) => {
-    console.warn(`Cloud profile sync failed for account ${accountUid}.`, error);
-  });
+  const savePromise = saveCloudState(accountUid, normalized);
 
   await Promise.race([
     savePromise,
@@ -334,6 +332,22 @@ async function saveCloudStateWithTimeout(accountUid: string, normalized: StoredA
   if (timeoutId) {
     clearTimeout(timeoutId);
   }
+}
+
+async function hydrateStateFromCloud(account: AppAccount, localState: StoredAppState) {
+  if (!isFirebaseConfigured()) {
+    return localState;
+  }
+
+  const cloudResult = await loadCloudStateWithTimeout(account.uid);
+  if (!cloudResult.completed || !cloudResult.state) {
+    return localState;
+  }
+
+  const hydrated = mergeStoredStates(localState, cloudResult.state, account);
+  await persistLocalAppState(hydrated);
+  lastCloudRefreshAt.set(account.uid, Date.now());
+  return hydrated;
 }
 
 function refreshCloudStateInBackground(account: AppAccount) {
@@ -370,7 +384,7 @@ function refreshCloudStateInBackground(account: AppAccount) {
     });
 }
 
-export async function readAppState(): Promise<StoredAppState> {
+export async function readAppState(options?: { awaitCloudRefresh?: boolean }): Promise<StoredAppState> {
   try {
     const remoteAccount = getAuthenticatedAccount();
     let localState = await readLocalAppState(remoteAccount?.uid);
@@ -393,6 +407,13 @@ export async function readAppState(): Promise<StoredAppState> {
     } satisfies StoredAppState);
 
     await persistLocalAppState(merged);
+    if (options?.awaitCloudRefresh) {
+      try {
+        return await hydrateStateFromCloud(remoteAccount, merged);
+      } catch (error) {
+        console.warn(`Cloud profile refresh failed for account ${remoteAccount.uid}.`, error);
+      }
+    }
     refreshCloudStateInBackground(remoteAccount);
     return merged;
   } catch {
