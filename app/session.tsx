@@ -290,7 +290,7 @@ export default function SessionScreen() {
       return;
     }
 
-    if (focusMode === "topic") {
+    if (!isClassroomActivity && focusMode === "topic") {
       if (isCustomTopic) {
         return;
       }
@@ -766,13 +766,13 @@ export default function SessionScreen() {
       return;
     }
 
-    if (!subject || !profile || phase !== "setup") {
+    if ((!subject && !isClassroomActivity) || !profile || phase !== "setup") {
       return;
     }
 
     hasAutoStartedRef.current = true;
     loadQuestions();
-  }, [params.autoStart, subject, profile, phase]);
+  }, [isClassroomActivity, params.autoStart, subject, profile, phase]);
 
   const chooseAnswer = (option: string) => {
     if (phase !== "active") {

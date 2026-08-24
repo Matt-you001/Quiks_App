@@ -2826,7 +2826,7 @@ async function handleLessonNoteRefine(body, response) {
     ? "Correct spelling, grammar, factual slips, and formatting. Make only small additions needed for clarity."
     : level === "rich"
       ? "Develop the supplied material into a richer, well-structured, complete lesson note while preserving the teacher's intent. Add useful explanations and examples."
-      : "Deeply develop the note into a complete, engaging lesson. Add examples and 1 to 3 lightweight visual illustration plans represented as titled diagrams with a caption and labelled points.";
+      : "Deeply develop the note into a detailed, elaborate, complete, and engaging lesson. Add thorough explanations, relevant examples, and 1 to 3 lightweight visual illustration plans represented as titled diagrams with a caption and labelled points.";
   const data = await createOpenAiResponse({
     schemaName: "classroom_lesson_note_refinement",
     schema: buildLessonNoteRefinementSchema(),

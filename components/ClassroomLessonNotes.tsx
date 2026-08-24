@@ -88,6 +88,15 @@ function derivedNoteTitle(subject: string, topic: string) {
   return [subject.trim(), topic.trim()].filter(Boolean).join(": ") || "Lesson Note";
 }
 
+function lessonNoteListTitle(note: ClassroomLessonNote) {
+  if (note.topic?.trim()) return note.topic.trim();
+  const subjectPrefix = note.subject?.trim();
+  if (subjectPrefix && note.title.toLowerCase().startsWith(`${subjectPrefix.toLowerCase()}:`)) {
+    return note.title.slice(subjectPrefix.length + 1).trim() || note.title;
+  }
+  return note.title;
+}
+
 function addMonths(date: Date, count: number) {
   return new Date(date.getFullYear(), date.getMonth() + count, 1);
 }
@@ -101,6 +110,24 @@ function illustrationIcon(value: string) {
   if (/earth|world|global/.test(text)) return "earth";
   if (/number|math|fraction|calculate/.test(text)) return "calculator-variant-outline";
   return "lightbulb-on-outline";
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] ?? character);
+}
+
+function buildLessonNoteDocument(note: ClassroomLessonNote) {
+  const paragraphs = cleanNoteText(note.content).split(/\n{2,}/).map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
+  const visuals = (note.illustrations ?? []).map((illustration) => `
+    <section class="visual">
+      <h2>◉ ${escapeHtml(illustration.title)}</h2>
+      <div class="steps">${illustration.points.map((point, index) => `<div class="step"><div class="icon">${index + 1}</div><strong>${escapeHtml(cleanNoteText(point))}</strong></div>${index < illustration.points.length - 1 ? '<div class="arrow">↓</div>' : ""}`).join("")}</div>
+      <p class="caption">${escapeHtml(illustration.caption)}</p>
+    </section>`).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(note.title)}</title><style>
+    body{font-family:Arial,sans-serif;color:#163845;max-width:820px;margin:0 auto;padding:36px;line-height:1.55}h1{color:#075e66;margin-bottom:4px}.meta{color:#17a99d;font-weight:700;margin-bottom:28px}p{white-space:normal}.visual{background:#eef9fa;border:1px solid #cfe9e8;border-radius:22px;padding:24px;margin:28px 0;page-break-inside:avoid}.visual h2{text-align:center;color:#075e66}.steps{display:flex;flex-direction:column;align-items:center;gap:8px}.step{text-align:center;max-width:560px}.icon{width:52px;height:52px;border-radius:50%;background:#17b8aa;color:white;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;margin:0 auto 8px}.arrow{font-size:30px;color:#17b8aa}.caption{text-align:center;color:#536d79;font-style:italic}.footer{margin-top:36px;border-top:1px solid #d8e7ea;padding-top:12px;color:#6a7f88;font-size:12px}@media print{body{padding:10mm}.visual{break-inside:avoid}}</style></head><body>
+    <h1>${escapeHtml(note.title)}</h1><div class="meta">${escapeHtml([note.subject, note.topic].filter(Boolean).join(" · "))}</div>${paragraphs}${visuals}<div class="footer">Prepared in Quiks Classroom</div>
+  </body></html>`;
 }
 
 function parseLocalDateTime(dateValue: string, timeValue: string) {
@@ -346,10 +373,10 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
 
   const downloadLessonNote = async (note: ClassroomLessonNote) => {
     try {
-      const fileName = `${note.title.replace(/[^a-zA-Z0-9._-]+/g, "-") || "lesson-note"}.txt`;
-      const noteText = [note.title, note.subject, note.topic, "", cleanNoteText(note.content)].filter(Boolean).join("\n");
+      const fileName = `${note.title.replace(/[^a-zA-Z0-9._-]+/g, "-") || "lesson-note"}.html`;
+      const noteDocument = buildLessonNoteDocument(note);
       if (Platform.OS === "web") {
-        const url = URL.createObjectURL(new Blob([noteText], { type: "text/plain;charset=utf-8" }));
+        const url = URL.createObjectURL(new Blob([noteDocument], { type: "text/html;charset=utf-8" }));
         const anchor = document.createElement("a");
         anchor.href = url;
         anchor.download = fileName;
@@ -357,8 +384,8 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
         URL.revokeObjectURL(url);
       } else {
         const path = `${FileSystem.cacheDirectory}${fileName}`;
-        await FileSystem.writeAsStringAsync(path, noteText, { encoding: FileSystem.EncodingType.UTF8 });
-        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path, { mimeType: "text/plain", dialogTitle: `Save ${note.title}` });
+        await FileSystem.writeAsStringAsync(path, noteDocument, { encoding: FileSystem.EncodingType.UTF8 });
+        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path, { mimeType: "text/html", dialogTitle: `Save ${note.title}` });
         else await Linking.openURL(Platform.OS === "android" ? await FileSystem.getContentUriAsync(path) : path);
       }
     } catch (caught) {
@@ -542,8 +569,8 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
         <View key={note.noteId} style={styles.noteCard}>
           <View style={styles.noteHeader}>
             <View style={styles.noteHeaderText}>
-              <Text style={styles.subtitle}>{note.title}</Text>
-              <Text style={styles.noteMeta}>{[note.subject, note.topic, note.status === "draft" ? "Draft" : "Published"].filter(Boolean).join(" · ")}</Text>
+              <Text style={styles.subtitle}>{lessonNoteListTitle(note)}</Text>
+              {note.status === "draft" ? <Text style={styles.noteMeta}>Draft</Text> : null}
             </View>
             <Text style={styles.date}>{new Date(note.updatedAt).toLocaleDateString()}</Text>
           </View>
