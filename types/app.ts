@@ -53,6 +53,7 @@ export interface TopicValidationResult {
 
 export interface UserProfile {
   id: string;
+  updatedAt?: number;
   name: string;
   age: number;
   targetExam: string;

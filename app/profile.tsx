@@ -108,7 +108,7 @@ export default function ProfileScreen() {
   const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
 
   const load = useCallback(async () => {
-    const state = await readAppState({ awaitCloudRefresh: Platform.OS !== "web" });
+    const state = await readAppState({ awaitCloudRefresh: true });
     if (!state.isAuthenticated) {
       router.replace({ pathname: "/signup" } as never);
       return;

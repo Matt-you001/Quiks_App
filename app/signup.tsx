@@ -204,10 +204,10 @@ export default function SignupScreen() {
     setLoading(true);
     try {
       const account = await signUpWithEmailAccount("", email, password);
-      await Promise.all([
-        setAuthenticatedAccount(account, true),
-        syncRevenueCatIdentityForAuthentication(account),
-      ]);
+      // Finish the cloud profile merge before persisting subscription state so
+      // plan synchronization cannot overwrite profiles from another device.
+      await setAuthenticatedAccount(account, true);
+      await syncRevenueCatIdentityForAuthentication(account);
       router.replace(getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never);
     } catch (error) {
       reportAuthError(formatFirebaseError(error));
@@ -272,10 +272,8 @@ export default function SignupScreen() {
                   onSuccess={async (idToken, accessToken) => {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
-                      await Promise.all([
-                        setAuthenticatedAccount(account, true),
-                        syncRevenueCatIdentityForAuthentication(account),
-                      ]);
+                      await setAuthenticatedAccount(account, true);
+                      await syncRevenueCatIdentityForAuthentication(account);
                       router.replace(
                         getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never
                       );

@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
@@ -23,7 +23,7 @@ export default function SelectProfileScreen() {
   const selectedSubject = getSubjectById(subject, language);
 
   const load = useCallback(async () => {
-    const state = await readAppState({ awaitCloudRefresh: Platform.OS !== "web" });
+    const state = await readAppState({ awaitCloudRefresh: true });
     setProfiles(state.profiles);
     setSubscriptionTier(state.subscriptionTier);
     if (state.profiles.length === 0 && subject) {

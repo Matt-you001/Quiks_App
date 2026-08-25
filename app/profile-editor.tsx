@@ -103,6 +103,7 @@ export default function ProfileEditorScreen() {
 
     const profile: UserProfile = {
       id: editingProfile?.id ?? createId(),
+      updatedAt: Date.now(),
       name: form.name.trim(),
       age: isTeacher ? (Number.isFinite(age) && age >= 18 ? age : editingProfile?.age ?? 18) : age,
       targetExam: isTeacher ? t(form.language, "teacherAccount") : form.targetExam.trim() || "General school prep",

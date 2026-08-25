@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getAuthenticatedAccount, isFirebaseConfigured, loadCloudState, saveCloudState } from "./firebase";
+import { deleteCloudProfile, getAuthenticatedAccount, isFirebaseConfigured, loadCloudState, saveCloudState } from "./firebase";
 import { DEFAULT_LANGUAGE, normalizeLanguage } from "./i18n";
-import { areSubscriptionRestrictionsEnabled } from "./subscription";
 import { getSubjectDisplayName } from "./subjects";
 import type { AppAccount, SessionResult, StoredAppState, SubscriptionTier, UserProfile, UserRole } from "../types/app";
 
@@ -34,31 +33,10 @@ const defaultState: StoredAppState = {
   subscriptionUpdatedAt: 0,
 };
 
-function enforceProfileLimit(state: StoredAppState): StoredAppState {
-  if (!areSubscriptionRestrictionsEnabled()) {
-    return state;
-  }
-
-  if (state.subscriptionTier !== "free" || state.profiles.length <= 1) {
-    return state;
-  }
-
-  const firstProfile = state.profiles[0] ?? null;
-  const nextResults = firstProfile
-    ? { [firstProfile.id]: state.results[firstProfile.id] ?? [] }
-    : {};
-
-  return {
-    ...state,
-    profiles: firstProfile ? [firstProfile] : [],
-    currentProfileId: firstProfile?.id ?? null,
-    results: nextResults,
-  };
-}
-
 function normalizeProfile(profile: UserProfile): UserProfile {
   return {
     ...profile,
+    updatedAt: Number.isFinite(profile.updatedAt) ? profile.updatedAt : 0,
     targetExam: profile.targetExam ?? "",
     preferredCurriculum: typeof profile.preferredCurriculum === "string" ? profile.preferredCurriculum : "",
     dailyGoalMinutes: Number.isFinite(profile.dailyGoalMinutes) ? profile.dailyGoalMinutes : 0,
@@ -119,7 +97,12 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
       ? state.reviewCompletedAt
       : null;
 
-  return enforceProfileLimit({
+  // Subscription limits govern whether another profile may be created. They
+  // must never trim profiles that already belong to the account: web plan
+  // hydration can briefly report "free" before the subscription lookup
+  // completes, and destructive normalization would otherwise overwrite the
+  // complete cloud record with a one-profile snapshot.
+  return {
     account: state.account ?? null,
     isAuthenticated: Boolean(state.isAuthenticated && state.account),
     profiles,
@@ -136,21 +119,21 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
       typeof state.subscriptionUpdatedAt === "number" && Number.isFinite(state.subscriptionUpdatedAt)
         ? state.subscriptionUpdatedAt
         : 0,
-  });
+  };
 }
 
 function mergeProfiles(localProfiles: UserProfile[], remoteProfiles: UserProfile[]) {
-  const merged = [...localProfiles];
-  const seen = new Set(localProfiles.map((profile) => profile.id));
+  const merged = new Map(remoteProfiles.map((profile) => [profile.id, normalizeProfile(profile)]));
 
-  for (const profile of remoteProfiles) {
-    if (!seen.has(profile.id)) {
-      merged.push(profile);
-      seen.add(profile.id);
+  for (const profile of localProfiles) {
+    const normalizedLocal = normalizeProfile(profile);
+    const remote = merged.get(normalizedLocal.id);
+    if (!remote || (normalizedLocal.updatedAt ?? 0) >= (remote.updatedAt ?? 0)) {
+      merged.set(normalizedLocal.id, normalizedLocal);
     }
   }
 
-  return merged;
+  return Array.from(merged.values());
 }
 
 function mergeResultsMap(
@@ -260,6 +243,13 @@ async function readLocalAppState(accountUid?: string): Promise<StoredAppState> {
 
   const accountState = await readStoredState(getAccountStorageKey(resolvedUid));
   if (accountState) {
+    if (sharedState?.account?.uid === resolvedUid) {
+      return mergeStoredStates(
+        accountState,
+        sharedState,
+        accountState.account ?? sharedState.account
+      );
+    }
     return accountState;
   }
 
@@ -347,6 +337,12 @@ async function hydrateStateFromCloud(account: AppAccount, localState: StoredAppS
   const hydrated = mergeStoredStates(localState, cloudResult.state, account);
   await persistLocalAppState(hydrated);
   lastCloudRefreshAt.set(account.uid, Date.now());
+  const remoteProfileCount = normalizeState(cloudResult.state).profiles.length;
+  if (hydrated.profiles.length > remoteProfileCount) {
+    // Repair a cloud record that was previously truncated by an older build.
+    // The device holding the richer account cache becomes the recovery source.
+    syncCloudStateInBackground(account.uid, hydrated);
+  }
   return hydrated;
 }
 
@@ -416,7 +412,8 @@ export async function readAppState(options?: { awaitCloudRefresh?: boolean }): P
     }
     refreshCloudStateInBackground(remoteAccount);
     return merged;
-  } catch {
+  } catch (error) {
+    console.warn("App state hydration failed; using the account's local cache.", error);
     return readLocalAppState();
   }
 }
@@ -456,7 +453,10 @@ export async function deleteProfile(profileId: string) {
   if (state.currentProfileId === profileId) {
     state.currentProfileId = state.profiles[0]?.id ?? null;
   }
-  await writeAppState(state);
+  await writeAppState(state, { awaitCloudSync: true });
+  if (state.account?.uid && state.isAuthenticated && isFirebaseConfigured()) {
+    await deleteCloudProfile(state.account.uid, profileId);
+  }
   return state;
 }
 
@@ -532,7 +532,10 @@ export async function setSubscriptionTier(
   subscriptionTier: SubscriptionTier,
   subscriptionExpiresAt: string | null = null
 ) {
-  const state = await readMutableAppState();
+  // Subscription refreshes can happen immediately after authentication. Merge
+  // the latest cloud state first so updating the plan never publishes a stale
+  // local profile snapshot over the account's complete profile collection.
+  const state = await readAppState({ awaitCloudRefresh: true });
   state.subscriptionTier = subscriptionTier;
   state.subscriptionExpiresAt = subscriptionTier === "pro" ? subscriptionExpiresAt : null;
   state.subscriptionUpdatedAt = Date.now();

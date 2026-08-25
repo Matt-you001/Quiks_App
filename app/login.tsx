@@ -188,10 +188,11 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const account = await signInWithEmailAccount(email, password);
-      await Promise.all([
-        setAuthenticatedAccount(account, true),
-        syncRevenueCatIdentityForAuthentication(account),
-      ]);
+      // Hydrate the complete account state before the plan sync writes its
+      // updated tier. Running these together can let a one-profile browser
+      // cache overwrite the fully hydrated Firestore document.
+      await setAuthenticatedAccount(account, true);
+      await syncRevenueCatIdentityForAuthentication(account);
       router.replace(getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never);
     } catch (error) {
       reportAuthError(formatFirebaseError(error));
@@ -266,10 +267,8 @@ export default function LoginScreen() {
                   onSuccess={async (idToken, accessToken) => {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
-                      await Promise.all([
-                        setAuthenticatedAccount(account, true),
-                        syncRevenueCatIdentityForAuthentication(account),
-                      ]);
+                      await setAuthenticatedAccount(account, true);
+                      await syncRevenueCatIdentityForAuthentication(account);
                       router.replace(
                         getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never
                       );

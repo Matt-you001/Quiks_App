@@ -17,9 +17,9 @@ import {
   type User,
 } from "firebase/auth";
 import { Platform } from "react-native";
-import { doc, getDoc, getFirestore, setDoc } from "firebase/firestore";
+import { doc, getDoc, getFirestore, runTransaction } from "firebase/firestore";
 import type { Persistence } from "firebase/auth";
-import type { AppAccount, StoredAppState } from "../types/app";
+import type { AppAccount, SessionResult, StoredAppState, UserProfile } from "../types/app";
 import { clearNativeGoogleSession } from "./google-auth";
 import { appVariant } from "./app-variant";
 
@@ -342,24 +342,113 @@ export async function loadCloudState(userId: string) {
   return (snapshot.data().state ?? null) as Partial<StoredAppState> | null;
 }
 
+function mergeCloudProfiles(remoteProfiles: UserProfile[], localProfiles: UserProfile[]) {
+  const profilesById = new Map(remoteProfiles.map((profile) => [profile.id, profile]));
+
+  for (const localProfile of localProfiles) {
+    const remoteProfile = profilesById.get(localProfile.id);
+    const localUpdatedAt = Number.isFinite(localProfile.updatedAt) ? localProfile.updatedAt ?? 0 : 0;
+    const remoteUpdatedAt = Number.isFinite(remoteProfile?.updatedAt) ? remoteProfile?.updatedAt ?? 0 : 0;
+    if (!remoteProfile || localUpdatedAt >= remoteUpdatedAt) {
+      profilesById.set(localProfile.id, localProfile);
+    }
+  }
+
+  return Array.from(profilesById.values());
+}
+
+function mergeCloudResults(
+  remoteResults: Record<string, SessionResult[]>,
+  localResults: Record<string, SessionResult[]>
+) {
+  const merged: Record<string, SessionResult[]> = {};
+  const profileIds = new Set([...Object.keys(remoteResults), ...Object.keys(localResults)]);
+
+  for (const profileId of profileIds) {
+    const resultsById = new Map<string, SessionResult>();
+    for (const result of remoteResults[profileId] ?? []) {
+      resultsById.set(result.id, result);
+    }
+    for (const result of localResults[profileId] ?? []) {
+      const remote = resultsById.get(result.id);
+      if (!remote || new Date(result.date).getTime() >= new Date(remote.date).getTime()) {
+        resultsById.set(result.id, result);
+      }
+    }
+    merged[profileId] = Array.from(resultsById.values()).sort(
+      (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()
+    );
+  }
+
+  return merged;
+}
+
 export async function saveCloudState(userId: string, state: StoredAppState) {
   if (!firebaseDb) {
     return;
   }
 
-  await setDoc(
-    doc(firebaseDb, "users", userId),
-    {
-      state: {
-        profiles: state.profiles,
-        currentProfileId: state.currentProfileId,
-        results: state.results,
-        subscriptionTier: state.subscriptionTier,
-        subscriptionExpiresAt: state.subscriptionExpiresAt,
-        subscriptionUpdatedAt: state.subscriptionUpdatedAt,
+  const userRef = doc(firebaseDb, "users", userId);
+  await runTransaction(firebaseDb, async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+    const remoteState = (snapshot.data()?.state ?? {}) as Partial<StoredAppState>;
+    const profiles = mergeCloudProfiles(remoteState.profiles ?? [], state.profiles);
+    const results = mergeCloudResults(remoteState.results ?? {}, state.results);
+
+    transaction.set(
+      userRef,
+      {
+        state: {
+          profiles,
+          currentProfileId:
+            state.currentProfileId && profiles.some((profile) => profile.id === state.currentProfileId)
+              ? state.currentProfileId
+              : remoteState.currentProfileId ?? profiles[0]?.id ?? null,
+          results,
+          subscriptionTier: state.subscriptionTier,
+          subscriptionExpiresAt: state.subscriptionExpiresAt,
+          subscriptionUpdatedAt: state.subscriptionUpdatedAt,
+        },
+        updatedAt: Date.now(),
       },
-      updatedAt: Date.now(),
-    },
-    { merge: true }
-  );
+      { merge: true }
+    );
+  });
+}
+
+export async function deleteCloudProfile(userId: string, profileId: string) {
+  if (!firebaseDb) {
+    return;
+  }
+
+  const userRef = doc(firebaseDb, "users", userId);
+  await runTransaction(firebaseDb, async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+    if (!snapshot.exists()) {
+      return;
+    }
+
+    const data = snapshot.data();
+    const remoteState = (data.state ?? {}) as Partial<StoredAppState>;
+    const profiles = (remoteState.profiles ?? []).filter((profile) => profile.id !== profileId);
+    const results = { ...(remoteState.results ?? {}) };
+    delete results[profileId];
+
+    transaction.set(
+      userRef,
+      {
+        state: {
+          ...remoteState,
+          profiles,
+          results,
+          currentProfileId:
+            remoteState.currentProfileId === profileId
+              ? profiles[0]?.id ?? null
+              : remoteState.currentProfileId ?? profiles[0]?.id ?? null,
+        },
+        updatedAt: Date.now(),
+      },
+      { merge: true }
+    );
+  });
 }
