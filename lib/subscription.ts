@@ -3,6 +3,7 @@ import { appVariant } from "./app-variant";
 import type { SessionResult, SubscriptionTier } from "../types/app";
 
 const FREE_PROFILE_LIMIT = 1;
+const PRO_PROFILE_LIMIT = 2;
 
 const FREE_AI_SESSION_LIMITS = {
   children: 2,
@@ -88,7 +89,11 @@ export function canUseClassroom(subscriptionTier: SubscriptionTier) {
 }
 
 export function getProfileLimit(subscriptionTier: SubscriptionTier) {
-  return hasProAccess(subscriptionTier) ? Number.POSITIVE_INFINITY : FREE_PROFILE_LIMIT;
+  if (!subscriptionRestrictionsEnabled) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return isProTier(subscriptionTier) ? PRO_PROFILE_LIMIT : FREE_PROFILE_LIMIT;
 }
 
 export function canCreateAnotherProfile(subscriptionTier: SubscriptionTier, profileCount: number) {

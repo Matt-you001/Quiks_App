@@ -87,6 +87,7 @@ export default function SelectProfileScreen() {
         message={t(language, "profileLimitReachedMessage")}
         upgradeLabel={t(language, "upgradeToPro")}
         cancelLabel={t(language, "cancel")}
+        showUpgradeAction={subscriptionTier !== "pro"}
         onClose={() => setShowProfileUpgrade(false)}
         onUpgrade={() => {
           setShowProfileUpgrade(false);

@@ -10,6 +10,7 @@ interface PremiumFeatureDialogProps {
   cancelLabel: string;
   onUpgrade: () => void;
   onClose: () => void;
+  showUpgradeAction?: boolean;
 }
 
 export function PremiumFeatureDialog({
@@ -20,17 +21,20 @@ export function PremiumFeatureDialog({
   cancelLabel,
   onUpgrade,
   onClose,
+  showUpgradeAction = true,
 }: PremiumFeatureDialogProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={(event) => event.stopPropagation()}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>PRO</Text>
-          </View>
+          {showUpgradeAction ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>PRO</Text>
+            </View>
+          ) : null}
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
-          <PrimaryButton label={upgradeLabel} onPress={onUpgrade} />
+          {showUpgradeAction ? <PrimaryButton label={upgradeLabel} onPress={onUpgrade} /> : null}
           <PrimaryButton label={cancelLabel} variant="ghost" onPress={onClose} />
         </Pressable>
       </Pressable>

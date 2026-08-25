@@ -189,15 +189,14 @@ function describeAcademicStage(request: QuestionRequest) {
   ].join(" ");
 }
 
-function describeLevelCurriculumFocus(request: QuestionRequest) {
+function describeGeneralCoverage(request: QuestionRequest) {
   if (request.focusMode === "topic" || request.subject.topics.length === 0) return null;
-  const normalizedLevel = Math.min(Math.max(request.level, 1), 20);
-  const topicIndex = Math.min(
-    Math.floor(((normalizedLevel - 1) * request.subject.topics.length) / 20),
-    request.subject.topics.length - 1
-  );
-  const topic = request.subject.topics[topicIndex];
-  return `Level curriculum focus: Give primary emphasis to ${topic.label} (${topic.description}) while including useful review from earlier subject topics.`;
+  const distinctTopicCount = Math.min(request.subject.topics.length, request.questionCount);
+  const availableTopics = request.subject.topics
+    .map((topic) => `${topic.label} (${topic.description})`)
+    .join("; ");
+
+  return `General coverage plan: Cover every available curriculum topic at least once when the requested question count permits. This set must contain ${distinctTopicCount} distinct topic areas, distribute remaining questions as evenly as possible, alternate topic areas throughout the returned order, and do not give one topic primary emphasis. If there are more topics than questions, vary the selected topic subset between sessions. Available topics: ${availableTopics}.`;
 }
 
 function buildPromptLines(request: QuestionRequest) {
@@ -217,10 +216,10 @@ function buildPromptLines(request: QuestionRequest) {
     `Variant guidance: ${appVariant.aiGuidance}`,
     `Academic stage guidance: ${describeAcademicStage(request)}`,
     `Difficulty rigour guidance: ${describeDifficultyRigour(request)}`,
-    describeLevelCurriculumFocus(request) ?? "",
+    describeGeneralCoverage(request) ?? "",
     request.focusMode === "topic"
       ? "Generate questions only from the selected topic. Do not mix unrelated topics into this set."
-      : "Use a healthy mix of topics within the subject or course.",
+      : "Use a balanced mix of topics within the subject or course. Do not repeat one narrow skill throughout a General session.",
     "Treat the provided grade/band and level as mandatory signals for academic standard.",
     "Treat the selected difficulty as a mandatory signal for reasoning depth inside that academic stage.",
     "The questions must match the real reasoning level expected for that class, band, level, difficulty, and app variant.",

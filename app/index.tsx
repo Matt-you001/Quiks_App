@@ -542,6 +542,7 @@ export default function HomeScreen() {
         message={premiumPrompt === "profiles" ? t(language, "profileLimitReachedMessage") : t(language, "classroomProRequired")}
         upgradeLabel={t(language, "upgradeToPro")}
         cancelLabel={t(language, "cancel")}
+        showUpgradeAction={premiumPrompt !== "profiles" || subscriptionTier !== "pro"}
         onClose={() => setPremiumPrompt(null)}
         onUpgrade={() => {
           const source = premiumPrompt === "classroom" ? "classroom" : "profiles";

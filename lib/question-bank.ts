@@ -1669,6 +1669,54 @@ function getTopicScore(question: BankQuestion, topic: SubjectTopic) {
   return score;
 }
 
+function spreadQuestionsAcrossTopics(
+  questions: BankQuestion[],
+  topics: SubjectTopic[],
+  seed: number
+) {
+  if (topics.length < 2 || questions.length < 2) {
+    return questions;
+  }
+
+  const buckets = new Map(topics.map((topic) => [topic.id, [] as BankQuestion[]]));
+  const unclassified: BankQuestion[] = [];
+
+  for (const question of questions) {
+    const rankedTopics = topics
+      .map((topic) => ({ topic, score: getTopicScore(question, topic) }))
+      .sort((left, right) => right.score - left.score);
+    const bestMatch = rankedTopics[0];
+
+    if (!bestMatch || bestMatch.score <= 0) {
+      unclassified.push(question);
+      continue;
+    }
+
+    buckets.get(bestMatch.topic.id)?.push(question);
+  }
+
+  const orderedTopics = rotate(topics, seed % topics.length);
+  const orderedBuckets = orderedTopics.map((topic, index) => {
+    const bucket = buckets.get(topic.id) ?? [];
+    return rotate(bucket, bucket.length > 0 ? (seed + index) % bucket.length : 0);
+  });
+  const spread: BankQuestion[] = [];
+  let addedQuestion = true;
+
+  while (addedQuestion) {
+    addedQuestion = false;
+    for (const bucket of orderedBuckets) {
+      const question = bucket.shift();
+      if (question) {
+        spread.push(question);
+        addedQuestion = true;
+      }
+    }
+  }
+
+  return [...spread, ...unclassified];
+}
+
 export function getLocalQuestions(request: QuestionRequest): Question[] {
   const gradeBucket = toGradeBucket(request.grade);
   const allQuestions = [...bank, ...extraBank];
@@ -1719,10 +1767,12 @@ export function getLocalQuestions(request: QuestionRequest): Question[] {
   const candidatePool = [...freshPool, ...refillPool];
 
   const seed = hashSeed([request.subject.id, request.grade, request.difficulty, request.level]);
-  const offset = seed % candidatePool.length;
-  const rotated = rotate(candidatePool, offset);
+  const orderedPool =
+    request.focusMode === "general"
+      ? spreadQuestionsAcrossTopics(candidatePool, request.subject.topics, seed)
+      : rotate(candidatePool, seed % candidatePool.length);
 
-  return rotated
-    .slice(0, Math.min(request.questionCount, rotated.length))
+  return orderedPool
+    .slice(0, Math.min(request.questionCount, orderedPool.length))
     .map(({ subjectId, difficulty, gradeBucket: bucket, ...question }) => question);
 }

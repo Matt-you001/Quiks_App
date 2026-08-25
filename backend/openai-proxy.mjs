@@ -274,13 +274,21 @@ function describeAcademicStage(body) {
   ].join(" ");
 }
 
-function describeLevelCurriculumFocus(body) {
+function describeGeneralCoverage(body) {
   const topics = Array.isArray(body.subject?.topics) ? body.subject.topics : [];
   if (body.focusMode === "topic" || topics.length === 0) return null;
-  const normalizedLevel = Math.min(Math.max(Number(body.level ?? 1), 1), 20);
-  const topicIndex = Math.min(Math.floor(((normalizedLevel - 1) * topics.length) / 20), topics.length - 1);
-  const topic = topics[topicIndex];
-  return `Level curriculum focus: Give primary emphasis to ${topic.label ?? "the designated topic"} (${topic.description ?? "the expected curriculum content"}) while including useful review from earlier subject topics.`;
+  const requestedQuestionCount = Math.max(
+    1,
+    Number(body.requestedQuestionCount ?? body.questionCount ?? 10)
+  );
+  const distinctTopicCount = Math.min(topics.length, requestedQuestionCount);
+  const availableTopics = topics
+    .map(
+      (topic) =>
+        `${topic.label ?? "Curriculum topic"} (${topic.description ?? "grade-appropriate curriculum content"})`
+    )
+    .join("; ");
+  return `General coverage plan: Cover every available curriculum topic at least once when the requested question count permits. The first ${requestedQuestionCount} candidates must contain ${distinctTopicCount} distinct topic areas, distribute remaining questions as evenly as possible, alternate topic areas in the returned order, and do not give one topic primary emphasis. If there are more topics than questions, vary the selected topic subset between sessions. Available topics: ${availableTopics}.`;
 }
 
 function buildQuestionPromptLines(body) {
@@ -310,10 +318,10 @@ function buildQuestionPromptLines(body) {
           `Source lesson note content:\n${String(body.lessonNoteContent).slice(0, 30000)}`,
         ]
       : []),
-    describeLevelCurriculumFocus(body) ?? "",
+    describeGeneralCoverage(body) ?? "",
     body.focusMode === "topic"
       ? "Generate questions only from the selected topic or topics. Cover every selected topic as evenly as the requested question count permits. Do not mix in unrelated topics."
-      : "Use a healthy spread of topics within the subject or course.",
+      : "Use a balanced spread of topics within the subject or course. Do not repeat one narrow skill throughout a General session.",
     "Treat the provided grade/band and level as mandatory signals for academic standard.",
     "Treat the selected difficulty as a mandatory signal for reasoning depth inside that academic stage.",
     "The set must reflect the true reasoning level expected for the class, band, level, difficulty, and app variant.",
@@ -1398,7 +1406,7 @@ async function generateQuestionSet(body) {
     maxQuestionCandidates,
     Math.max(requestedCount + 4, Math.ceil(requestedCount * questionCandidateMultiplier))
   );
-  const generationBody = { ...body, questionCount: candidateCount };
+  const generationBody = { ...body, questionCount: candidateCount, requestedQuestionCount: requestedCount };
   const data = await createOpenAiResponse({
     schemaName: "competition_questions",
     schema: buildQuestionSchema(),
@@ -1710,7 +1718,7 @@ async function handleQuestions(body, response) {
     maxQuestionCandidates,
     Math.max(requestedCount + 4, Math.ceil(requestedCount * questionCandidateMultiplier))
   );
-  const generationBody = { ...body, questionCount: candidateCount };
+  const generationBody = { ...body, questionCount: candidateCount, requestedQuestionCount: requestedCount };
   const data = await createOpenAiResponse({
     schemaName: "quiz_questions",
     schema: buildQuestionSchema(),

@@ -10,7 +10,7 @@ import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile } from "../lib/subscription";
 import { readAppState, upsertProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
-import type { AppLanguage, UserProfile, UserRole } from "../types/app";
+import type { AppLanguage, SubscriptionTier, UserProfile, UserRole } from "../types/app";
 
 const defaultForm = {
   name: "",
@@ -43,9 +43,11 @@ export default function ProfileEditorScreen() {
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [showProfileUpgrade, setShowProfileUpgrade] = useState(false);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
 
   useEffect(() => {
     readAppState().then((state) => {
+      setSubscriptionTier(state.subscriptionTier);
       const activeProfile = state.profiles.find((profile) => profile.id === state.currentProfileId) ?? null;
 
       if (isEditMode && activeProfile) {
@@ -279,6 +281,7 @@ export default function ProfileEditorScreen() {
         message={t(form.language, "profileLimitReachedMessage")}
         upgradeLabel={t(form.language, "upgradeToPro")}
         cancelLabel={t(form.language, "cancel")}
+        showUpgradeAction={subscriptionTier !== "pro"}
         onClose={() => setShowProfileUpgrade(false)}
         onUpgrade={() => {
           setShowProfileUpgrade(false);
