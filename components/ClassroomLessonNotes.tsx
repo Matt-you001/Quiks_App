@@ -570,6 +570,11 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
           <View style={styles.noteHeader}>
             <View style={styles.noteHeaderText}>
               <Text style={styles.subtitle}>{lessonNoteListTitle(note)}</Text>
+              {note.subject?.trim() || note.topic?.trim() ? (
+                <Text style={styles.noteMeta}>
+                  {[note.subject?.trim(), note.topic?.trim()].filter(Boolean).join(" · ")}
+                </Text>
+              ) : null}
               {note.status === "draft" ? <Text style={styles.noteMeta}>Draft</Text> : null}
             </View>
             <Text style={styles.date}>{new Date(note.updatedAt).toLocaleDateString()}</Text>
