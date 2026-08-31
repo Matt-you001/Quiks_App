@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { Fragment, useCallback, useMemo, useState } from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
@@ -142,6 +142,8 @@ export default function HomeScreen() {
   const [resultsByProfile, setResultsByProfile] = useState<Record<string, SessionResult[]>>({});
   const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
   const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
+  const homeScrollRef = useRef<ScrollView>(null);
+  const [practiceSectionY, setPracticeSectionY] = useState(0);
 
   const loadData = useCallback(async () => {
     const state = await readAppState({ awaitCloudRefresh: true });
@@ -299,7 +301,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <AppBackground webContentWidth="wide">
+    <AppBackground webContentWidth="wide" scrollRef={homeScrollRef}>
       <View style={[styles.heroCard, isWeb ? styles.heroCardWeb : null, isWeb ? styles.homeSurfaceWeb : null]}>
         {!isWeb ? <Image source={heroLogos[appVariant.id]} style={styles.heroLogo} resizeMode="cover" /> : null}
         <Text style={[styles.title, isWeb ? styles.titleWeb : null]}>{appVariant.heroTitle}</Text>
@@ -453,6 +455,13 @@ export default function HomeScreen() {
         )}
       </View>
 
+      <View style={[styles.practiceAction, isWeb ? styles.homeSurfaceWeb : null]}>
+        <PrimaryButton
+          label="Practice/Quiz"
+          onPress={() => homeScrollRef.current?.scrollTo({ y: Math.max(0, practiceSectionY + (isWeb ? 110 : 0)), animated: true })}
+        />
+      </View>
+
       <View
         style={[
           styles.homeActionColumn,
@@ -512,7 +521,7 @@ export default function HomeScreen() {
 
       {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
-      <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeader} onLayout={(event) => setPracticeSectionY(event.nativeEvent.layout.y)}>
         <Text style={styles.sectionTitle}>{appVariant.curriculumPlural}</Text>
         <Text style={styles.sectionHint}>
           {activeProfile
@@ -807,8 +816,11 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   homeActionColumn: {
-    marginTop: 18,
+    marginTop: 12,
     gap: 12,
+  },
+  practiceAction: {
+    marginTop: 18,
   },
   homeActionRowDesktop: {
     flexDirection: "row",

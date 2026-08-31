@@ -1,3 +1,4 @@
+import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
@@ -12,11 +13,18 @@ export default function SchoolOwnerScreen() {
   const [name, setName] = useState("");
   const [administratorEmail, setAdministratorEmail] = useState("");
   const [enrolmentMode, setEnrolmentMode] = useState<SchoolEnrolmentMode>("shared_code");
+  const [enrolmentModeOpen, setEnrolmentModeOpen] = useState(false);
   const [students, setStudents] = useState("500");
   const [teachers, setTeachers] = useState("50");
   const [startDate, setStartDate] = useState(getTodayDateValue());
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
+  const [creationNotice, setCreationNotice] = useState<{
+    schoolName: string;
+    schoolCode: string;
+    administratorEmail: string;
+    administratorInvitationCode: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -33,8 +41,24 @@ export default function SchoolOwnerScreen() {
   }, []);
 
   async function addSchool() {
+    if (busy) return;
+    setError("");
+    setCreationNotice(null);
     if (!name.trim() || !administratorEmail.trim() || !endDate) {
-      setError("Enter the school name, administrator email, and licence expiry date.");
+      const message = "Enter the school name, administrator email, and licence expiry date.";
+      setError(message);
+      return;
+    }
+    const startAt = new Date(`${startDate}T00:00:00`).getTime();
+    const endAt = new Date(`${endDate}T23:59:59`).getTime();
+    const studentSeatLimit = Number(students);
+    const teacherSeatLimit = Number(teachers);
+    if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      setError("Select a licence expiry date after the licence start date.");
+      return;
+    }
+    if (!Number.isInteger(studentSeatLimit) || studentSeatLimit < 1 || !Number.isInteger(teacherSeatLimit) || teacherSeatLimit < 1) {
+      setError("Student and teacher seats must be whole numbers greater than zero.");
       return;
     }
     setBusy(true);
@@ -44,12 +68,21 @@ export default function SchoolOwnerScreen() {
         administratorEmail: administratorEmail.trim().toLowerCase(),
         enrolmentMode,
         plan: "term",
-        startAt: new Date(`${startDate}T00:00:00`).getTime(),
-        endAt: new Date(`${endDate}T23:59:59`).getTime(),
-        studentSeatLimit: Number(students),
-        teacherSeatLimit: Number(teachers),
+        startAt,
+        endAt,
+        studentSeatLimit,
+        teacherSeatLimit,
         allowedVariants: ["children", "teens", "uni"],
         gracePeriodDays: 0,
+      });
+      if (!created?.school?.schoolCode || !created?.administratorInvitation?.invitationCode) {
+        throw new Error("The server returned an incomplete school record. Deploy the latest backend and try again.");
+      }
+      setCreationNotice({
+        schoolName: created.school.name,
+        schoolCode: created.school.schoolCode,
+        administratorEmail: created.administratorInvitation.email,
+        administratorInvitationCode: created.administratorInvitation.invitationCode,
       });
       setName("");
       setAdministratorEmail("");
@@ -60,7 +93,8 @@ export default function SchoolOwnerScreen() {
         `School code: ${created.school.schoolCode}\n\nAdministrator invitation code: ${created.administratorInvitation.invitationCode}\n\nSend the administrator code only to ${created.administratorInvitation.email}. They must sign in with that email address.`
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to create school.");
+      const message = caught instanceof Error ? caught.message : "Unable to create school.";
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -91,16 +125,29 @@ export default function SchoolOwnerScreen() {
           <TextInput value={name} onChangeText={setName} placeholder="School name" style={styles.input} />
           <TextInput value={administratorEmail} onChangeText={setAdministratorEmail} autoCapitalize="none" keyboardType="email-address" placeholder="School administrator email" style={styles.input} />
           <Text style={styles.fieldLabel}>Student and staff enrolment codes</Text>
-          <View style={styles.modeRow}>
-            <Pressable onPress={() => setEnrolmentMode("shared_code")} style={[styles.modeChoice, enrolmentMode === "shared_code" && styles.modeChoiceActive]}>
-              <Text style={[styles.modeTitle, enrolmentMode === "shared_code" && styles.modeTextActive]}>One shared code</Text>
-              <Text style={[styles.modeCopy, enrolmentMode === "shared_code" && styles.modeTextActive]}>Everybody applies with the school code. The administrator approves each request.</Text>
-            </Pressable>
-            <Pressable onPress={() => setEnrolmentMode("individual_codes")} style={[styles.modeChoice, enrolmentMode === "individual_codes" && styles.modeChoiceActive]}>
-              <Text style={[styles.modeTitle, enrolmentMode === "individual_codes" && styles.modeTextActive]}>Unique individual codes</Text>
-              <Text style={[styles.modeCopy, enrolmentMode === "individual_codes" && styles.modeTextActive]}>The administrator generates an email-locked code for each teacher or student.</Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.dropdownTrigger} onPress={() => setEnrolmentModeOpen((current) => !current)}>
+            <Text style={styles.dropdownValue}>{enrolmentMode === "individual_codes" ? "Unique individual codes" : "One shared code"}</Text>
+            <MaterialIcons name={enrolmentModeOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={24} color={palette.navy} />
+          </Pressable>
+          {enrolmentModeOpen ? (
+            <View style={styles.dropdownMenu}>
+              {([
+                ["shared_code", "One shared code"],
+                ["individual_codes", "Unique individual codes"],
+              ] as const).map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  style={[styles.dropdownOption, enrolmentMode === value && styles.dropdownOptionActive]}
+                  onPress={() => {
+                    setEnrolmentMode(value);
+                    setEnrolmentModeOpen(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownOptionText, enrolmentMode === value && styles.dropdownOptionTextActive]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <View style={styles.row}>
             <TextInput value={students} onChangeText={setStudents} keyboardType="number-pad" placeholder="Student seats" style={[styles.input, styles.flex]} />
             <TextInput value={teachers} onChangeText={setTeachers} keyboardType="number-pad" placeholder="Teacher seats" style={[styles.input, styles.flex]} />
@@ -110,6 +157,15 @@ export default function SchoolOwnerScreen() {
           <Pressable disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={addSchool}>
             <Text style={styles.buttonText}>{busy ? "Creating…" : "Create Quiks School account"}</Text>
           </Pressable>
+          {error ? <Text style={styles.formError}>{error}</Text> : null}
+          {creationNotice ? (
+            <View style={styles.creationNotice}>
+              <Text style={styles.creationNoticeTitle}>{creationNotice.schoolName} was created successfully.</Text>
+              <Text style={styles.creationNoticeText}>School code: {creationNotice.schoolCode}</Text>
+              <Text style={styles.creationNoticeText}>Administrator: {creationNotice.administratorEmail}</Text>
+              <Text style={styles.creationNoticeText}>Administrator invitation code: {creationNotice.administratorInvitationCode}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={styles.card}>
           <Text style={styles.heading}>Schools and enrolment records</Text>
@@ -153,17 +209,22 @@ const styles = StyleSheet.create({
   copy: { color: "#587180", lineHeight: 21, marginBottom: 8 },
   input: { backgroundColor: "#F6F9FB", borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, padding: 13, marginVertical: 6 },
   fieldLabel: { color: palette.navy, fontWeight: "900", marginTop: 12, marginBottom: 7 },
-  modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  modeChoice: { flexGrow: 1, flexBasis: 190, borderWidth: 1, borderColor: "#D4E0E7", backgroundColor: "#F6F9FB", borderRadius: 14, padding: 13 },
-  modeChoiceActive: { backgroundColor: palette.navy, borderColor: palette.navy },
-  modeTitle: { color: palette.navy, fontWeight: "900" },
-  modeCopy: { color: "#587180", fontSize: 12, lineHeight: 17, marginTop: 5 },
-  modeTextActive: { color: "white" },
+  dropdownTrigger: { minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F6F9FB", borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, paddingHorizontal: 13, marginBottom: 6 },
+  dropdownValue: { color: palette.navy, fontWeight: "800" },
+  dropdownMenu: { borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, overflow: "hidden", backgroundColor: "white", marginBottom: 6 },
+  dropdownOption: { padding: 13, borderBottomWidth: 1, borderBottomColor: "#E5EDF2" },
+  dropdownOptionActive: { backgroundColor: palette.navy },
+  dropdownOptionText: { color: palette.navy, fontWeight: "800" },
+  dropdownOptionTextActive: { color: "white" },
   row: { flexDirection: "row", gap: 8 },
   flex: { flex: 1 },
   button: { backgroundColor: palette.navy, borderRadius: 14, padding: 15, alignItems: "center", marginTop: 10 },
   disabled: { opacity: 0.55 },
   buttonText: { color: "white", fontWeight: "900" },
+  formError: { color: "#B42318", backgroundColor: "#FFF0EE", padding: 12, borderRadius: 12, marginTop: 10, lineHeight: 20 },
+  creationNotice: { backgroundColor: "#E9F8F2", borderWidth: 1, borderColor: "#81C9AF", borderRadius: 14, padding: 13, marginTop: 10 },
+  creationNoticeTitle: { color: "#125C45", fontWeight: "900", marginBottom: 6 },
+  creationNoticeText: { color: "#125C45", fontWeight: "700", marginTop: 3 },
   school: { paddingVertical: 15, borderTopColor: "#E4ECF1", borderTopWidth: 1 },
   schoolName: { color: palette.navy, fontSize: 17, fontWeight: "900" },
   meta: { color: "#587180", marginTop: 4 },
