@@ -97,7 +97,6 @@ function createWrapperHtml(variant, pageTitle, entryScriptName) {
     <title>${titles[variant]} | ${pageTitle}</title>
     <link rel="icon" type="image/png" sizes="512x512" href="../favicon.png" />
     <link rel="apple-touch-icon" href="../favicon.png" />
-    <link rel="stylesheet" href="../variant-shell.css" />
     <style id="expo-reset">html,body{height:100%;}body{margin:0;}#root{display:flex;flex:1;min-height:100%;}</style>
   </head>
   <body>

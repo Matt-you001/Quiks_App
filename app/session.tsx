@@ -121,6 +121,7 @@ export default function SessionScreen() {
   const hasAutoStartedRef = useRef(false);
   const lastScheduledCompetitionRef = useRef<string | null>(null);
   const isFinishingRef = useRef(false);
+  const initialTimedSessionSecondsRef = useRef(0);
   const sessionResultIdRef = useRef<string>(`${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
   const competitionOpponentName =
     typeof params.competitionOpponentName === "string" ? params.competitionOpponentName : undefined;
@@ -175,6 +176,7 @@ export default function SessionScreen() {
 
   useEffect(() => {
     isFinishingRef.current = false;
+    initialTimedSessionSecondsRef.current = 0;
     sessionResultIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }, [params.classroomActivityId, params.competitionId, params.subjectId, grade, mode, selectedLevel]);
 
@@ -687,7 +689,9 @@ export default function SessionScreen() {
         setElapsed(0);
         const absoluteRemainingSeconds = Math.max(1, Math.floor((assignment.activity.endAt - Date.now()) / 1000));
         const perAttemptSeconds = Math.max(60, assignment.activity.durationMinutes * 60);
-        setTimeLeft(Math.min(absoluteRemainingSeconds, perAttemptSeconds));
+        const classroomTimeLimitSeconds = Math.min(absoluteRemainingSeconds, perAttemptSeconds);
+        initialTimedSessionSecondsRef.current = classroomTimeLimitSeconds;
+        setTimeLeft(classroomTimeLimitSeconds);
         setPhase(assignment.activity.startAt > Date.now() ? "countdown" : "active");
         return;
       }
@@ -869,7 +873,11 @@ export default function SessionScreen() {
       } as const);
 
     const score = scoreQuestions(questions, finalAnswers);
-    const timeTakenSeconds = mode === "quiz" ? calculateQuizTime(selectedLevel) - timeLeft : elapsed;
+    const timeTakenSeconds = isClassroomActivity
+      ? Math.max(1, initialTimedSessionSecondsRef.current - timeLeft)
+      : mode === "quiz"
+        ? Math.max(1, calculateQuizTime(selectedLevel) - timeLeft)
+        : Math.max(1, elapsed);
     const bonusCoins = mode === "quiz" && score.score === 100 ? Math.floor(Math.max(timeLeft, 0) * 0.05) : 0;
     const practiceLabel = resolvedFocusLabel ?? effectiveSubject.name;
     let feedback = `You completed your ${practiceLabel} session. Keep building your confidence one level at a time.`;

@@ -3335,7 +3335,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/school/owner/create") {
-      sendJson(response, 200, { school: await createSchool(await requireFirebasePrincipal(request), body) });
+      sendJson(response, 200, await createSchool(await requireFirebasePrincipal(request), body));
       return;
     }
 

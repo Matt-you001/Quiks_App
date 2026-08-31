@@ -12,6 +12,8 @@ const storePath = configuredStorePath
   : join(currentDirectory, "data", "school-store.json");
 const dataDirectory = dirname(storePath);
 const temporaryStorePath = `${storePath}.tmp`;
+const backupStorePath = `${storePath}.backup`;
+const temporaryBackupStorePath = `${backupStorePath}.tmp`;
 
 const defaultStore = {
   schools: {},
@@ -51,24 +53,59 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function normalizeStore(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("The school store does not contain a valid data object.");
+  }
+  return {
+    schools: value.schools && typeof value.schools === "object" ? value.schools : {},
+    memberships: value.memberships && typeof value.memberships === "object" ? value.memberships : {},
+    invitations: value.invitations && typeof value.invitations === "object" ? value.invitations : {},
+    auditEvents: value.auditEvents && typeof value.auditEvents === "object" ? value.auditEvents : {},
+  };
+}
+
+async function readStoreSnapshot(path) {
+  return normalizeStore(JSON.parse(await readFile(path, "utf8")));
+}
+
+async function writeStoreSnapshot(store) {
+  const serialized = JSON.stringify(store, null, 2);
+  await writeFile(temporaryStorePath, serialized, "utf8");
+  await rename(temporaryStorePath, storePath);
+  await writeFile(temporaryBackupStorePath, serialized, "utf8");
+  await rename(temporaryBackupStorePath, backupStorePath);
+}
+
 async function ensureStore() {
   await mkdir(dataDirectory, { recursive: true });
   if (storeCache) return storeCache;
 
   try {
-    const raw = await readFile(storePath, "utf8");
-    storeCache = { ...defaultStore, ...JSON.parse(raw) };
-  } catch {
-    storeCache = cloneValue(defaultStore);
-    await writeFile(storePath, JSON.stringify(storeCache, null, 2), "utf8");
+    storeCache = await readStoreSnapshot(storePath);
+    return storeCache;
+  } catch (primaryError) {
+    try {
+      storeCache = await readStoreSnapshot(backupStorePath);
+      await writeStoreSnapshot(storeCache);
+      return storeCache;
+    } catch (backupError) {
+      const primaryMissing = primaryError?.code === "ENOENT";
+      const backupMissing = backupError?.code === "ENOENT";
+      if (!primaryMissing || !backupMissing) {
+        throw new Error("The school database could not be read safely. The existing files were preserved for recovery.");
+      }
+    }
   }
+
+  storeCache = cloneValue(defaultStore);
+  await writeStoreSnapshot(storeCache);
   return storeCache;
 }
 
 async function persistStore(store) {
   writeQueue = writeQueue.catch(() => undefined).then(async () => {
-    await writeFile(temporaryStorePath, JSON.stringify(store, null, 2), "utf8");
-    await rename(temporaryStorePath, storePath);
+    await writeStoreSnapshot(store);
   });
   await writeQueue;
 }
@@ -137,6 +174,16 @@ function buildSchoolSummary(store, school) {
   const studentCount = active.filter((membership) => membership.role === "student").length;
   const teacherCount = active.filter((membership) => membership.role === "teacher").length;
   const adminCount = active.filter((membership) => membership.role === "school_admin").length;
+  const administratorSetup = school.administratorSetup;
+  const administratorInvitation = administratorSetup?.invitationCode
+    ? store.invitations[administratorSetup.invitationCode]
+    : null;
+  const administratorActive = administratorSetup?.email
+    ? active.some(
+        (membership) =>
+          membership.role === "school_admin" && membership.email === administratorSetup.email
+      )
+    : false;
   return {
     schoolId: school.id,
     schoolCode: school.schoolCode,
@@ -148,6 +195,25 @@ function buildSchoolSummary(store, school) {
     teacherCount,
     adminCount,
     pendingCount: memberships.filter((membership) => membership.status === "pending").length,
+    enrolmentMode: school.enrolmentMode ?? (school.enrolmentOpen ? "shared_code" : "individual_codes"),
+    ...(administratorSetup
+      ? {
+          administratorSetup: {
+            email: administratorSetup.email,
+            status: administratorActive
+              ? "active"
+              : administratorInvitation && administratorInvitation.expiresAt > Date.now()
+                ? "invited"
+                : "expired",
+            ...(administratorInvitation
+              ? {
+                  invitationCode: administratorInvitation.invitationCode,
+                  expiresAt: administratorInvitation.expiresAt,
+                }
+              : {}),
+          },
+        }
+      : {}),
     seatUsagePercent:
       school.licence.studentSeatLimit > 0
         ? Math.min(100, Math.round((studentCount / school.licence.studentSeatLimit) * 100))
@@ -312,6 +378,8 @@ export function getSchoolStoreDiagnostics() {
   return {
     configured: Boolean(configuredStorePath),
     persistentPathExpected: storePath.startsWith("/var/data/"),
+    backupEnabled: true,
+    atomicWrites: true,
     ownerConfigured:
       ownerValues("QUIKS_OWNER_PRINCIPAL_IDS").size > 0 ||
       ownerValues("QUIKS_OWNER_UIDS").size > 0 ||
@@ -335,7 +403,8 @@ export async function getSchoolPublicDetails(schoolCode) {
     allowedVariants: school.licence.allowedVariants,
     profileFields: school.profileFields,
     enrolmentOpen: school.enrolmentOpen,
-    ...(invitation ? { invitationCode: invitation.invitationCode } : {}),
+    enrolmentMode: school.enrolmentMode ?? (school.enrolmentOpen ? "shared_code" : "individual_codes"),
+    ...(invitation ? { invitationCode: invitation.invitationCode, invitationRole: invitation.role } : {}),
   };
 }
 
@@ -343,19 +412,24 @@ export async function createSchool(principal, payload) {
   requireOwner(principal);
   return mutateStore(async (store) => {
     const name = String(payload.name ?? "").trim().slice(0, 120);
+    const administratorEmail = String(payload.administratorEmail ?? "").trim().toLowerCase();
+    const enrolmentMode = payload.enrolmentMode === "individual_codes" ? "individual_codes" : "shared_code";
     const startAt = Number(payload.startAt);
     const endAt = Number(payload.endAt);
-    if (!name || !Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
-      throw new Error("School name and a valid licence period are required.");
+    if (!name || !administratorEmail.includes("@") || !Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      throw new Error("School name, administrator email, and a valid licence period are required.");
     }
     const schoolId = randomUUID();
     const schoolCode = generateCode(new Set(Object.values(store.schools).map((school) => school.schoolCode)), 7);
     const createdAt = Date.now();
+    const invitationCode = generateCode(new Set(Object.keys(store.invitations)), 10);
+    const invitationExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
     const school = {
       id: schoolId,
       schoolCode,
       name,
-      enrolmentOpen: true,
+      enrolmentOpen: enrolmentMode === "shared_code",
+      enrolmentMode,
       profileFields: cloneValue(defaultProfileFields),
       licence: {
         plan: ["term", "session", "pilot", "custom"].includes(payload.plan) ? payload.plan : "term",
@@ -370,23 +444,30 @@ export async function createSchool(principal, payload) {
       },
       createdAt,
       createdByPrincipalId: principal.principalId,
+      administratorSetup: {
+        email: administratorEmail,
+        invitationCode,
+      },
     };
     store.schools[schoolId] = school;
-    const membershipId = randomUUID();
-    store.memberships[membershipId] = {
-      membershipId,
+    store.invitations[invitationCode] = {
+      invitationCode,
       schoolId,
-      principalId: principal.principalId,
-      email: principal.email,
-      displayName: principal.name,
+      email: administratorEmail,
       role: "school_admin",
-      status: "active",
-      profileData: { fullName: principal.name, email: principal.email },
       createdAt,
-      joinedAt: createdAt,
+      expiresAt: invitationExpiresAt,
+      createdByPrincipalId: principal.principalId,
     };
-    recordAudit(store, principal, "school.created", schoolId, { name, schoolCode });
-    return buildSchoolSummary(store, school);
+    recordAudit(store, principal, "school.created", schoolId, { name, schoolCode, administratorEmail });
+    return {
+      school: buildSchoolSummary(store, school),
+      administratorInvitation: {
+        email: administratorEmail,
+        invitationCode,
+        expiresAt: invitationExpiresAt,
+      },
+    };
   });
 }
 
@@ -505,8 +586,8 @@ export async function enrolInSchool(principal, payload) {
       if (invitation.email && principal.email !== invitation.email) {
         throw new Error("Sign in with the email address that received this school invitation.");
       }
-    } else if (!school.enrolmentOpen) {
-      throw new Error("This school accepts invitation-only enrolment.");
+    } else if (!school.enrolmentOpen || school.enrolmentMode === "individual_codes") {
+      throw new Error("This school requires a unique individual invitation code.");
     }
     if (payload.appVariant && !school.licence.allowedVariants.includes(payload.appVariant)) {
       throw new Error("This Quiks variant is not included in the school's licence.");

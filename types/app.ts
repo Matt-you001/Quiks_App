@@ -342,6 +342,7 @@ export interface AccountSubscriptionStatusResponse {
 export type SchoolMemberRole = "school_admin" | "teacher" | "student";
 export type SchoolMembershipStatus = "invited" | "pending" | "active" | "suspended";
 export type SchoolLicenceStatus = "draft" | "active" | "expired" | "suspended";
+export type SchoolEnrolmentMode = "shared_code" | "individual_codes";
 export type SchoolProfileFieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "boolean";
 
 export interface SchoolProfileFieldDefinition {
@@ -386,6 +387,13 @@ export interface SchoolSummary {
   adminCount: number;
   pendingCount: number;
   seatUsagePercent: number;
+  enrolmentMode: SchoolEnrolmentMode;
+  administratorSetup?: {
+    email: string;
+    status: "invited" | "active" | "expired";
+    invitationCode?: string;
+    expiresAt?: number;
+  };
 }
 
 export interface SchoolPublicDetails {
@@ -396,7 +404,9 @@ export interface SchoolPublicDetails {
   allowedVariants: Array<"children" | "teens" | "uni">;
   profileFields: SchoolProfileFieldDefinition[];
   enrolmentOpen: boolean;
+  enrolmentMode: SchoolEnrolmentMode;
   invitationCode?: string;
+  invitationRole?: SchoolMemberRole;
 }
 
 export interface SchoolMembership {
@@ -437,6 +447,8 @@ export interface SchoolOwnerDashboardResponse {
 
 export interface SchoolCreateRequest {
   name: string;
+  administratorEmail: string;
+  enrolmentMode: SchoolEnrolmentMode;
   plan: SchoolLicence["plan"];
   startAt: number;
   endAt: number;
@@ -448,6 +460,11 @@ export interface SchoolCreateRequest {
 
 export interface SchoolCreateResponse {
   school: SchoolSummary;
+  administratorInvitation: {
+    email: string;
+    invitationCode: string;
+    expiresAt: number;
+  };
 }
 
 export interface SchoolOwnerLicenceUpdateRequest {

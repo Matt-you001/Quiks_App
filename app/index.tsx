@@ -491,7 +491,7 @@ export default function HomeScreen() {
           style={showWideActions ? styles.homeActionButtonDesktop : undefined}
         />
         <PrimaryButton
-          label="Quiks School"
+          label="School Control"
           variant="secondary"
           onPress={() => router.push("/school" as never)}
           style={showWideActions ? styles.homeActionButtonDesktop : undefined}
