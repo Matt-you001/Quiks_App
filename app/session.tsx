@@ -69,6 +69,7 @@ export default function SessionScreen() {
     competitionId?: string;
     competitionOpponentName?: string;
     classroomActivityId?: string;
+    cbtAccessCode?: string;
   }>();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -655,6 +656,7 @@ export default function SessionScreen() {
         const assignment = await getClassroomActivityDetails({
           profile,
           activityId: params.classroomActivityId!,
+          accessCode: params.cbtAccessCode,
         });
         if (assignment.activity.submitted) {
           Alert.alert("Classroom", `You have already submitted this ${assignment.activity.type}.`);

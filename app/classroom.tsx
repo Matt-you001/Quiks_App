@@ -158,6 +158,14 @@ export default function ClassroomScreen() {
   const [startTime, setStartTime] = useState("");
   const [resultVisibility, setResultVisibility] = useState<ClassroomResultVisibility>("private");
   const [questionOrderMode, setQuestionOrderMode] = useState<ClassroomQuestionOrderMode>("same");
+  const [assessmentMode, setAssessmentMode] = useState<"standard" | "cbt">("standard");
+  const [attemptsAllowed, setAttemptsAllowed] = useState("1");
+  const [navigationMode, setNavigationMode] = useState<"free" | "linear">("free");
+  const [randomizeOptions, setRandomizeOptions] = useState(false);
+  const [passMark, setPassMark] = useState("50");
+  const [cbtInstructions, setCbtInstructions] = useState("");
+  const [cbtAccessCode, setCbtAccessCode] = useState("");
+  const [activityAccessCodes, setActivityAccessCodes] = useState<Record<string, string>>({});
   const [candidateQuestions, setCandidateQuestions] = useState<Question[]>([]);
   const [acceptedQuestions, setAcceptedQuestions] = useState<Question[]>([]);
   const [candidateLoadError, setCandidateLoadError] = useState<string | null>(null);
@@ -527,6 +535,13 @@ export default function ClassroomScreen() {
     setCustomQuestionPrompt("");
     setCustomQuestionOptions(["", "", "", ""]);
     setCustomQuestionExplanation("");
+    setAssessmentMode("standard");
+    setAttemptsAllowed("1");
+    setNavigationMode("free");
+    setRandomizeOptions(false);
+    setPassMark("50");
+    setCbtInstructions("");
+    setCbtAccessCode("");
   };
 
   const copyClassCode = async (classCode: string) => {
@@ -1023,6 +1038,14 @@ export default function ClassroomScreen() {
             : parsedDeadline ?? undefined,
         resultVisibility,
         questionOrderMode,
+        assessmentMode: activityType === "test" ? assessmentMode : "standard",
+        attemptsAllowed: Math.max(1, Number(attemptsAllowed) || 1),
+        navigationMode,
+        randomizeOptions,
+        autoSubmit: true,
+        passMark: Math.max(0, Math.min(100, Number(passMark) || 0)),
+        instructions: cbtInstructions.trim() || undefined,
+        accessCode: cbtAccessCode.trim() || undefined,
         questions: acceptedQuestions.slice(0, desiredQuestionCount),
       };
 
@@ -1120,6 +1143,13 @@ export default function ClassroomScreen() {
       setQuestionCount(String(activity.questionCount));
       setResultVisibility(activity.resultVisibility);
       setQuestionOrderMode(activity.questionOrderMode);
+      setAssessmentMode(activity.assessmentMode ?? "standard");
+      setAttemptsAllowed(String(activity.attemptsAllowed ?? 1));
+      setNavigationMode(activity.navigationMode ?? "free");
+      setRandomizeOptions(Boolean(activity.randomizeOptions));
+      setPassMark(String(activity.passMark ?? 50));
+      setCbtInstructions(activity.instructions ?? "");
+      setCbtAccessCode("");
       setAcceptedQuestions(details.questions);
       setCandidateQuestions([]);
       setIsReviewingQuestions(false);
@@ -1199,6 +1229,7 @@ export default function ClassroomScreen() {
         mode: "quiz",
         autoStart: "1",
         classroomActivityId: activity.activityId,
+        cbtAccessCode: activityAccessCodes[activity.activityId]?.trim() || undefined,
       },
     });
   };
@@ -1682,6 +1713,19 @@ export default function ClassroomScreen() {
                         <PrimaryButton label={t(language, "shufflePerStudent")} onPress={() => setQuestionOrderMode("shuffled")} variant={questionOrderMode === "shuffled" ? "primary" : "secondary"} style={styles.inlineButton} />
                       </View>
 
+                      {activityType === "test" ? <>
+                        <Text style={styles.sectionLabel}>Assessment delivery</Text>
+                        <View style={styles.inlineActions}><PrimaryButton label="Standard test" onPress={() => setAssessmentMode("standard")} variant={assessmentMode === "standard" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="CBT mode" onPress={() => setAssessmentMode("cbt")} variant={assessmentMode === "cbt" ? "primary" : "secondary"} style={styles.inlineButton}/></View>
+                        {assessmentMode === "cbt" ? <View style={styles.questionCard}>
+                          <Text style={styles.sectionLabel}>Attempts allowed</Text><TextInput value={attemptsAllowed} onChangeText={setAttemptsAllowed} keyboardType="number-pad" style={styles.input}/>
+                          <Text style={styles.sectionLabel}>Navigation</Text><View style={styles.inlineActions}><PrimaryButton label="Free navigation" onPress={() => setNavigationMode("free")} variant={navigationMode === "free" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="Linear (no backtracking)" onPress={() => setNavigationMode("linear")} variant={navigationMode === "linear" ? "primary" : "secondary"} style={styles.inlineButton}/></View>
+                          <Text style={styles.sectionLabel}>Option order</Text><View style={styles.inlineActions}><PrimaryButton label="Same options" onPress={() => setRandomizeOptions(false)} variant={!randomizeOptions ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="Shuffle per student" onPress={() => setRandomizeOptions(true)} variant={randomizeOptions ? "primary" : "secondary"} style={styles.inlineButton}/></View>
+                          <Text style={styles.sectionLabel}>Pass mark (%)</Text><TextInput value={passMark} onChangeText={setPassMark} keyboardType="number-pad" style={styles.input}/>
+                          <Text style={styles.sectionLabel}>Candidate instructions</Text><TextInput value={cbtInstructions} onChangeText={setCbtInstructions} multiline style={[styles.input, styles.textAreaInput]}/>
+                          <Text style={styles.sectionLabel}>Access code (optional)</Text><TextInput value={cbtAccessCode} onChangeText={setCbtAccessCode} autoCapitalize="characters" style={styles.input}/>
+                        </View> : null}
+                      </> : null}
+
                       {showCustomQuestionForm ? (
                         <View style={styles.questionCard}>
                           <Text style={styles.sectionLabel}>{t(language, "promptLabel")}</Text>
@@ -1863,6 +1907,8 @@ export default function ClassroomScreen() {
                     />
                   </View>
                 ) : (
+                  <>
+                  {activity.accessCodeRequired && !activity.submitted && activity.status === "open" ? <TextInput value={activityAccessCodes[activity.activityId] ?? ""} onChangeText={(value) => setActivityAccessCodes((current) => ({ ...current, [activity.activityId]: value }))} autoCapitalize="characters" placeholder="CBT access code" placeholderTextColor="#8092A7" style={styles.input}/> : null}
                   <PrimaryButton
                     label={
                       activity.submitted
@@ -1882,6 +1928,7 @@ export default function ClassroomScreen() {
                     }
                     disabled={activity.status === "scheduled"}
                   />
+                  </>
                 )}
               </View>
             ))

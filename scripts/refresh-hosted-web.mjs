@@ -22,6 +22,10 @@ const routesByVariant = {
     ["breather", "Breather"],
     ["learning-hub", "Learning Hub"],
     ["certificate", "Certificate"],
+    ["school", "Quiks School"],
+    ["school-enrol", "School enrolment"],
+    ["school-admin", "School administration"],
+    ["school-owner", "School owner dashboard"],
   ],
   teens: [
     ["login", "Login"],
@@ -39,6 +43,10 @@ const routesByVariant = {
     ["breather", "Breather"],
     ["learning-hub", "Learning Hub"],
     ["certificate", "Certificate"],
+    ["school", "Quiks School"],
+    ["school-enrol", "School enrolment"],
+    ["school-admin", "School administration"],
+    ["school-owner", "School owner dashboard"],
   ],
   uni: [
     ["login", "Login"],
@@ -56,6 +64,10 @@ const routesByVariant = {
     ["breather", "Breather"],
     ["learning-hub", "Learning Hub"],
     ["certificate", "Certificate"],
+    ["school", "Quiks School"],
+    ["school-enrol", "School enrolment"],
+    ["school-admin", "School administration"],
+    ["school-owner", "School owner dashboard"],
   ],
 };
 

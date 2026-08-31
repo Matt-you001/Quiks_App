@@ -27,5 +27,9 @@ services:
         value: 20
       - key: CLASSROOM_STORE_PATH
         value: /var/data/classroom-store.json
+      - key: SCHOOL_STORE_PATH
+        value: /var/data/school-store.json
+      - key: QUIKS_OWNER_EMAILS
+        sync: false
       - key: OPENAI_API_KEY
         sync: false

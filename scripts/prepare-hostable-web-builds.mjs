@@ -47,6 +47,10 @@ const hostedRouteWrappers = {
     { route: "breather", title: "Breather" },
     { route: "learning-hub", title: "Learning Hub" },
     { route: "certificate", title: "Certificate" },
+    { route: "school", title: "Quiks School" },
+    { route: "school-enrol", title: "School enrolment" },
+    { route: "school-admin", title: "School administration" },
+    { route: "school-owner", title: "School owner dashboard" },
   ],
   teens: [
     { route: "login", title: "Login" },
@@ -64,6 +68,10 @@ const hostedRouteWrappers = {
     { route: "breather", title: "Breather" },
     { route: "learning-hub", title: "Learning Hub" },
     { route: "certificate", title: "Certificate" },
+    { route: "school", title: "Quiks School" },
+    { route: "school-enrol", title: "School enrolment" },
+    { route: "school-admin", title: "School administration" },
+    { route: "school-owner", title: "School owner dashboard" },
   ],
   uni: [
     { route: "login", title: "Login" },
@@ -81,6 +89,10 @@ const hostedRouteWrappers = {
     { route: "breather", title: "Breather" },
     { route: "learning-hub", title: "Learning Hub" },
     { route: "certificate", title: "Certificate" },
+    { route: "school", title: "Quiks School" },
+    { route: "school-enrol", title: "School enrolment" },
+    { route: "school-admin", title: "School administration" },
+    { route: "school-owner", title: "School owner dashboard" },
   ],
 };
 

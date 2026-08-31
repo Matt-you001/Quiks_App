@@ -192,6 +192,10 @@ export function getFirebaseConfigErrorMessage() {
   return `Missing Firebase config: ${missing.join(", ")}`;
 }
 
+export async function getFirebaseIdToken(forceRefresh = false) {
+  return firebaseAuth?.currentUser?.getIdToken(forceRefresh) ?? null;
+}
+
 export function formatFirebaseError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
 

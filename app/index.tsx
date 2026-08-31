@@ -490,6 +490,12 @@ export default function HomeScreen() {
           onPress={() => router.push("/learning-hub" as never)}
           style={showWideActions ? styles.homeActionButtonDesktop : undefined}
         />
+        <PrimaryButton
+          label="Quiks School"
+          variant="secondary"
+          onPress={() => router.push("/school" as never)}
+          style={showWideActions ? styles.homeActionButtonDesktop : undefined}
+        />
       </View>
 
       {subscriptionTier === "free" ? (

@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import { appVariant } from "../lib/app-variant";
+import { getFirebaseIdToken } from "../lib/firebase";
 import { getLanguageLabel, getLanguagePromptLabel, normalizeLanguage } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
 import type {
@@ -88,6 +89,19 @@ import type {
   PushTokenRegisterRequest,
   PushTokenRegisterResponse,
   PaddleSubscriptionSyncRequest,
+  SchoolCreateRequest,
+  SchoolCreateResponse,
+  SchoolDetailsResponse,
+  SchoolEnrolRequest,
+  SchoolEnrolResponse,
+  SchoolInviteRequest,
+  SchoolInviteResponse,
+  SchoolMembershipListResponse,
+  SchoolMembershipStatusUpdateRequest,
+  SchoolOwnerDashboardResponse,
+  SchoolOwnerLicenceUpdateRequest,
+  SchoolProfileFieldsUpdateRequest,
+  SchoolPublicDetails,
   FeedbackRequest,
   LearningLesson,
   LearningLessonRequest,
@@ -234,11 +248,13 @@ async function postJson<TRequest, TResponse>(path: string, body: TRequest): Prom
     throw new Error("AI API URL is not configured.");
   }
 
+  const firebaseIdToken = await getFirebaseIdToken();
   const response = await fetch(`${apiUrl.replace(/\/$/, "")}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      ...(firebaseIdToken ? { "X-Firebase-ID-Token": firebaseIdToken } : {}),
     },
     body: JSON.stringify(body),
   });
@@ -262,6 +278,46 @@ async function postJson<TRequest, TResponse>(path: string, body: TRequest): Prom
   }
 
   return (await response.json()) as TResponse;
+}
+
+export async function getSchoolPublicDetails(code: string): Promise<SchoolPublicDetails> {
+  return postJson("/school/public", { code });
+}
+
+export async function getSchoolMemberships(): Promise<SchoolMembershipListResponse> {
+  return postJson("/school/memberships", {});
+}
+
+export async function enrolInSchool(request: SchoolEnrolRequest): Promise<SchoolEnrolResponse> {
+  return postJson("/school/enrol", withVariantMeta(request));
+}
+
+export async function getSchoolAdminDetails(schoolId: string): Promise<SchoolDetailsResponse> {
+  return postJson("/school/admin/details", { schoolId });
+}
+
+export async function updateSchoolProfileFields(request: SchoolProfileFieldsUpdateRequest): Promise<SchoolDetailsResponse> {
+  return postJson("/school/admin/profile-fields", request);
+}
+
+export async function inviteSchoolMember(request: SchoolInviteRequest): Promise<SchoolInviteResponse> {
+  return postJson("/school/admin/invite", request);
+}
+
+export async function updateSchoolMembershipStatus(request: SchoolMembershipStatusUpdateRequest): Promise<SchoolDetailsResponse["memberships"][number]> {
+  return postJson("/school/admin/membership/status", request);
+}
+
+export async function getSchoolOwnerDashboard(): Promise<SchoolOwnerDashboardResponse> {
+  return postJson("/school/owner/dashboard", {});
+}
+
+export async function createSchool(request: SchoolCreateRequest): Promise<SchoolCreateResponse> {
+  return postJson("/school/owner/create", request);
+}
+
+export async function updateSchoolLicence(request: SchoolOwnerLicenceUpdateRequest): Promise<SchoolDetailsResponse["school"]> {
+  return postJson("/school/owner/licence", request);
 }
 
 function withVariantMeta<T extends object>(body: T) {

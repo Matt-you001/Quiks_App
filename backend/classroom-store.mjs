@@ -232,17 +232,19 @@ function hashString(value) {
 }
 
 function getOrderedQuestionsForStudent(activity, profileId) {
-  if (activity.questionOrderMode !== "shuffled") {
-    return activity.questions;
-  }
-
-  return [...activity.questions]
+  const questions = activity.questionOrderMode !== "shuffled" ? [...activity.questions] : [...activity.questions]
     .map((question, index) => ({
       question,
       weight: hashString(`${activity.id}:${profileId}:${question.id}:${index}`),
     }))
     .sort((left, right) => left.weight - right.weight)
     .map((entry) => entry.question);
+  if (!activity.randomizeOptions) return questions;
+  return questions.map((question) => {
+    const entries = question.options.map((option, index) => ({ option, index, weight: hashString(`${activity.id}:${profileId}:${question.id}:option:${index}`) }))
+      .sort((left, right) => left.weight - right.weight);
+    return { ...question, options: entries.map((entry) => entry.option), answerIndex: entries.findIndex((entry) => entry.index === question.answerIndex) };
+  });
 }
 
 function getActivitySubmissions(store, activityId) {
@@ -295,7 +297,9 @@ function buildAbsentSummaryForProfile(store, activity, profileId) {
 
 function buildActivitySummary(store, activity, profileId) {
   const submissions = getActivitySubmissions(store, activity.id);
-  const ownSubmission = submissions.find((submission) => submission.profileId === profileId);
+  const ownSubmissions = submissions.filter((submission) => submission.profileId === profileId);
+  const ownSubmission = [...ownSubmissions].sort((left, right) => right.submittedAt - left.submittedAt)[0];
+  const attemptsAllowed = Math.max(1, Number(activity.attemptsAllowed ?? 1));
 
   return {
     activityId: activity.id,
@@ -335,12 +339,20 @@ function buildActivitySummary(store, activity, profileId) {
     endAt: activity.endAt,
     resultVisibility: activity.resultVisibility,
     questionOrderMode: activity.questionOrderMode,
+    assessmentMode: activity.assessmentMode ?? "standard",
+    attemptsAllowed,
+    navigationMode: activity.navigationMode ?? "free",
+    randomizeOptions: Boolean(activity.randomizeOptions),
+    autoSubmit: activity.autoSubmit !== false,
+    passMark: activity.passMark ?? 50,
+    instructions: activity.instructions,
+    accessCodeRequired: Boolean(activity.accessCode),
     status: getClassStatus(activity),
     teacherProfileId: activity.teacherProfileId,
     teacherName: activity.teacherName,
     submissionCount: submissions.length,
     createdAt: activity.createdAt,
-    submitted: Boolean(ownSubmission),
+    submitted: ownSubmissions.length >= attemptsAllowed,
     score: ownSubmission?.score,
   };
 }
@@ -712,6 +724,14 @@ export async function createClassroomActivity(payload, appVariant) {
       endAt,
       resultVisibility: payload.resultVisibility ?? "private",
       questionOrderMode: payload.questionOrderMode ?? "same",
+      assessmentMode: isTest && payload.assessmentMode === "cbt" ? "cbt" : "standard",
+      attemptsAllowed: Math.max(1, Math.min(10, Math.floor(Number(payload.attemptsAllowed ?? 1)))),
+      navigationMode: payload.navigationMode === "linear" ? "linear" : "free",
+      randomizeOptions: Boolean(payload.randomizeOptions),
+      autoSubmit: payload.autoSubmit !== false,
+      passMark: Math.max(0, Math.min(100, Number(payload.passMark ?? 50))),
+      instructions: String(payload.instructions ?? "").trim().slice(0, 2000) || undefined,
+      accessCode: isTest ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined,
       questions: payload.questions,
       questionCount,
       teacherProfileId: payload.teacherProfile.id,
@@ -967,6 +987,14 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.endAt = endAt;
     activity.resultVisibility = payload.resultVisibility ?? "private";
     activity.questionOrderMode = payload.questionOrderMode ?? "same";
+    activity.assessmentMode = activity.type === "test" && payload.assessmentMode === "cbt" ? "cbt" : "standard";
+    activity.attemptsAllowed = Math.max(1, Math.min(10, Math.floor(Number(payload.attemptsAllowed ?? 1))));
+    activity.navigationMode = payload.navigationMode === "linear" ? "linear" : "free";
+    activity.randomizeOptions = Boolean(payload.randomizeOptions);
+    activity.autoSubmit = payload.autoSubmit !== false;
+    activity.passMark = Math.max(0, Math.min(100, Number(payload.passMark ?? 50)));
+    activity.instructions = String(payload.instructions ?? "").trim().slice(0, 2000) || undefined;
+    activity.accessCode = activity.type === "test" ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined;
     activity.questions = payload.questions;
     activity.questionCount = questionCount;
 
@@ -997,7 +1025,7 @@ export async function listActivitiesForProfile(profile, appVariant) {
   });
 }
 
-export async function getActivityDetails(profile, activityId, appVariant) {
+export async function getActivityDetails(profile, activityId, appVariant, accessCode) {
   return mutateStore(async (store) => {
     store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
     const activity = store.activities[activityId];
@@ -1014,6 +1042,9 @@ export async function getActivityDetails(profile, activityId, appVariant) {
     const isTeacher = classroom.teacherProfileId === profile.id;
     if (!membership && !isTeacher) {
       throw new Error("This profile is not part of the class.");
+    }
+    if (!isTeacher && activity.accessCode && String(accessCode ?? "").trim() !== activity.accessCode) {
+      throw new Error("Enter the correct CBT access code to open this test.");
     }
 
     const questions = isTeacher ? activity.questions : getOrderedQuestionsForStudent(activity, profile.id);
@@ -1059,9 +1090,10 @@ export async function submitActivity(profile, activityId, submissionPayload, app
       throw new Error(`Only active students can submit this ${activity.type}.`);
     }
 
-    const existing = getActivitySubmissions(store, activityId).find((submission) => submission.profileId === profile.id);
-    if (existing) {
-      throw new Error(`This ${activity.type} has already been submitted.`);
+    const attempts = getActivitySubmissions(store, activityId).filter((submission) => submission.profileId === profile.id);
+    const attemptsAllowed = Math.max(1, Number(activity.attemptsAllowed ?? 1));
+    if (attempts.length >= attemptsAllowed) {
+      throw new Error(`All ${attemptsAllowed} permitted attempt${attemptsAllowed === 1 ? "" : "s"} have been used.`);
     }
 
     const submissionId = randomUUID();
@@ -1076,6 +1108,7 @@ export async function submitActivity(profile, activityId, submissionPayload, app
       totalQuestions: submissionPayload.totalQuestions,
       timeTakenSeconds: submissionPayload.timeTakenSeconds,
       submittedAt: Date.now(),
+      attemptNumber: attempts.length + 1,
     };
 
     return {

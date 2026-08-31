@@ -15,6 +15,8 @@ export type ClassroomActivityType = "assignment" | "test";
 export type ClassroomResultVisibility = "public" | "private";
 
 export type ClassroomQuestionOrderMode = "same" | "shuffled";
+export type ClassroomAssessmentMode = "standard" | "cbt";
+export type ClassroomNavigationMode = "free" | "linear";
 
 export interface AppAccount {
   uid: string;
@@ -333,6 +335,169 @@ export interface AccountSubscriptionStatusResponse {
   active: boolean;
   expiresAt: string | null;
   managementUrl: string | null;
+  source?: "individual" | "school" | "individual_and_school" | "none";
+  school?: SchoolEntitlementSummary | null;
+}
+
+export type SchoolMemberRole = "school_admin" | "teacher" | "student";
+export type SchoolMembershipStatus = "invited" | "pending" | "active" | "suspended";
+export type SchoolLicenceStatus = "draft" | "active" | "expired" | "suspended";
+export type SchoolProfileFieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "boolean";
+
+export interface SchoolProfileFieldDefinition {
+  id: string;
+  label: string;
+  type: SchoolProfileFieldType;
+  enabled: boolean;
+  required: boolean;
+  options?: string[];
+  roles: Array<"teacher" | "student">;
+  system?: boolean;
+}
+
+export interface SchoolLicence {
+  plan: "term" | "session" | "pilot" | "custom";
+  status: SchoolLicenceStatus;
+  startAt: number;
+  endAt: number;
+  studentSeatLimit: number;
+  teacherSeatLimit: number;
+  allowedVariants: Array<"children" | "teens" | "uni">;
+  gracePeriodDays: number;
+  features: {
+    ai: boolean;
+    classroom: boolean;
+    cbt: boolean;
+    lessonNotes: boolean;
+    reports: boolean;
+    integrations: boolean;
+  };
+}
+
+export interface SchoolSummary {
+  schoolId: string;
+  schoolCode: string;
+  name: string;
+  status: SchoolLicenceStatus;
+  licence: SchoolLicence;
+  createdAt: number;
+  studentCount: number;
+  teacherCount: number;
+  adminCount: number;
+  pendingCount: number;
+  seatUsagePercent: number;
+}
+
+export interface SchoolPublicDetails {
+  schoolId: string;
+  schoolCode: string;
+  name: string;
+  status: SchoolLicenceStatus;
+  allowedVariants: Array<"children" | "teens" | "uni">;
+  profileFields: SchoolProfileFieldDefinition[];
+  enrolmentOpen: boolean;
+  invitationCode?: string;
+}
+
+export interface SchoolMembership {
+  membershipId: string;
+  schoolId: string;
+  schoolName: string;
+  role: SchoolMemberRole;
+  status: SchoolMembershipStatus;
+  email: string;
+  displayName: string;
+  appVariant?: "children" | "teens" | "uni";
+  profileData: Record<string, string | number | boolean>;
+  createdAt: number;
+  joinedAt?: number;
+}
+
+export interface SchoolEntitlementSummary {
+  schoolId: string;
+  schoolName: string;
+  role: SchoolMemberRole;
+  active: boolean;
+  expiresAt: string | null;
+  allowedVariants: Array<"children" | "teens" | "uni">;
+  reason?: "active" | "not_started" | "expired" | "suspended" | "variant_not_licensed";
+}
+
+export interface SchoolOwnerDashboardResponse {
+  totals: {
+    schools: number;
+    activeSchools: number;
+    students: number;
+    teachers: number;
+    administrators: number;
+    expiringWithin30Days: number;
+  };
+  schools: SchoolSummary[];
+}
+
+export interface SchoolCreateRequest {
+  name: string;
+  plan: SchoolLicence["plan"];
+  startAt: number;
+  endAt: number;
+  studentSeatLimit: number;
+  teacherSeatLimit: number;
+  allowedVariants: SchoolLicence["allowedVariants"];
+  gracePeriodDays?: number;
+}
+
+export interface SchoolCreateResponse {
+  school: SchoolSummary;
+}
+
+export interface SchoolOwnerLicenceUpdateRequest {
+  schoolId: string;
+  licence: Partial<SchoolLicence>;
+}
+
+export interface SchoolMembershipListResponse {
+  memberships: SchoolMembership[];
+}
+
+export interface SchoolDetailsResponse {
+  school: SchoolSummary;
+  profileFields: SchoolProfileFieldDefinition[];
+  memberships: SchoolMembership[];
+}
+
+export interface SchoolProfileFieldsUpdateRequest {
+  schoolId: string;
+  fields: SchoolProfileFieldDefinition[];
+}
+
+export interface SchoolEnrolRequest {
+  schoolCode: string;
+  role: "teacher" | "student";
+  appVariant?: "children" | "teens" | "uni";
+  profileData: Record<string, string | number | boolean>;
+  invitationCode?: string;
+}
+
+export interface SchoolEnrolResponse {
+  membership: SchoolMembership;
+  entitlement: SchoolEntitlementSummary;
+}
+
+export interface SchoolInviteRequest {
+  schoolId: string;
+  email: string;
+  role: SchoolMemberRole;
+}
+
+export interface SchoolInviteResponse {
+  invitationCode: string;
+  expiresAt: number;
+}
+
+export interface SchoolMembershipStatusUpdateRequest {
+  schoolId: string;
+  membershipId: string;
+  status: SchoolMembershipStatus;
 }
 
 export interface ClassroomQuestionCandidateRequest {
@@ -381,6 +546,14 @@ export interface ClassroomActivitySummary {
   endAt: number;
   resultVisibility: ClassroomResultVisibility;
   questionOrderMode: ClassroomQuestionOrderMode;
+  assessmentMode?: ClassroomAssessmentMode;
+  attemptsAllowed?: number;
+  navigationMode?: ClassroomNavigationMode;
+  randomizeOptions?: boolean;
+  autoSubmit?: boolean;
+  passMark?: number;
+  instructions?: string;
+  accessCodeRequired?: boolean;
   status: "scheduled" | "open" | "closed";
   teacherProfileId: string;
   teacherName: string;
@@ -415,6 +588,14 @@ export interface ClassroomActivityCreateRequest {
   endAt?: number;
   resultVisibility: ClassroomResultVisibility;
   questionOrderMode: ClassroomQuestionOrderMode;
+  assessmentMode?: ClassroomAssessmentMode;
+  attemptsAllowed?: number;
+  navigationMode?: ClassroomNavigationMode;
+  randomizeOptions?: boolean;
+  autoSubmit?: boolean;
+  passMark?: number;
+  instructions?: string;
+  accessCode?: string;
   questions: Question[];
 }
 
@@ -447,6 +628,7 @@ export interface ClassroomActivityListResponse {
 export interface ClassroomActivityDetailsRequest {
   profile: UserProfile;
   activityId: string;
+  accessCode?: string;
 }
 
 export interface ClassroomSubmissionSummary {

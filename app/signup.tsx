@@ -136,14 +136,18 @@ function GoogleSignupButton({
 }
 
 export default function SignupScreen() {
-  const params = useLocalSearchParams<{ redirect?: string; plan?: string; joinCode?: string; className?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{ redirect?: string; plan?: string; joinCode?: string; className?: string; returnTo?: string; schoolCode?: string }>();
   const [language, setLanguage] = useState<AppLanguage>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [schoolCode, setSchoolCode] = useState(String(params.schoolCode ?? ""));
   const [loading, setLoading] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
   const hasGoogleConfig = hasGoogleSignInConfig();
+  const nextRoute = () => schoolCode.trim()
+    ? ({ pathname: "/school-enrol", params: { code: schoolCode.trim().toUpperCase() } } as const)
+    : getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo);
 
   const reportAuthError = useCallback((message: string) => {
     setAuthFeedback(message);
@@ -169,8 +173,7 @@ export default function SignupScreen() {
           void syncRevenueCatIdentityForAuthentication(firebaseAccount);
         }
         if (firebaseAccount || (Platform.OS !== "web" && state.isAuthenticated)) {
-          const nextRoute = getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo);
-          router.replace(nextRoute as never);
+          router.replace(nextRoute() as never);
         }
       });
     }, [params.className, params.joinCode, params.plan, params.redirect, params.returnTo])
@@ -208,7 +211,7 @@ export default function SignupScreen() {
       // plan synchronization cannot overwrite profiles from another device.
       await setAuthenticatedAccount(account, true);
       await syncRevenueCatIdentityForAuthentication(account);
-      router.replace(getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never);
+      router.replace(nextRoute() as never);
     } catch (error) {
       reportAuthError(formatFirebaseError(error));
     } finally {
@@ -259,6 +262,9 @@ export default function SignupScreen() {
               returnKeyType="done"
             />
 
+            <Text style={styles.label}>School code or invitation (optional)</Text>
+            <TextInput value={schoolCode} onChangeText={setSchoolCode} autoCapitalize="characters" placeholder="Enter code to join Quiks School" placeholderTextColor="#7E93A8" style={styles.input} />
+
             <View style={styles.actionColumn}>
               {authFeedback ? (
                 <View style={styles.feedbackCard}>
@@ -274,9 +280,7 @@ export default function SignupScreen() {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
                       await setAuthenticatedAccount(account, true);
                       await syncRevenueCatIdentityForAuthentication(account);
-                      router.replace(
-                        getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo) as never
-                      );
+                      router.replace(nextRoute() as never);
                     } catch (error) {
                       reportAuthError(formatFirebaseError(error));
                     }
@@ -295,6 +299,7 @@ export default function SignupScreen() {
                       ...(params.joinCode ? { joinCode: params.joinCode } : {}),
                       ...(params.className ? { className: params.className } : {}),
                       ...(params.returnTo ? { returnTo: params.returnTo } : {}),
+                      ...(schoolCode.trim() ? { schoolCode: schoolCode.trim().toUpperCase() } : {}),
                     },
                   } as never)
                 }

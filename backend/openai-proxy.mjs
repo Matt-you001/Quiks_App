@@ -30,6 +30,21 @@ import {
   updateLessonNote,
   upsertClassroomProfile,
 } from "./classroom-store.mjs";
+import { getFirebaseAuthDiagnostics, verifyFirebaseRequest } from "./firebase-auth.mjs";
+import {
+  createSchool,
+  enrolInSchool,
+  getInstitutionalEntitlement,
+  getOwnerDashboard,
+  getSchoolDetails,
+  getSchoolPublicDetails,
+  getSchoolStoreDiagnostics,
+  inviteSchoolMember,
+  listPrincipalMemberships,
+  updateMembershipStatus,
+  updateSchoolLicence,
+  updateSchoolProfileFields,
+} from "./school-store.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
@@ -138,15 +153,42 @@ async function fetchRevenueCatSubscriber(accountUid, appVariant) {
   return revenueCatResponse.json();
 }
 
-async function handleSubscriptionStatus(body, response) {
+async function handleSubscriptionStatus(request, body, response) {
   if (!body.accountUid?.trim()) {
     sendJson(response, 400, { error: "Account UID is required." });
     return;
   }
 
+  const principal = await verifyFirebaseRequest(request);
+  if (principal.uid !== body.accountUid.trim()) {
+    sendJson(response, 403, { error: "The signed-in account does not match this subscription request." });
+    return;
+  }
   const appVariant = body.appVariant ?? "children";
-  const subscriber = await fetchRevenueCatSubscriber(body.accountUid.trim(), appVariant);
-  sendJson(response, 200, parseRevenueCatSubscriptionStatus(subscriber, appVariant));
+  const school = await getInstitutionalEntitlement(principal, appVariant);
+  let individual = { active: false, expiresAt: null, managementUrl: null };
+  try {
+    const subscriber = await fetchRevenueCatSubscriber(body.accountUid.trim(), appVariant);
+    individual = parseRevenueCatSubscriptionStatus(subscriber, appVariant);
+  } catch (error) {
+    if (!school?.active) throw error;
+  }
+  const active = individual.active || Boolean(school?.active);
+  const source = individual.active && school?.active ? "individual_and_school" : individual.active ? "individual" : school?.active ? "school" : "none";
+  const expirations = [individual.expiresAt, school?.active ? school.expiresAt : null]
+    .filter(Boolean)
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime());
+  sendJson(response, 200, {
+    active,
+    expiresAt: expirations[0] ?? null,
+    managementUrl: individual.managementUrl,
+    source,
+    school,
+  });
+}
+
+async function requireFirebasePrincipal(request) {
+  return verifyFirebaseRequest(request);
 }
 
 async function handlePaddleSubscriptionSync(body, response) {
@@ -348,12 +390,18 @@ function getClientErrorStatus(error) {
     return null;
   }
 
+  if (message.includes("sign in is required") || message.includes("identity token")) {
+    return 401;
+  }
+
   if (
     message.includes("not allowed") ||
     message.includes("only students can request") ||
     message.includes("only teachers can") ||
     message.includes("not an active member") ||
     message.includes("read-only")
+    || message.includes("school administrator")
+    || message.includes("quiks owner")
   ) {
     return 403;
   }
@@ -3044,7 +3092,7 @@ async function handleAssignmentDetails(body, response) {
     return;
   }
 
-  const payload = await getActivityDetails(body.profile, body.activityId, body.appVariant ?? "children");
+  const payload = await getActivityDetails(body.profile, body.activityId, body.appVariant ?? "children", body.accessCode);
   sendJson(response, 200, payload);
 }
 
@@ -3075,7 +3123,7 @@ const server = http.createServer(async (request, response) => {
     response.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Firebase-ID-Token",
     });
     response.end();
     return;
@@ -3089,6 +3137,8 @@ const server = http.createServer(async (request, response) => {
       verifierModel: openAiVerifierModel,
       verifierReasoningEffort: openAiVerifierReasoningEffort,
       classroomStore: getClassroomStoreDiagnostics(),
+      schoolStore: getSchoolStoreDiagnostics(),
+      firebaseAuth: getFirebaseAuthDiagnostics(),
       hasApiKey: Boolean(openAiApiKey),
     });
     return;
@@ -3238,7 +3288,59 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/subscriptions/status") {
-      await handleSubscriptionStatus(body, response);
+      await handleSubscriptionStatus(request, body, response);
+      return;
+    }
+
+    if (url.pathname === "/school/public") {
+      sendJson(response, 200, await getSchoolPublicDetails(body.code));
+      return;
+    }
+
+    if (url.pathname === "/school/memberships") {
+      sendJson(response, 200, { memberships: await listPrincipalMemberships(await requireFirebasePrincipal(request)) });
+      return;
+    }
+
+    if (url.pathname === "/school/enrol") {
+      sendJson(response, 200, await enrolInSchool(await requireFirebasePrincipal(request), body));
+      return;
+    }
+
+    if (url.pathname === "/school/admin/details") {
+      sendJson(response, 200, await getSchoolDetails(await requireFirebasePrincipal(request), body.schoolId));
+      return;
+    }
+
+    if (url.pathname === "/school/admin/profile-fields") {
+      const principal = await requireFirebasePrincipal(request);
+      await updateSchoolProfileFields(principal, body.schoolId, body.fields);
+      sendJson(response, 200, await getSchoolDetails(principal, body.schoolId));
+      return;
+    }
+
+    if (url.pathname === "/school/admin/invite") {
+      sendJson(response, 200, await inviteSchoolMember(await requireFirebasePrincipal(request), body.schoolId, body.email, body.role));
+      return;
+    }
+
+    if (url.pathname === "/school/admin/membership/status") {
+      sendJson(response, 200, await updateMembershipStatus(await requireFirebasePrincipal(request), body.schoolId, body.membershipId, body.status));
+      return;
+    }
+
+    if (url.pathname === "/school/owner/dashboard") {
+      sendJson(response, 200, await getOwnerDashboard(await requireFirebasePrincipal(request)));
+      return;
+    }
+
+    if (url.pathname === "/school/owner/create") {
+      sendJson(response, 200, { school: await createSchool(await requireFirebasePrincipal(request), body) });
+      return;
+    }
+
+    if (url.pathname === "/school/owner/licence") {
+      sendJson(response, 200, await updateSchoolLicence(await requireFirebasePrincipal(request), body.schoolId, body.licence));
       return;
     }
 
