@@ -464,7 +464,13 @@ export interface SchoolCreateResponse {
     email: string;
     invitationCode: string;
     expiresAt: number;
+    emailDelivery?: SchoolEmailDelivery;
   };
+}
+
+export interface SchoolEmailDelivery {
+  status: "sent" | "not_configured" | "failed";
+  messageId?: string;
 }
 
 export interface SchoolOwnerLicenceUpdateRequest {
@@ -477,6 +483,11 @@ export interface SchoolMembershipListResponse {
 }
 
 export interface SchoolDetailsResponse {
+  viewer: {
+    displayName: string;
+    email: string;
+    role: "app_owner" | "school_admin";
+  };
   school: SchoolSummary;
   profileFields: SchoolProfileFieldDefinition[];
   memberships: SchoolMembership[];
@@ -509,6 +520,7 @@ export interface SchoolInviteRequest {
 export interface SchoolInviteResponse {
   invitationCode: string;
   expiresAt: number;
+  emailDelivery?: SchoolEmailDelivery;
 }
 
 export interface SchoolMembershipStatusUpdateRequest {

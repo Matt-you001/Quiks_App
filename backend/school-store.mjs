@@ -526,6 +526,11 @@ export async function getSchoolDetails(principal, schoolId) {
   const school = store.schools[schoolId];
   if (!school) throw new Error("School not found.");
   return {
+    viewer: {
+      displayName: principal.name || principal.email || "Quiks user",
+      email: principal.email,
+      role: isOwner(principal) ? "app_owner" : "school_admin",
+    },
     school: buildSchoolSummary(store, school),
     profileFields: cloneValue(school.profileFields),
     memberships: membershipsForSchool(store, schoolId)
@@ -567,7 +572,7 @@ export async function inviteSchoolMember(principal, schoolId, email, role) {
       createdByPrincipalId: principal.principalId,
     };
     recordAudit(store, principal, "school.member.invited", schoolId, { email: normalizedEmail, role });
-    return { invitationCode, expiresAt };
+    return { invitationCode, expiresAt, email: normalizedEmail, role, schoolName: school.name };
   });
 }
 

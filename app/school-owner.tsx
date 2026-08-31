@@ -24,6 +24,7 @@ export default function SchoolOwnerScreen() {
     schoolCode: string;
     administratorEmail: string;
     administratorInvitationCode: string;
+    emailStatus: "sent" | "not_configured" | "failed";
   } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -83,6 +84,7 @@ export default function SchoolOwnerScreen() {
         schoolCode: created.school.schoolCode,
         administratorEmail: created.administratorInvitation.email,
         administratorInvitationCode: created.administratorInvitation.invitationCode,
+        emailStatus: created.administratorInvitation.emailDelivery?.status ?? "not_configured",
       });
       setName("");
       setAdministratorEmail("");
@@ -164,6 +166,7 @@ export default function SchoolOwnerScreen() {
               <Text style={styles.creationNoticeText}>School code: {creationNotice.schoolCode}</Text>
               <Text style={styles.creationNoticeText}>Administrator: {creationNotice.administratorEmail}</Text>
               <Text style={styles.creationNoticeText}>Administrator invitation code: {creationNotice.administratorInvitationCode}</Text>
+              <Text style={styles.creationNoticeText}>{creationNotice.emailStatus === "sent" ? "The invitation code was sent to the administrator by email." : creationNotice.emailStatus === "failed" ? "Email delivery failed. Copy and send the administrator code manually." : "Automatic email is not configured. Copy and send the administrator code manually."}</Text>
             </View>
           ) : null}
         </View>

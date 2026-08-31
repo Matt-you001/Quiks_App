@@ -31,6 +31,7 @@ import {
   upsertClassroomProfile,
 } from "./classroom-store.mjs";
 import { getFirebaseAuthDiagnostics, verifyFirebaseRequest } from "./firebase-auth.mjs";
+import { getSchoolEmailDiagnostics, sendSchoolInvitationEmail } from "./school-email.mjs";
 import {
   createSchool,
   enrolInSchool,
@@ -3138,6 +3139,7 @@ const server = http.createServer(async (request, response) => {
       verifierReasoningEffort: openAiVerifierReasoningEffort,
       classroomStore: getClassroomStoreDiagnostics(),
       schoolStore: getSchoolStoreDiagnostics(),
+      schoolEmail: getSchoolEmailDiagnostics(),
       firebaseAuth: getFirebaseAuthDiagnostics(),
       hasApiKey: Boolean(openAiApiKey),
     });
@@ -3320,7 +3322,18 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/school/admin/invite") {
-      sendJson(response, 200, await inviteSchoolMember(await requireFirebasePrincipal(request), body.schoolId, body.email, body.role));
+      const invitation = await inviteSchoolMember(await requireFirebasePrincipal(request), body.schoolId, body.email, body.role);
+      const emailDelivery = await sendSchoolInvitationEmail({
+        email: invitation.email,
+        schoolName: invitation.schoolName,
+        invitationCode: invitation.invitationCode,
+        role: invitation.role,
+        expiresAt: invitation.expiresAt,
+      }).catch((error) => {
+        console.error("School invitation email could not be sent:", error);
+        return { status: "failed" };
+      });
+      sendJson(response, 200, { invitationCode: invitation.invitationCode, expiresAt: invitation.expiresAt, emailDelivery });
       return;
     }
 
@@ -3335,7 +3348,21 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/school/owner/create") {
-      sendJson(response, 200, await createSchool(await requireFirebasePrincipal(request), body));
+      const created = await createSchool(await requireFirebasePrincipal(request), body);
+      const emailDelivery = await sendSchoolInvitationEmail({
+        email: created.administratorInvitation.email,
+        schoolName: created.school.name,
+        invitationCode: created.administratorInvitation.invitationCode,
+        role: "school_admin",
+        expiresAt: created.administratorInvitation.expiresAt,
+      }).catch((error) => {
+        console.error("School administrator invitation email could not be sent:", error);
+        return { status: "failed" };
+      });
+      sendJson(response, 200, {
+        ...created,
+        administratorInvitation: { ...created.administratorInvitation, emailDelivery },
+      });
       return;
     }
 

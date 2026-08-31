@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { PropsWithChildren, RefObject } from "react";
+import { PropsWithChildren } from "react";
 import { Platform, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { palette } from "../lib/theme";
@@ -8,11 +8,10 @@ import { WebLegalFooter } from "./WebLegalFooter";
 
 interface AppBackgroundProps extends PropsWithChildren {
   scroll?: boolean;
-  scrollRef?: RefObject<ScrollView | null>;
   webContentWidth?: "narrow" | "standard" | "wide";
 }
 
-export function AppBackground({ children, scroll = true, scrollRef, webContentWidth = "standard" }: AppBackgroundProps) {
+export function AppBackground({ children, scroll = true, webContentWidth = "standard" }: AppBackgroundProps) {
   const { width } = useWindowDimensions();
   const useDesktopShell = width >= 1024;
   const pageContent =
@@ -48,7 +47,7 @@ export function AppBackground({ children, scroll = true, scrollRef, webContentWi
     <LinearGradient colors={[palette.gradientTop, palette.gradientMid, palette.gradientBottom]} style={styles.fill}>
       <SafeAreaView style={styles.fill}>
         {scroll ? (
-          <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {content}
           </ScrollView>
         ) : (

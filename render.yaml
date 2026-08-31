@@ -31,5 +31,11 @@ services:
         value: /var/data/school-store.json
       - key: QUIKS_OWNER_EMAILS
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: QUIKS_SCHOOL_EMAIL_FROM
+        sync: false
+      - key: QUIKS_SCHOOL_ENROLMENT_URL
+        value: https://children.quiks.site/school-enrol
       - key: OPENAI_API_KEY
         sync: false
