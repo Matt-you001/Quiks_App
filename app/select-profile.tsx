@@ -9,6 +9,7 @@ import { canShowAds } from "../lib/ads";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile } from "../lib/subscription";
+import { countLearnerProfiles } from "../lib/school-identity";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getSubjectById } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -45,7 +46,7 @@ export default function SelectProfileScreen() {
     }
   };
 
-  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, countLearnerProfiles(profiles));
 
   return (
     <AppBackground webContentWidth="standard">

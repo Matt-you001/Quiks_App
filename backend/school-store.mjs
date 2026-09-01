@@ -133,7 +133,11 @@ function ownerValues(name) {
   return new Set(
     String(process.env[name] ?? "")
       .split(",")
-      .map((value) => value.trim().toLowerCase())
+      .map((value) => {
+        const trimmed = value.trim().replace(/^['"]|['"]$/g, "");
+        const friendlyAddress = trimmed.match(/<([^>]+)>/);
+        return (friendlyAddress?.[1] ?? trimmed).trim().toLowerCase();
+      })
       .filter(Boolean)
   );
 }
@@ -150,7 +154,11 @@ function isOwner(principal) {
 }
 
 function requireOwner(principal) {
-  if (!isOwner(principal)) throw new Error("Only a configured Quiks owner can perform this action.");
+  if (!isOwner(principal)) {
+    throw new Error(
+      `Only a configured Quiks owner can perform this action. Signed in as ${principal.email || principal.uid}.`
+    );
+  }
 }
 
 function generateCode(existingCodes, length = 8) {
@@ -531,6 +539,27 @@ export async function listPrincipalMemberships(principal) {
     .filter((membership) => membershipMatchesPrincipal(membership, principal))
     .map((membership) => buildMembership(store, membership))
     .sort((left, right) => left.schoolName.localeCompare(right.schoolName));
+}
+
+export async function getPrincipalSchoolIdentity(principal) {
+  const store = await ensureStore();
+  const administratorMemberships = Object.values(store.memberships)
+    .filter(
+      (membership) =>
+        membershipMatchesPrincipal(membership, principal) &&
+        membership.role === "school_admin" &&
+        membership.status === "active"
+    )
+    .map((membership) => buildMembership(store, membership));
+
+  return {
+    viewer: {
+      displayName: principal.name || principal.email || "Quiks user",
+      email: principal.email,
+    },
+    isAppOwner: isOwner(principal),
+    administratorMemberships,
+  };
 }
 
 export async function getSchoolDetails(principal, schoolId) {

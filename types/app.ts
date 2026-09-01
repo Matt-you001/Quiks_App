@@ -66,6 +66,9 @@ export interface UserProfile {
   language: AppLanguage;
   role: UserRole;
   quiksId: string;
+  administrativeRole?: "app_owner" | "school_admin";
+  administrativeAccountUid?: string;
+  administrativeSchoolId?: string;
 }
 
 export interface Question {
@@ -480,6 +483,15 @@ export interface SchoolOwnerLicenceUpdateRequest {
 
 export interface SchoolMembershipListResponse {
   memberships: SchoolMembership[];
+}
+
+export interface SchoolIdentityResponse {
+  viewer: {
+    displayName: string;
+    email: string;
+  };
+  isAppOwner: boolean;
+  administratorMemberships: SchoolMembership[];
 }
 
 export interface SchoolDetailsResponse {

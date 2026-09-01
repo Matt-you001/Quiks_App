@@ -37,6 +37,7 @@ import {
   enrolInSchool,
   getInstitutionalEntitlement,
   getOwnerDashboard,
+  getPrincipalSchoolIdentity,
   getSchoolDetails,
   getSchoolPublicDetails,
   getSchoolStoreDiagnostics,
@@ -3301,6 +3302,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/school/memberships") {
       sendJson(response, 200, { memberships: await listPrincipalMemberships(await requireFirebasePrincipal(request)) });
+      return;
+    }
+
+    if (url.pathname === "/school/identity") {
+      sendJson(response, 200, await getPrincipalSchoolIdentity(await requireFirebasePrincipal(request)));
       return;
     }
 

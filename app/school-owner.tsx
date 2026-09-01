@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { CalendarDateField, getTodayDateValue } from "../components/CalendarDateField";
 import { palette, shadows } from "../lib/theme";
@@ -10,6 +10,7 @@ import type { SchoolEnrolmentMode, SchoolOwnerDashboardResponse } from "../types
 
 export default function SchoolOwnerScreen() {
   const [data, setData] = useState<SchoolOwnerDashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [administratorEmail, setAdministratorEmail] = useState("");
   const [enrolmentMode, setEnrolmentMode] = useState<SchoolEnrolmentMode>("shared_code");
@@ -29,11 +30,15 @@ export default function SchoolOwnerScreen() {
   const [busy, setBusy] = useState(false);
 
   async function load() {
+    setLoading(true);
     try {
       setData(await getSchoolOwnerDashboard());
       setError("");
     } catch (caught) {
+      setData(null);
       setError(caught instanceof Error ? caught.message : "Owner access is not configured for this account.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -109,7 +114,16 @@ export default function SchoolOwnerScreen() {
         <Text style={styles.title}>Quiks School portfolio</Text>
         <Text style={styles.light}>Institutional enrolment, seats, licence expiry and operational visibility.</Text>
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {loading ? <ActivityIndicator size="large" color={palette.navy} style={styles.loader} /> : null}
+      {!loading && !data && error ? (
+        <View style={styles.accessErrorCard}>
+          <Text style={styles.error}>{error}</Text>
+          <View style={styles.row}>
+            <Pressable style={styles.button} onPress={() => void load()}><Text style={styles.buttonText}>Try again</Text></Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => router.replace("/school" as never)}><Text style={styles.secondaryButtonText}>Back to School Control</Text></Pressable>
+          </View>
+        </View>
+      ) : null}
       {data ? (
         <View style={styles.metrics}>
           {Object.entries(data.totals).map(([key, value]) => (
@@ -120,7 +134,7 @@ export default function SchoolOwnerScreen() {
           ))}
         </View>
       ) : null}
-      <View style={styles.grid}>
+      {data ? <View style={styles.grid}>
         <View style={styles.card}>
           <Text style={styles.heading}>Create school licence</Text>
           <Text style={styles.copy}>Choose the first school administrator. They receive a one-time, email-locked invitation and can approve subsequent staff and student requests.</Text>
@@ -192,7 +206,7 @@ export default function SchoolOwnerScreen() {
             </View>
           ))}
         </View>
-      </View>
+      </View> : null}
     </AppBackground>
   );
 }
@@ -202,6 +216,8 @@ const styles = StyleSheet.create({
   eyebrow: { color: "#70E2D8", fontWeight: "900", letterSpacing: 1.5 },
   title: { color: "white", fontSize: 31, fontWeight: "900", marginTop: 7 },
   light: { color: "#D8E8EE", marginTop: 7 },
+  loader: { marginVertical: 24 },
+  accessErrorCard: { backgroundColor: "#FFF1F0", borderRadius: 18, padding: 18, marginBottom: 16 },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
   metric: { backgroundColor: "white", borderRadius: 18, padding: 16, minWidth: 145, flexGrow: 1, ...shadows.card },
   number: { color: palette.navy, fontSize: 26, fontWeight: "900" },

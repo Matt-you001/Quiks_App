@@ -8,6 +8,7 @@ import { appVariant } from "../lib/app-variant";
 import { preloadAppOpenAd, showAppOpenAd } from "../lib/ads";
 import { waitForFirebaseAuthAccount } from "../lib/firebase";
 import { syncRevenueCatIdentityForAuthentication } from "../lib/revenuecat";
+import { syncAdministrativeProfileForAccount } from "../lib/school-identity";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
 import {
   useNotificationNavigation,
@@ -31,6 +32,18 @@ export default function RootLayout() {
   const segments = useSegments();
   const rootSegment = segments[0];
   const [webAuthReady, setWebAuthReady] = useState(Platform.OS !== "web");
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    // Firebase restores native sessions independently of the local app cache.
+    // Reconcile both and refresh administrative roles on every cold start so a
+    // newly approved school administrator does not have to sign out first.
+    void waitForFirebaseAuthAccount().then(async (account) => {
+      if (!account) return;
+      await setAuthenticatedAccount(account, true);
+      await syncAdministrativeProfileForAccount(account).catch(() => undefined);
+    });
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -69,7 +82,10 @@ export default function RootLayout() {
         // Restore the route immediately, then refresh cloud state and plan in
         // the background. Explicit sign-in still performs the awaited first
         // cloud merge before it navigates here.
-        await readAppState();
+        await setAuthenticatedAccount(account, true);
+        // Resolve app-owner/school-admin identity before showing a protected
+        // route so a browser refresh cannot briefly downgrade the account.
+        await syncAdministrativeProfileForAccount(account).catch(() => undefined);
         void syncRevenueCatIdentityForAuthentication(account);
         hydratedAccountUidRef.current = account.uid;
       }

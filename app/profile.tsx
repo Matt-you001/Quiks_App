@@ -14,11 +14,12 @@ import { signOutAccount } from "../lib/firebase";
 import { getCertificateExcellenceLabel, getCertificateSpeedLabel, getLanguageLabel, t } from "../lib/i18n";
 import { syncRevenueCatIdentity } from "../lib/revenuecat";
 import { canCreateAnotherProfile } from "../lib/subscription";
+import { countLearnerProfiles } from "../lib/school-identity";
 import { logoutAccount, readAppState, setCurrentProfile, setSubscriptionTier as storeSubscriptionTier } from "../lib/storage";
 import { SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import { getAccountSubscriptionStatus } from "../services/ai";
-import type { SessionResult, UserProfile } from "../types/app";
+import type { AppAccount, SessionResult, UserProfile } from "../types/app";
 
 function getGradeRank(grade: string) {
   const gradeNumber = Number(grade.replace(/[^\d]/g, ""));
@@ -99,6 +100,7 @@ function formatGoalDuration(totalSeconds: number) {
 }
 
 export default function ProfileScreen() {
+  const [account, setAccount] = useState<AppAccount | null>(null);
   const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
@@ -113,6 +115,7 @@ export default function ProfileScreen() {
       router.replace({ pathname: "/signup" } as never);
       return;
     }
+    setAccount(state.account);
     const profile =
       state.profiles.find((item) => item.id === state.currentProfileId) ??
       state.profiles[0] ??
@@ -127,7 +130,7 @@ export default function ProfileScreen() {
     setSubscriptionTier(state.subscriptionTier);
     setSubscriptionExpiresAt(state.subscriptionExpiresAt);
     setSubscriptionUpdatedAt(state.subscriptionUpdatedAt);
-    setProfileCount(state.profiles.length);
+    setProfileCount(countLearnerProfiles(state.profiles));
 
     if (state.account) {
       const refreshSubscription =
@@ -163,6 +166,11 @@ export default function ProfileScreen() {
 
   const bestScore = results.length > 0 ? `${Math.max(...results.map((result) => result.score))}%` : "0%";
   const language = activeProfile?.language ?? "en";
+  const administrativeLabel = activeProfile?.administrativeRole === "app_owner"
+    ? "Quiks App Owner"
+    : activeProfile?.administrativeRole === "school_admin"
+      ? "School Administrator"
+      : null;
   const latestPerformance = results[0] ? `${results[0].score}% in ${results[0].subjectName}` : t(language, "noSessionsYet");
   const certificates = useMemo(
     () => activeProfile ? getProfileCertificates(activeProfile, results) : [],
@@ -334,12 +342,14 @@ export default function ProfileScreen() {
       <AppBackground>
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>{t(language, "profileNoSelection")}</Text>
-            <Text style={styles.emptyText}>{t(language, "profileCreateOrChoose")}</Text>
-            <View style={styles.actionColumn}>
+          {account ? <Text style={styles.emptyText}>{account.name} · {account.email}</Text> : null}
+          <Text style={styles.emptyText}>{t(language, "profileCreateOrChoose")}</Text>
+          <View style={styles.actionColumn}>
             <PrimaryButton
               label={t(language, "createProfile")}
               onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
             />
+            <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} />
             <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
           </View>
         </View>
@@ -355,7 +365,7 @@ export default function ProfileScreen() {
           <View style={styles.heroIdentity}>
             <Text style={styles.heroTitle}>{activeProfile.name}</Text>
             <Text style={styles.heroSubtitle}>
-              {t(language, "age")} {activeProfile.age} | {activeProfile.targetExam}
+              {administrativeLabel ?? `${t(language, "age")} ${activeProfile.age} | ${activeProfile.targetExam}`}
             </Text>
           </View>
         </View>

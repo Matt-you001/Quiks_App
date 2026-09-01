@@ -8,6 +8,7 @@ import { appVariant } from "../lib/app-variant";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, t } from "../lib/i18n";
 import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile } from "../lib/subscription";
+import { countLearnerProfiles } from "../lib/school-identity";
 import { readAppState, upsertProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import type { AppLanguage, SubscriptionTier, UserProfile, UserRole } from "../types/app";
@@ -95,7 +96,7 @@ export default function ProfileEditorScreen() {
 
     if (!editingProfile) {
       const state = await readAppState();
-      if (!canCreateAnotherProfile(state.subscriptionTier, state.profiles.length)) {
+      if (!canCreateAnotherProfile(state.subscriptionTier, countLearnerProfiles(state.profiles))) {
         setShowProfileUpgrade(true);
         return;
       }

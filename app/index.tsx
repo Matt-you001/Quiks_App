@@ -13,11 +13,12 @@ import { readClassroomInvitationCodeFromLocation } from "../lib/classroom-invite
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile, canUseClassroom } from "../lib/subscription";
+import { countLearnerProfiles } from "../lib/school-identity";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getLocalizedSubjects, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import { readWebCheckoutIntentFromLocation } from "../lib/web-checkout";
-import type { SessionResult, UserProfile } from "../types/app";
+import type { AppLanguage, SessionResult, UserProfile } from "../types/app";
 
 const heroLogos = {
   children: require("../assets/images/quiks-children-playstore-icon-512.png"),
@@ -130,6 +131,12 @@ function getGradeRank(grade: string) {
   }
 
   return 0;
+}
+
+function getProfileSubtitle(profile: UserProfile, language: AppLanguage) {
+  if (profile.administrativeRole === "app_owner") return "Quiks App Owner";
+  if (profile.administrativeRole === "school_admin") return "School Administrator";
+  return `${t(language, "age")} ${profile.age} | ${profile.targetExam}`;
 }
 
 export default function HomeScreen() {
@@ -268,7 +275,8 @@ export default function HomeScreen() {
     await syncRemotePushRegistration();
   };
 
-  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profiles.length);
+  const learnerProfileCount = countLearnerProfiles(profiles);
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, learnerProfileCount);
   const showWideActions = width >= 900;
 
   if (!authChecked) {
@@ -290,7 +298,7 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>{heroSubtitle}</Text>
 
         <View style={styles.statRow}>
-          <StatPill label={`${appVariant.profileNoun}s`} value={String(profiles.length)} />
+          <StatPill label={`${appVariant.profileNoun}s`} value={String(learnerProfileCount)} />
           <StatPill label={t(language, "currentLearner")} value={selectedProfileLabel} />
         </View>
 
@@ -364,7 +372,7 @@ export default function HomeScreen() {
                 <View style={styles.studentMeta}>
                   <Text style={styles.studentName}>{profile.name}</Text>
                   <Text style={styles.studentSubtext}>
-                    {t(language, "age")} {profile.age} | {profile.targetExam}
+                    {getProfileSubtitle(profile, language)}
                   </Text>
                   <Text style={styles.studentSubtext}>
                     {latest
@@ -408,7 +416,7 @@ export default function HomeScreen() {
           <>
             <Text style={styles.activeLearnerName}>{activeProfile.name}</Text>
             <Text style={styles.activeLearnerText}>
-              {t(language, "age")} {activeProfile.age} | {activeProfile.targetExam}
+              {getProfileSubtitle(activeProfile, language)}
             </Text>
             <Text style={styles.progressTitle}>{t(language, "highestUnlockedBySubject")}</Text>
             {highestUnlockedBySubject.length > 0 ? (

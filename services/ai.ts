@@ -96,6 +96,7 @@ import type {
   SchoolEnrolResponse,
   SchoolInviteRequest,
   SchoolInviteResponse,
+  SchoolIdentityResponse,
   SchoolMembershipListResponse,
   SchoolMembershipStatusUpdateRequest,
   SchoolOwnerDashboardResponse,
@@ -286,6 +287,10 @@ export async function getSchoolPublicDetails(code: string): Promise<SchoolPublic
 
 export async function getSchoolMemberships(): Promise<SchoolMembershipListResponse> {
   return postJson("/school/memberships", {});
+}
+
+export async function getSchoolIdentity(): Promise<SchoolIdentityResponse> {
+  return postJson("/school/identity", {});
 }
 
 export async function enrolInSchool(request: SchoolEnrolRequest): Promise<SchoolEnrolResponse> {

@@ -29,6 +29,7 @@ import {
 } from "../lib/firebase";
 import { t } from "../lib/i18n";
 import { syncRevenueCatIdentityForAuthentication } from "../lib/revenuecat";
+import { syncAdministrativeProfileForAccount } from "../lib/school-identity";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import { getPostAuthRoute } from "../lib/web-checkout";
@@ -170,6 +171,8 @@ export default function SignupScreen() {
           // Firebase browser persistence has already restored this account.
           // readAppState above opens its account-scoped cache and starts the
           // cloud refresh, so do not block the returning user on network I/O.
+          await setAuthenticatedAccount(firebaseAccount, true);
+          void syncAdministrativeProfileForAccount(firebaseAccount).catch(() => undefined);
           void syncRevenueCatIdentityForAuthentication(firebaseAccount);
         }
         if (firebaseAccount || (Platform.OS !== "web" && state.isAuthenticated)) {
@@ -210,6 +213,7 @@ export default function SignupScreen() {
       // Finish the cloud profile merge before persisting subscription state so
       // plan synchronization cannot overwrite profiles from another device.
       await setAuthenticatedAccount(account, true);
+      await syncAdministrativeProfileForAccount(account).catch(() => undefined);
       await syncRevenueCatIdentityForAuthentication(account);
       router.replace(nextRoute() as never);
     } catch (error) {
@@ -279,6 +283,7 @@ export default function SignupScreen() {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
                       await setAuthenticatedAccount(account, true);
+                      await syncAdministrativeProfileForAccount(account).catch(() => undefined);
                       await syncRevenueCatIdentityForAuthentication(account);
                       router.replace(nextRoute() as never);
                     } catch (error) {
