@@ -409,6 +409,88 @@ a {
   color: var(--brand);
 }
 
+.enrolment-hero {
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.enrolment-panel {
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.enrolment-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--brand-dark);
+  font-weight: 800;
+}
+
+.enrolment-code-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.enrolment-code-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  border: 1px solid rgba(15, 105, 112, 0.28);
+  border-radius: 16px;
+  background: #f7fbfc;
+  padding: 13px 16px;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.enrolment-code-input:focus {
+  outline: 3px solid rgba(43, 191, 181, 0.22);
+  border-color: var(--brand);
+}
+
+.enrolment-button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.enrolment-status {
+  min-height: 24px;
+  margin: 10px 0 24px;
+  color: var(--muted);
+}
+
+.enrolment-status-ready {
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
+.enrolment-variant-grid {
+  align-items: stretch;
+}
+
+.enrolment-variant-grid .variant-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.enrolment-variant-grid .variant-link {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.enrolment-link-disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 @media (max-width: 960px) {
   .hero,
   .variant-grid,
@@ -445,5 +527,13 @@ a {
   .site-nav a {
     width: 100%;
     justify-content: center;
+  }
+
+  .enrolment-code-row {
+    flex-direction: column;
+  }
+
+  .enrolment-button {
+    width: 100%;
   }
 }

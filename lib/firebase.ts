@@ -193,7 +193,19 @@ export function getFirebaseConfigErrorMessage() {
 }
 
 export async function getFirebaseIdToken(forceRefresh = false) {
-  return firebaseAuth?.currentUser?.getIdToken(forceRefresh) ?? null;
+  if (!firebaseAuth) {
+    return null;
+  }
+
+  if (!firebaseAuth.currentUser) {
+    // On a browser refresh and on a native cold start, Firebase may still be
+    // restoring its persisted account when the first protected API request is
+    // made. Wait for that initial auth result instead of sending an anonymous
+    // request that the school backend will correctly reject.
+    await waitForFirebaseAuthAccount();
+  }
+
+  return firebaseAuth.currentUser?.getIdToken(forceRefresh) ?? null;
 }
 
 export function formatFirebaseError(error: unknown) {

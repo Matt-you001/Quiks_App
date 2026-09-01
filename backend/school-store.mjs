@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,6 +49,17 @@ const defaultFeatures = {
 
 let storeCache = null;
 let writeQueue = Promise.resolve();
+
+function persistentMountDetected() {
+  if (process.platform !== "linux" || !storePath.startsWith("/var/data/")) return null;
+  try {
+    return readFileSync("/proc/self/mountinfo", "utf8")
+      .split("\n")
+      .some((line) => line.split(" ")[4] === "/var/data");
+  } catch {
+    return null;
+  }
+}
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
@@ -378,6 +390,7 @@ export function getSchoolStoreDiagnostics() {
   return {
     configured: Boolean(configuredStorePath),
     persistentPathExpected: storePath.startsWith("/var/data/"),
+    persistentMountDetected: persistentMountDetected(),
     backupEnabled: true,
     atomicWrites: true,
     ownerConfigured:

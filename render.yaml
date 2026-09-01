@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: quiks-openai-proxy
+    name: quiks-app
     runtime: node
     plan: starter
     buildCommand: npm install
@@ -36,6 +36,6 @@ services:
       - key: QUIKS_SCHOOL_EMAIL_FROM
         sync: false
       - key: QUIKS_SCHOOL_ENROLMENT_URL
-        value: https://children.quiks.site/school-enrol
+        value: https://quiks.site/school-enrol.html
       - key: OPENAI_API_KEY
         sync: false

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiks School | Choose Your Learning App</title>
+  <meta name="description" content="Use your Quiks School invitation code in Quiks Children, Quiks Teens, or Quiks Uni." />
+  <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <div class="header-top">
+        <a class="brand" href="./index.html" aria-label="Quiks home">
+          <img src="./logo.svg" alt="Quiks logo" class="brand-logo" />
+          <div>
+            <p class="brand-name">Quiks School</p>
+            <p class="brand-tag">One invitation. The right learning environment.</p>
+          </div>
+        </a>
+        <a class="secondary-link" href="./index.html">Back to Quiks</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="inner-hero enrolment-hero">
+        <span class="eyebrow">School enrolment portal</span>
+        <h1>Choose the Quiks app that fits you.</h1>
+        <p>Your invitation remains connected while you continue to Quiks Children, Quiks Teens, or Quiks Uni.</p>
+      </section>
+
+      <section class="content-panel enrolment-panel">
+        <div class="section-heading">
+          <span class="eyebrow pricing-eyebrow">Invitation code</span>
+          <h2>Enter or confirm your code</h2>
+          <p>The code is normally included automatically when you open the link from your invitation email.</p>
+        </div>
+
+        <label class="enrolment-label" for="invitation-code">School invitation code</label>
+        <div class="enrolment-code-row">
+          <input id="invitation-code" class="enrolment-code-input" type="text" inputmode="text" autocomplete="one-time-code" maxlength="16" placeholder="Enter invitation code" aria-describedby="code-status" />
+          <button id="apply-code" class="primary-link enrolment-button" type="button">Apply code</button>
+        </div>
+        <p id="code-status" class="enrolment-status" role="status" aria-live="polite">Enter the invitation code supplied by your school.</p>
+
+        <div class="variant-grid enrolment-variant-grid" id="variant-options" aria-label="Choose a Quiks variant">
+          <article class="variant-card children-card">
+            <span class="variant-badge">Ages 5–12</span>
+            <h3>Quiks Children</h3>
+            <p>For foundational and primary-school learning.</p>
+            <a class="variant-link enrolment-variant-link" data-variant="children" href="https://children.quiks.site/school-enrol">Continue to Children</a>
+          </article>
+          <article class="variant-card teens-card">
+            <span class="variant-badge">Secondary school</span>
+            <h3>Quiks Teens</h3>
+            <p>For secondary-school study, revision, and classroom activities.</p>
+            <a class="variant-link enrolment-variant-link" data-variant="teens" href="https://teens.quiks.site/school-enrol">Continue to Teens</a>
+          </article>
+          <article class="variant-card uni-card">
+            <span class="variant-badge">Tertiary education</span>
+            <h3>Quiks Uni</h3>
+            <p>For tertiary and university learners.</p>
+            <a class="variant-link enrolment-variant-link" data-variant="uni" href="https://uni.quiks.site/school-enrol">Continue to Uni</a>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Quiks School is operated by Tech Solution Providers Ltd.</p>
+      <div class="footer-links">
+        <a href="./privacy.html">Privacy</a>
+        <a href="./terms.html">Terms</a>
+        <a href="./contact.html">Support</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var input = document.getElementById("invitation-code");
+      var applyButton = document.getElementById("apply-code");
+      var status = document.getElementById("code-status");
+      var variantLinks = Array.prototype.slice.call(document.querySelectorAll(".enrolment-variant-link"));
+      var variantUrls = {
+        children: "https://children.quiks.site/school-enrol",
+        teens: "https://teens.quiks.site/school-enrol",
+        uni: "https://uni.quiks.site/school-enrol"
+      };
+
+      function normalizeCode(value) {
+        return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+      }
+
+      function updateLinks(code) {
+        variantLinks.forEach(function (link) {
+          var variant = link.getAttribute("data-variant");
+          var baseUrl = variantUrls[variant];
+          if (!code) {
+            link.setAttribute("href", baseUrl);
+            link.setAttribute("aria-disabled", "true");
+            link.classList.add("enrolment-link-disabled");
+            return;
+          }
+          link.setAttribute("href", baseUrl + "?code=" + encodeURIComponent(code));
+          link.removeAttribute("aria-disabled");
+          link.classList.remove("enrolment-link-disabled");
+        });
+      }
+
+      function applyCode() {
+        var code = normalizeCode(input.value);
+        input.value = code;
+        updateLinks(code);
+        if (code) {
+          status.textContent = "Invitation code " + code + " is ready. Choose the appropriate Quiks app below.";
+          status.classList.add("enrolment-status-ready");
+          var nextUrl = new URL(window.location.href);
+          nextUrl.searchParams.set("code", code);
+          window.history.replaceState({}, "", nextUrl.toString());
+        } else {
+          status.textContent = "Enter the invitation code supplied by your school.";
+          status.classList.remove("enrolment-status-ready");
+        }
+      }
+
+      input.addEventListener("input", function () {
+        input.value = normalizeCode(input.value);
+      });
+      input.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") applyCode();
+      });
+      applyButton.addEventListener("click", applyCode);
+      variantLinks.forEach(function (link) {
+        link.addEventListener("click", function (event) {
+          if (link.getAttribute("aria-disabled") === "true") {
+            event.preventDefault();
+            input.focus();
+            status.textContent = "Enter your invitation code before choosing a Quiks app.";
+          }
+        });
+      });
+
+      var suppliedCode = normalizeCode(new URLSearchParams(window.location.search).get("code"));
+      if (suppliedCode) {
+        input.value = suppliedCode;
+        applyCode();
+      } else {
+        updateLinks("");
+      }
+    })();
+  </script>
+</body>
+</html>
