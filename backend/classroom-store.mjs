@@ -4,6 +4,8 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { CLASSROOM_RESET_VERSION, migrateClassroomTestData } from "./classroom-migration.mjs";
+import { captureSchoolResult, backfillSchoolResults, processSchoolResults } from "./school-results.mjs";
+import { schoolClassroomOperation, teacherSchoolClassOperation, newClassCode } from "./school-classrooms.mjs";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const configuredStorePath = String(process.env.CLASSROOM_STORE_PATH ?? "").trim();
@@ -24,6 +26,8 @@ const defaultStore = {
   submissions: {},
   lessonNotes: {},
   chatMessages: {},
+  schoolResults: {},
+  schoolReports: {},
 };
 
 let storeCache = null;
@@ -143,7 +147,8 @@ export async function authorizeClassroomRequest(path, body, actor, actorKey) {
     }
     const targets = [];
     if (body.classId) targets.push(store.classrooms[body.classId]);
-    if (body.classCode) targets.push(Object.values(store.classrooms).find((c) => c.classCode === String(body.classCode).trim().toUpperCase() && c.appVariant === variant));
+    const claiming = path === "/classroom/classes/claim";
+    if (body.classCode) targets.push(Object.values(store.classrooms).find((c) => (claiming ? c.teacherAccessCode : c.classCode) === String(body.classCode).trim().toUpperCase() && c.appVariant === variant));
     let activity;
     if (body.activityId) {
       activity = store.activities[body.activityId];
@@ -160,13 +165,16 @@ export async function authorizeClassroomRequest(path, body, actor, actorKey) {
       const joining = path.endsWith("/classes/join") || path.endsWith("/invite-link/accept");
       const responding = path.endsWith("/membership/respond");
       if (actorKey === "teacherProfile") {
-        if (actor.role !== "teacher" || classroom.teacherProfileId !== actor.id) denyAccess("Only the class teacher can manage this class.");
+        if (claiming) {
+          if (actor.role !== "teacher" || !actor.schoolMembershipId || classroom.assignedTeacherMembershipId !== actor.schoolMembershipId || (classroom.teacherProfileId && classroom.teacherProfileId !== actor.id)) denyAccess("This class is assigned to another teacher.");
+        } else if (actor.role !== "teacher" || classroom.teacherProfileId !== actor.id) denyAccess("Only the class teacher can manage this class.");
       } else if (responding) {
         const member = store.memberships[body.membershipId];
         if (classroom.teacherProfileId !== actor.id && member?.profileId !== actor.id) denyAccess("This membership request belongs to another user.");
       } else if (!joining && classroom.teacherProfileId !== actor.id && !getActiveMembership(store, classroom.id, actor.id)) {
         denyAccess("This profile is not an active member of the class.");
       }
+      if (joining && !classroom.teacherProfileId) denyAccess("The assigned teacher must open this class before students can join.", 409);
     }
     const listRoutes = new Set(["/classroom/profile/upsert", "/classroom/classes/list", "/classroom/assignments/list", "/classroom/classes/create"]);
     if (!classroom && !listRoutes.has(path)) denyAccess("A classroom resource is required.", 400);
@@ -194,17 +202,6 @@ function normalizeProfileRecord(profile, appVariant) {
     appVariant,
     updatedAt: Date.now(),
   };
-}
-
-function generateClassCode(existingCodes) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let nextCode = "";
-
-  do {
-    nextCode = Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
-  } while (existingCodes.has(nextCode));
-
-  return nextCode;
 }
 
 function getClassStatus(activity) {
@@ -256,9 +253,10 @@ function buildClassroomSummary(store, classroom) {
   const memberships = getMembershipsForClass(store, classroom.id);
   return {
     classId: classroom.id,
-    classCode: classroom.classCode,
+    classCode: classroom.classCode ?? "",
     className: classroom.className,
     schoolId: classroom.schoolId ?? null,
+    codePolicy: classroom.codePolicy ?? "shared",
     teacherProfileId: classroom.teacherProfileId,
     teacherName: classroom.teacherName,
     createdAt: classroom.createdAt,
@@ -482,8 +480,7 @@ export async function createClassroom(teacherProfile, className, appVariant) {
     store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
 
     const classroomId = randomUUID();
-    const existingCodes = new Set(Object.values(store.classrooms).map((classroom) => classroom.classCode));
-    const classCode = generateClassCode(existingCodes);
+    const classCode = newClassCode(store);
     const createdAt = Date.now();
 
     store.classrooms[classroomId] = {
@@ -702,6 +699,7 @@ export async function updateClassroomName(teacherProfile, classId, className, ap
 
 export async function deleteClassroom(teacherProfile, classId, appVariant) {
   return mutateStore(async (store) => {
+    backfillSchoolResults(store);
     store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
     const classroom = store.classrooms[classId];
     ensureTeacherOwnsClass(classroom, teacherProfile.id);
@@ -862,6 +860,7 @@ export async function createClassroomActivity(payload, appVariant) {
 
 export async function deleteClassroomActivity(teacherProfile, activityId, appVariant) {
   return mutateStore(async (store) => {
+    backfillSchoolResults(store);
     store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
     const activity = store.activities[activityId];
     if (!activity) throw new Error("Activity not found.");
@@ -1189,6 +1188,12 @@ export async function getActivityDetails(profile, activityId, appVariant, access
 
 export async function submitActivity(profile, activityId, submissionPayload, appVariant) {
   return mutateStore(async (store) => {
+    if (typeof submissionPayload.score !== "number" || !Number.isFinite(submissionPayload.score) || submissionPayload.score < 0 || submissionPayload.score > 100
+      || !Number.isInteger(submissionPayload.totalQuestions) || submissionPayload.totalQuestions < 1
+      || !Number.isInteger(submissionPayload.correctAnswers) || submissionPayload.correctAnswers < 0 || submissionPayload.correctAnswers > submissionPayload.totalQuestions
+      || !Number.isFinite(submissionPayload.timeTakenSeconds) || submissionPayload.timeTakenSeconds < 0) {
+      throw Object.assign(new Error("The submitted result contains invalid marks, question counts or study time."), { statusCode: 400 });
+    }
     store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
     const activity = store.activities[activityId];
     if (!activity) {
@@ -1228,10 +1233,27 @@ export async function submitActivity(profile, activityId, submissionPayload, app
       submittedAt: Date.now(),
       attemptNumber: attempts.length + 1,
     };
+    captureSchoolResult(store, store.submissions[submissionId]);
 
     return {
       activity: buildActivitySummary(store, activity, profile.id),
       submission: buildSubmissionSummary(store.submissions[submissionId]),
     };
+  });
+}
+
+export async function schoolResultsOperation(operation, scope, payload) {
+  return mutateStore((store) => processSchoolResults(store, operation, scope, payload));
+}
+
+export async function schoolClassroomsOperation(action, scope, payload) {
+  return mutateStore(store => schoolClassroomOperation(store, action, scope, payload));
+}
+
+export async function manageTeacherSchoolClass(action, actor, payload) {
+  return mutateStore(store => {
+    const classroom = teacherSchoolClassOperation(store, action, actor, payload);
+    store.profiles[actor.id] = normalizeProfileRecord(actor, payload.appVariant);
+    return { classroom: buildClassroomSummary(store, classroom) };
   });
 }

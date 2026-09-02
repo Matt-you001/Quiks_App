@@ -584,6 +584,27 @@ export async function getSchoolDetails(principal, schoolId) {
   };
 }
 
+export async function getSchoolReportingContext(principal, schoolId) {
+  const store = await ensureStore();
+  requireSchoolAdmin(store, schoolId, principal);
+  const school = store.schools[schoolId];
+  if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+  if (getEffectiveLicenceStatus(school.licence) !== "active" || !school.licence.features?.reports) {
+    throw Object.assign(new Error("An active school licence with Reports enabled is required."), { statusCode: 403 });
+  }
+  return { principal, school: cloneValue(school), memberships: cloneValue(membershipsForSchool(store, schoolId)) };
+}
+
+export async function getSchoolClassroomContext(principal, schoolId) {
+  const store = await ensureStore();
+  requireSchoolAdmin(store, schoolId, principal);
+  const school = store.schools[schoolId];
+  if (!school || getEffectiveLicenceStatus(school.licence) !== "active" || !school.licence.features?.classroom) {
+    throw Object.assign(new Error("An active school licence with Classroom enabled is required."), { statusCode: 403 });
+  }
+  return { principal, school: cloneValue(school), memberships: cloneValue(membershipsForSchool(store, schoolId)) };
+}
+
 export async function updateSchoolProfileFields(principal, schoolId, fields) {
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);

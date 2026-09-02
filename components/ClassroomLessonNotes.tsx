@@ -17,6 +17,7 @@ import {
   updateClassroomLessonNote,
 } from "../services/ai";
 import { palette, shadows } from "../lib/theme";
+import { cleanNoteText } from "../lib/lesson-note-text";
 import type {
   ClassroomLessonNote,
   LessonNoteAttachmentInput,
@@ -71,18 +72,6 @@ function getDefaultDeadlineDate() {
   return toLocalDateValue(tomorrow);
 }
 
-function cleanNoteText(value: string) {
-  return value
-    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/__([^_]+)__/g, "$1")
-    .replace(/\*([^*\n]+)\*/g, "$1")
-    .replace(/_([^_\n]+)_/g, "$1")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
-    .replace(/^\s*[-*+]\s+/gm, "• ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
 
 function derivedNoteTitle(subject: string, topic: string) {
   return [subject.trim(), topic.trim()].filter(Boolean).join(": ") || "Lesson Note";

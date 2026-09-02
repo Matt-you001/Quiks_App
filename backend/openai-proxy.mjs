@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
 import {
   acceptClassInviteLink,
+  manageTeacherSchoolClass,
   createLessonNote,
   createClassroomActivity,
   createClassroom,
@@ -33,6 +34,8 @@ import {
 } from "./classroom-store.mjs";
 import { getFirebaseAuthDiagnostics, verifyFirebaseRequest } from "./firebase-auth.mjs";
 import { authenticateClassroomRequest } from "./classroom-auth.mjs";
+import { schoolResultsRequest } from "./school-results-api.mjs";
+import { schoolClassroomsRequest } from "./school-classrooms-api.mjs";
 import { getSchoolEmailDiagnostics, sendSchoolInvitationEmail } from "./school-email.mjs";
 import {
   createSchool,
@@ -3288,6 +3291,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (["/classroom/classes/claim", "/classroom/classes/student-code"].includes(url.pathname)) {
+      sendJson(response, 200, await manageTeacherSchoolClass(url.pathname.split("/").at(-1), body.teacherProfile, body));
+      return;
+    }
+
     if (url.pathname === "/classroom/classes/create") {
       await handleClassroomCreate(body, response);
       return;
@@ -3325,6 +3333,18 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/school/admin/details") {
       sendJson(response, 200, await getSchoolDetails(await requireFirebasePrincipal(request), body.schoolId));
+      return;
+    }
+
+    if (url.pathname.startsWith("/school/admin/classes/")) {
+      sendJson(response, 200, await schoolClassroomsRequest(await requireFirebasePrincipal(request), url.pathname.split("/").at(-1), body));
+      return;
+    }
+
+    if (url.pathname.startsWith("/school/admin/results/")) {
+      const principal = await requireFirebasePrincipal(request);
+      const action = url.pathname.slice("/school/admin/results/".length);
+      sendJson(response, 200, await schoolResultsRequest(principal, action, body));
       return;
     }
 

@@ -54,6 +54,7 @@ export async function authenticateClassroomRequest(request, path, body, dependen
   const actorKeys = ["profile", "teacherProfile", "studentProfile", "actorProfile"].filter((key) => body[key]);
   if (actorKeys.length !== 1) throw accessError("Exactly one classroom actor is required.", 400);
   const key = actorKeys[0];
+  if (["/classroom/classes/claim", "/classroom/classes/student-code"].includes(path) && key !== "teacherProfile") throw accessError("A teacher profile is required.", 400);
   const id = body[key]?.id;
   if (typeof id !== "string" || !id || ["__proto__", "constructor", "prototype"].includes(id)) throw accessError("Invalid profile identity.", 400);
   let actor;

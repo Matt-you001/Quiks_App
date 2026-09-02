@@ -10,6 +10,28 @@ export function getSchoolEmailDiagnostics() {
   };
 }
 
+export async function sendSchoolResultEmail(report, fetcher = fetch) {
+  if (!resendApiKey || !invitationFrom) return { status: "not_configured" };
+  const lines = [report.schoolName, report.title, `Student: ${report.studentName}`, "",
+    ...report.rows.flatMap((row) => [
+      `${row.subject} | ${row.className} | ${row.title} (${row.type})`,
+      `Report mark: ${row.adjustedScore ?? row.score}% | Attempt: ${row.attemptNumber}`,
+      ...(row.adjustmentReason ? [`Original mark: ${row.score}% | Reviewed adjustment: ${row.adjustmentReason}`] : []), "",
+    ]), `Average: ${report.average}%`, report.calculation, "",
+    `Administrator's comment: ${report.comment || "No additional comment."}`,
+    "", "Marks have been reviewed for this report by the school. Contact the school with any questions."];
+  try {
+    const response = await fetcher("https://api.resend.com/emails", {
+      method: "POST", signal: AbortSignal.timeout(15000),
+      headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json", "Idempotency-Key": report.delivery.key },
+      body: JSON.stringify({ from: invitationFrom, to: [report.email], subject: `${report.schoolName}: ${report.title}`.replace(/[\r\n]/g, " "), text: lines.join("\n") }),
+    });
+    if (!response.ok) return { status: response.status >= 500 ? "unknown" : "failed" };
+    const payload = await response.json();
+    return typeof payload.id === "string" ? { status: "sent", messageId: payload.id } : { status: "unknown" };
+  } catch { return { status: "unknown" }; }
+}
+
 export async function sendSchoolInvitationEmail({ email, schoolName, invitationCode, role, expiresAt }) {
   if (!resendApiKey || !invitationFrom) {
     return { status: "not_configured" };

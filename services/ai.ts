@@ -3,6 +3,7 @@ import { appVariant } from "../lib/app-variant";
 import { getFirebaseIdToken } from "../lib/firebase";
 import { getLanguageLabel, getLanguagePromptLabel, normalizeLanguage } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
+import type { SchoolResultFilters, SchoolResultsResponse, SchoolReport, SchoolReportEdit } from "../types/school-results";
 import type {
   BreatherContent,
   BreatherRequest,
@@ -299,6 +300,28 @@ export async function enrolInSchool(request: SchoolEnrolRequest): Promise<School
 
 export async function getSchoolAdminDetails(schoolId: string): Promise<SchoolDetailsResponse> {
   return postJson("/school/admin/details", { schoolId });
+}
+
+export function getSchoolResults(schoolId: string, filters: SchoolResultFilters, page = 1): Promise<SchoolResultsResponse> {
+  return postJson("/school/admin/results/list", { schoolId, filters, page });
+}
+export function getSchoolReports(schoolId: string): Promise<{ reports: SchoolReport[] }> {
+  return postJson("/school/admin/results/reports", { schoolId });
+}
+export function createSchoolReport(schoolId: string, studentMembershipId: string, title: string, filters: SchoolResultFilters): Promise<{ report: SchoolReport }> {
+  return postJson("/school/admin/results/create", { schoolId, studentMembershipId, title, filters });
+}
+export function editSchoolReport(schoolId: string, edit: SchoolReportEdit): Promise<{ report: SchoolReport }> {
+  return postJson("/school/admin/results/update", { schoolId, ...edit });
+}
+export function approveSchoolReport(schoolId: string, report: SchoolReport): Promise<{ report: SchoolReport }> {
+  return postJson("/school/admin/results/approve", { schoolId, reportId: report.reportId, revision: report.revision, reviewed: true });
+}
+export function sendSchoolReport(schoolId: string, report: SchoolReport): Promise<{ report: SchoolReport }> {
+  return postJson("/school/admin/results/send", { schoolId, reportId: report.reportId, revision: report.revision, confirm: true });
+}
+export function exportSchoolReport(schoolId: string, reportId: string): Promise<{ filename: string; csv: string }> {
+  return postJson("/school/admin/results/export", { schoolId, reportId });
 }
 
 export async function updateSchoolProfileFields(request: SchoolProfileFieldsUpdateRequest): Promise<SchoolDetailsResponse> {
@@ -1002,6 +1025,23 @@ export async function syncPaddleSubscriptionPurchase(
 
 export async function syncClassroomProfile(request: ClassroomProfileSyncRequest) {
   return postJson("/classroom/profile/upsert", withVariantMeta(request));
+}
+
+export async function manageSchoolTeacherClass(action: "claim" | "student-code", request: { teacherProfile: import("../types/app").UserProfile; classCode?: string; classId?: string }): Promise<ClassroomClassCreateResponse> {
+  return postJson(`/classroom/classes/${action}`, withVariantMeta(request));
+}
+
+export async function listSchoolClasses(schoolId: string): Promise<{ classes: import("../types/school-classrooms").SchoolClassRecord[] }> {
+  return postJson("/school/admin/classes/list", { schoolId });
+}
+export async function createSchoolClass(request: { schoolId: string; className: string; appVariant: string; teacherMembershipId: string; codePolicy: "shared" | "teacher_generated" }): Promise<{ classroom: import("../types/school-classrooms").SchoolClassRecord }> {
+  return postJson("/school/admin/classes/create", request);
+}
+export async function linkSchoolClass(schoolId: string, classCode: string) {
+  return postJson("/school/admin/classes/link", { schoolId, classCode });
+}
+export async function getSchoolClassDetails(schoolId: string, classId: string): Promise<import("../types/school-classrooms").SchoolClassDetails> {
+  return postJson("/school/admin/classes/details", { schoolId, classId });
 }
 
 export async function createClassroomClass(

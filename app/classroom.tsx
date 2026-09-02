@@ -19,6 +19,7 @@ import { palette, shadows } from "../lib/theme";
 import {
   createClassroomAssignment,
   createClassroomClass,
+  manageSchoolTeacherClass,
   deleteClassroomActivity,
   deleteClassroomClass,
   duplicateClassroomActivity,
@@ -135,6 +136,8 @@ export default function ClassroomScreen() {
   const [classroomLoadError, setClassroomLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+  const [schoolTeacherCode, setSchoolTeacherCode] = useState("");
+  const [schoolClassMessage, setSchoolClassMessage] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [inviteStudentId, setInviteStudentId] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
@@ -545,6 +548,7 @@ export default function ClassroomScreen() {
   };
 
   const copyClassCode = async (classCode: string) => {
+    if (!classCode) { setSchoolClassMessage("Generate the student join code first."); return; }
     try {
       await Clipboard.setStringAsync(classCode);
       Alert.alert(t(language, "classroomTitle"), t(language, "copyClassCodeSuccess"));
@@ -560,6 +564,7 @@ export default function ClassroomScreen() {
       return;
     }
 
+    if (!selectedClass.classCode) { setSchoolClassMessage("Generate the student join code before sharing invitations."); return; }
     const link = createClassroomInvitationLink(selectedClass.classCode, selectedClass.className);
     const message = createClassroomInvitationMessage(selectedClass.className, selectedClass.classCode);
 
@@ -620,6 +625,19 @@ export default function ClassroomScreen() {
       setDeadlineTime(value);
     }
     setOpenPicker(null);
+  };
+
+  const openSchoolClass = async (action: "claim" | "student-code") => {
+    if (!profile || saving) return;
+    setSaving(true); setSchoolClassMessage("");
+    try {
+      const result = await manageSchoolTeacherClass(action, { teacherProfile: profile, classCode: action === "claim" ? schoolTeacherCode.trim() : undefined, classId: action === "student-code" ? selectedClassId ?? undefined : undefined });
+      setSchoolTeacherCode("");
+      await refreshClassroomData();
+      setSelectedClassId(result.classroom.classId);
+      setSchoolClassMessage(action === "claim" ? "School class opened. Select it below to manage activities, notes and students." : `Student code: ${result.classroom.classCode}. Share it with your students.`);
+    } catch (e) { setSchoolClassMessage(e instanceof Error ? e.message : "Unable to open school class."); }
+    finally { setSaving(false); }
   };
 
   const createClass = async () => {
@@ -1319,6 +1337,14 @@ export default function ClassroomScreen() {
               />
               <PrimaryButton label={t(language, "createClassAction")} onPress={createClass} loading={saving} style={styles.createClassButton} />
             </View>
+            {profile.schoolId && <View>
+              <Text style={styles.classMeta}>Open a class assigned by your school administrator</Text>
+              <TextInput accessibilityLabel="Assigned teacher class code" value={schoolTeacherCode} onChangeText={setSchoolTeacherCode} placeholder="Teacher code from school administrator" autoCapitalize="characters" style={styles.input}/>
+              <PrimaryButton label="Open school class" onPress={() => void openSchoolClass("claim")} loading={saving}/>
+              {selectedClass?.codePolicy === "teacher_generated" && !selectedClass.classCode && <PrimaryButton label="Generate student join code" onPress={() => void openSchoolClass("student-code")} loading={saving}/>}
+              {schoolClassMessage ? <Text accessibilityLiveRegion="polite" style={styles.classMeta}>{schoolClassMessage}</Text> : null}
+              <Text style={styles.classMeta}>Classes created with this school profile are also available to your school administrator.</Text>
+            </View>}
           </View>
         ) : null}
         <View style={styles.classroomTabs}>
@@ -1363,7 +1389,7 @@ export default function ClassroomScreen() {
                       >
                         <Text style={styles.classTitle}>{entry.className}</Text>
                         <View style={styles.codeRow}>
-                          <Text style={styles.classMeta}>{t(language, "classCode")}: {entry.classCode}</Text>
+                          <Text style={styles.classMeta}>{t(language, "classCode")}: {entry.classCode || "Not generated yet"}</Text>
                           <Pressable onPress={() => copyClassCode(entry.classCode)} style={styles.copyButton}>
                             <MaterialIcons name="content-copy" size={16} color={palette.navy} />
                           </Pressable>
@@ -1412,7 +1438,7 @@ export default function ClassroomScreen() {
                       <PrimaryButton
                         label={t(language, "inviteStudentsByLink")}
                         variant="secondary"
-                        onPress={() => setShowInviteLinkOptions(true)}
+                        onPress={() => selectedClass.classCode ? setShowInviteLinkOptions(true) : setSchoolClassMessage("Generate the student join code before sharing invitations.")}
                       />
                     </>
                   ) : null}

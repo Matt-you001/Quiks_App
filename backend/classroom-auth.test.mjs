@@ -116,6 +116,7 @@ test("Firestore lookup uses verified project/UID and caller token, fails on outa
 test("every HTTP classroom route rejects anonymous requests before its handler", async () => {
   const source = await readFile(new URL("./openai-proxy.mjs", import.meta.url), "utf8");
   const routes = [...new Set([...source.matchAll(/url\.pathname === "(\/classroom\/[^\"]+)"/g)].map((match) => match[1]))];
+  routes.push("/classroom/classes/claim", "/classroom/classes/student-code", ...["list", "create", "link", "details"].map(action => `/school/admin/classes/${action}`));
   assert.ok(routes.length >= 29);
   const probe = createServer();
   probe.listen(0, "127.0.0.1");

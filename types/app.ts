@@ -245,6 +245,8 @@ export interface ClassroomMemberSummary {
 }
 
 export interface ClassroomSummary {
+  schoolId?: string | null;
+  codePolicy?: "shared" | "teacher_generated";
   classId: string;
   classCode: string;
   className: string;

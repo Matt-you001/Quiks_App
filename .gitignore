@@ -19,6 +19,7 @@
 
 # production
 /build
+/hosting-backups/
 
 # misc
 .DS_Store
