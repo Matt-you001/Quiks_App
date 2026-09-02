@@ -63,7 +63,9 @@ export default function SelectProfileScreen() {
             <View>
               <Text style={styles.name}>{profile.name}</Text>
               <Text style={styles.meta}>
-                {t(language, "age")} {profile.age} | {profile.targetExam} | {getLanguageLabel(profile.language)}
+                {profile.schoolMembershipId
+                  ? `${profile.schoolName || "Quiks School"} | ${profile.administrativeRole === "school_admin" ? "School Administrator" : profile.role === "teacher" ? "Teacher" : "Student"}`
+                  : `${t(language, "age")} ${profile.age} | ${profile.targetExam} | ${getLanguageLabel(profile.language)}`}
               </Text>
             </View>
             <PrimaryButton label={t(language, "use")} onPress={() => continueWithProfile(profile.id)} style={styles.useButton} />

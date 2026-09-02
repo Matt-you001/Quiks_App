@@ -69,6 +69,8 @@ export interface UserProfile {
   administrativeRole?: "app_owner" | "school_admin";
   administrativeAccountUid?: string;
   administrativeSchoolId?: string;
+  schoolId?: string;
+  schoolMembershipId?: string;
 }
 
 export interface Question {
@@ -492,6 +494,7 @@ export interface SchoolIdentityResponse {
   };
   isAppOwner: boolean;
   administratorMemberships: SchoolMembership[];
+  memberships?: SchoolMembership[];
 }
 
 export interface SchoolDetailsResponse {

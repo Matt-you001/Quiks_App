@@ -14,6 +14,7 @@ import {
   getLessonNoteAttachment,
   getLessonNoteForTeacher,
   getClassroomStoreDiagnostics,
+  initializeClassroomStore,
   getClassroomDetails,
   inviteStudentToClass,
   listActivitiesForProfile,
@@ -31,6 +32,7 @@ import {
   upsertClassroomProfile,
 } from "./classroom-store.mjs";
 import { getFirebaseAuthDiagnostics, verifyFirebaseRequest } from "./firebase-auth.mjs";
+import { authenticateClassroomRequest } from "./classroom-auth.mjs";
 import { getSchoolEmailDiagnostics, sendSchoolInvitationEmail } from "./school-email.mjs";
 import {
   createSchool,
@@ -386,6 +388,7 @@ function sendJson(response, statusCode, payload) {
 }
 
 function getClientErrorStatus(error) {
+  if ([400, 401, 403, 404, 409, 503].includes(error?.statusCode)) return error.statusCode;
   const message = error instanceof Error ? error.message.trim().toLowerCase() : "";
 
   if (!message) {
@@ -3153,7 +3156,12 @@ const server = http.createServer(async (request, response) => {
   }
 
   try {
-    const body = await readJsonBody(request);
+    let body = await readJsonBody(request);
+    // All classroom, lesson-note, chat and CBT endpoints share the school
+    // Firebase principal. Validate before reading records or calling AI.
+    if (url.pathname.startsWith("/classroom/")) {
+      body = await authenticateClassroomRequest(request, url.pathname, body);
+    }
 
     if (url.pathname === "/questions") {
       await handleQuestions(body, response);
@@ -3521,6 +3529,10 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
+const classroomInitialization = await initializeClassroomStore();
+if (classroomInitialization.status !== "not_requested") {
+  console.log(`Classroom identity migration: ${classroomInitialization.status}; backup created: ${Boolean(classroomInitialization.backupCreated)}`);
+}
 server.listen(port, () => {
   console.log(`OpenAI proxy listening on http://localhost:${port}`);
 });

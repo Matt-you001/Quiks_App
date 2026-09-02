@@ -1,6 +1,7 @@
 import type { AppAccount, SchoolIdentityResponse, UserProfile } from "../types/app";
 import { getSchoolIdentity } from "../services/ai";
 import { readAppState, setCurrentProfile, upsertProfile } from "./storage";
+import { appVariant } from "./app-variant";
 
 function administrativeProfileId(account: AppAccount) {
   return `admin-${account.uid}`;
@@ -13,12 +14,37 @@ function administrativeQuiksId(account: AppAccount) {
 
 export async function syncAdministrativeProfileForAccount(account: AppAccount) {
   const identity = await getSchoolIdentity();
+  // Stable membership-derived profiles connect enrolment, classrooms and CBT.
+  // Existing personal profiles and their learning history are never removed.
+  const beforeSync = await readAppState({ awaitCloudRefresh: true });
+  const selectedBeforeSync = beforeSync.currentProfileId;
+  for (const membership of identity.memberships ?? []) {
+    if (membership.status !== "active") continue;
+    const id = `school-${appVariant.id}-${membership.membershipId}`;
+    const existingSchoolProfile = beforeSync.profiles.find((profile) => profile.id === id);
+    await upsertProfile({
+      id, updatedAt: Date.now(), name: membership.displayName,
+      age: existingSchoolProfile?.age ?? 0,
+      targetExam: membership.role === "student" ? "School learning" : "School teaching",
+      dailyGoalMinutes: existingSchoolProfile?.dailyGoalMinutes ?? 45,
+      language: existingSchoolProfile?.language ?? "en",
+      role: membership.role === "student" ? "student" : "teacher",
+      quiksId: `QX-S-${appVariant.id.toUpperCase()}-${membership.membershipId.toUpperCase()}`,
+      schoolName: membership.schoolName, schoolId: membership.schoolId,
+      schoolMembershipId: membership.membershipId,
+      ...(membership.role === "school_admin" ? { administrativeRole: "school_admin" as const, administrativeAccountUid: account.uid, administrativeSchoolId: membership.schoolId } : {}),
+    });
+  }
+  if (selectedBeforeSync) {
+    const previous = beforeSync.profiles.find((profile) => profile.id === selectedBeforeSync);
+    const administrativeMembership = identity.memberships?.find((membership) => membership.status === "active" && membership.schoolId === previous?.administrativeSchoolId);
+    await setCurrentProfile(administrativeMembership && !identity.isAppOwner
+      ? `school-${appVariant.id}-${administrativeMembership.membershipId}` : selectedBeforeSync);
+  }
   const administratorMembership = identity.administratorMemberships[0];
   const administrativeRole = identity.isAppOwner
     ? "app_owner"
-    : administratorMembership
-      ? "school_admin"
-      : null;
+    : null;
 
   if (!administrativeRole) {
     return { identity, profile: null };
@@ -63,7 +89,7 @@ export function isAdministrativeProfile(profile: UserProfile) {
 }
 
 export function countLearnerProfiles(profiles: UserProfile[]) {
-  return profiles.filter((profile) => !isAdministrativeProfile(profile)).length;
+  return profiles.filter((profile) => !isAdministrativeProfile(profile) && !profile.schoolMembershipId).length;
 }
 
 export function describeAdministrativeIdentity(identity: SchoolIdentityResponse) {

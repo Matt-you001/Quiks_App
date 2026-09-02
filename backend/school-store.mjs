@@ -149,7 +149,7 @@ function isOwner(principal) {
   return (
     ownerPrincipals.has(principal.principalId.toLowerCase()) ||
     ownerUids.has(principal.uid.toLowerCase()) ||
-    (principal.email && ownerEmails.has(principal.email.toLowerCase()))
+    (principal.emailVerified && principal.email && ownerEmails.has(principal.email.toLowerCase()))
   );
 }
 
@@ -559,6 +559,9 @@ export async function getPrincipalSchoolIdentity(principal) {
     },
     isAppOwner: isOwner(principal),
     administratorMemberships,
+    memberships: Object.values(store.memberships)
+      .filter((membership) => membershipMatchesPrincipal(membership, principal))
+      .map((membership) => buildMembership(store, membership)),
   };
 }
 

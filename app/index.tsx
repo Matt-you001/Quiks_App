@@ -135,6 +135,7 @@ function getGradeRank(grade: string) {
 
 function getProfileSubtitle(profile: UserProfile, language: AppLanguage) {
   if (profile.administrativeRole === "app_owner") return "Quiks App Owner";
+  if (profile.schoolMembershipId) return `${profile.schoolName || "Quiks School"} | ${profile.administrativeRole === "school_admin" ? "School Administrator" : profile.role === "teacher" ? "Teacher" : "Student"}`;
   if (profile.administrativeRole === "school_admin") return "School Administrator";
   return `${t(language, "age")} ${profile.age} | ${profile.targetExam}`;
 }

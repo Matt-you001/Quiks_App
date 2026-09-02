@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { CLASSROOM_RESET_VERSION, migrateClassroomTestData } from "./classroom-migration.mjs";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const configuredStorePath = String(process.env.CLASSROOM_STORE_PATH ?? "").trim();
@@ -16,6 +17,7 @@ const temporaryStorePath = `${storePath}.tmp`;
 
 const defaultStore = {
   profiles: {},
+  profileIdentities: {},
   classrooms: {},
   memberships: {},
   activities: {},
@@ -26,6 +28,7 @@ const defaultStore = {
 
 let storeCache = null;
 let writeQueue = Promise.resolve();
+let mutationQueue = Promise.resolve();
 
 function persistentMountDetected() {
   if (process.platform !== "linux" || !storePath.startsWith("/var/data/")) return null;
@@ -55,7 +58,9 @@ async function ensureStore() {
       ...defaultStore,
       ...JSON.parse(raw),
     };
-  } catch {
+  } catch (error) {
+    // A read/parse failure must not erase records or the ownership registry.
+    if (error.code !== "ENOENT") throw error;
     storeCache = cloneValue(defaultStore);
     await writeFile(storePath, JSON.stringify(storeCache, null, 2), "utf8");
   }
@@ -76,14 +81,102 @@ export function getClassroomStoreDiagnostics() {
     configured: Boolean(configuredStorePath),
     persistentPathExpected: storePath.startsWith("/var/data/"),
     persistentMountDetected: persistentMountDetected(),
+    identityResetCompleted: Boolean(storeCache?.migrations?.[CLASSROOM_RESET_VERSION]?.completedAt),
   };
 }
 
-async function mutateStore(mutator) {
-  const store = await ensureStore();
-  const result = await mutator(store);
-  await persistStore(store);
+export async function initializeClassroomStore() {
+  const result = await migrateClassroomTestData({
+    mode: String(process.env.QUIKS_CLASSROOM_MIGRATION ?? "").trim(),
+    classroomPath: configuredStorePath,
+    schoolPath: String(process.env.SCHOOL_STORE_PATH ?? "").trim(),
+    emptyStore: defaultStore,
+  });
+  await ensureStore();
   return result;
+}
+
+async function mutateStore(mutator) {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const store = cloneValue(await ensureStore());
+    const result = await mutator(store);
+    await persistStore(store);
+    storeCache = store;
+    return result;
+  });
+  mutationQueue = operation;
+  return operation;
+}
+
+function denyAccess(message, statusCode = 403) {
+  throw Object.assign(new Error(message), { statusCode });
+}
+
+function sameSchool(classroom, profile) {
+  return (classroom.schoolId ?? null) === (profile.schoolId ?? null);
+}
+
+// Called only after token verification and authoritative actor resolution.
+// Existing unbound IDs require an operator-verified migration; knowing an ID
+// or copying it into one's own Firestore document must never claim old records.
+export async function authorizeClassroomRequest(path, body, actor, actorKey) {
+  return mutateStore(async (store) => {
+    const variant = body.appVariant;
+    const binding = actor.schoolMembershipId
+      ? `school:${actor.schoolMembershipId}` : actor.principalId;
+    const existingIdentity = store.profileIdentities[actor.id];
+    const quiksId = String(actor.quiksId).trim().toUpperCase();
+    if (Object.values(store.profiles).some((p) => p.profileId !== actor.id && p.appVariant === variant && p.quiksId === quiksId)
+      || Object.values(store.memberships).some((m) => m.profileId !== actor.id && m.quiksId === quiksId && store.classrooms[m.classId]?.appVariant === variant)) {
+      denyAccess("This Quiks ID is already associated with another classroom profile.");
+    }
+    if (existingIdentity && (existingIdentity.owner !== binding || existingIdentity.appVariant !== variant)) {
+      denyAccess("This classroom profile belongs to a different account or app variant.");
+    }
+    if (!existingIdentity && store.profiles[actor.id]) {
+      const mappingPath = process.env.QUIKS_CLASSROOM_IDENTITY_MAP_PATH;
+      const mappings = mappingPath ? JSON.parse(await readFile(mappingPath, "utf8")) : {};
+      const entry = Object.hasOwn(mappings, actor.id) ? mappings[actor.id] : null;
+      if (!entry || entry.owner !== binding || entry.appVariant !== variant) {
+        denyAccess("This existing classroom profile needs a verified ownership migration. Contact Quiks support; its records have not been deleted.", 409);
+      }
+    }
+    const targets = [];
+    if (body.classId) targets.push(store.classrooms[body.classId]);
+    if (body.classCode) targets.push(Object.values(store.classrooms).find((c) => c.classCode === String(body.classCode).trim().toUpperCase() && c.appVariant === variant));
+    let activity;
+    if (body.activityId) {
+      activity = store.activities[body.activityId];
+      targets.push(store.classrooms[activity?.classId]);
+    }
+    if (body.noteId) targets.push(store.classrooms[store.lessonNotes[body.noteId]?.classId]);
+    if (body.membershipId) targets.push(store.classrooms[store.memberships[body.membershipId]?.classId]);
+    if (targets.some((c) => !c)) denyAccess("Classroom resource not found.", 404);
+    if (new Set(targets.map((c) => c.id)).size > 1) denyAccess("The requested classroom resources do not belong to the same class.");
+    const classroom = targets[0];
+    if (classroom) {
+      if (classroom.appVariant !== variant || !sameSchool(classroom, actor)) denyAccess("This class is outside your school or app variant.");
+      if (classroom.teacherProfileId === actor.id && actor.role !== "teacher") denyAccess("Your current school role cannot manage this class.");
+      const joining = path.endsWith("/classes/join") || path.endsWith("/invite-link/accept");
+      const responding = path.endsWith("/membership/respond");
+      if (actorKey === "teacherProfile") {
+        if (actor.role !== "teacher" || classroom.teacherProfileId !== actor.id) denyAccess("Only the class teacher can manage this class.");
+      } else if (responding) {
+        const member = store.memberships[body.membershipId];
+        if (classroom.teacherProfileId !== actor.id && member?.profileId !== actor.id) denyAccess("This membership request belongs to another user.");
+      } else if (!joining && classroom.teacherProfileId !== actor.id && !getActiveMembership(store, classroom.id, actor.id)) {
+        denyAccess("This profile is not an active member of the class.");
+      }
+    }
+    const listRoutes = new Set(["/classroom/profile/upsert", "/classroom/classes/list", "/classroom/assignments/list", "/classroom/classes/create"]);
+    if (!classroom && !listRoutes.has(path)) denyAccess("A classroom resource is required.", 400);
+    if (body.studentQuiksId) {
+      const target = Object.values(store.profiles).find((p) => p.quiksId === String(body.studentQuiksId).trim().toUpperCase() && p.appVariant === variant);
+      if (!target || !store.profileIdentities[target.profileId] || !sameSchool(target, actor)) denyAccess("Student profile not found in this school or app variant.", 404);
+    }
+    store.profileIdentities[actor.id] = { owner: binding, appVariant: variant };
+    return { assessmentMode: activity?.assessmentMode };
+  });
 }
 
 function normalizeRole(role) {
@@ -96,6 +189,8 @@ function normalizeProfileRecord(profile, appVariant) {
     quiksId: String(profile.quiksId ?? "").trim().toUpperCase(),
     name: profile.name,
     role: normalizeRole(profile.role),
+    schoolId: profile.schoolId ?? null,
+    schoolMembershipId: profile.schoolMembershipId ?? null,
     appVariant,
     updatedAt: Date.now(),
   };
@@ -163,6 +258,7 @@ function buildClassroomSummary(store, classroom) {
     classId: classroom.id,
     classCode: classroom.classCode,
     className: classroom.className,
+    schoolId: classroom.schoolId ?? null,
     teacherProfileId: classroom.teacherProfileId,
     teacherName: classroom.teacherName,
     createdAt: classroom.createdAt,
@@ -396,6 +492,7 @@ export async function createClassroom(teacherProfile, className, appVariant) {
       className: className.trim(),
       teacherProfileId: teacherProfile.id,
       teacherName: teacherProfile.name,
+      schoolId: teacherProfile.schoolId ?? null,
       appVariant,
       createdAt,
     };
@@ -424,13 +521,20 @@ export async function listClassroomsForProfile(profile, appVariant) {
 
     const classes = Object.values(store.classrooms)
       .filter((classroom) => classroom.appVariant === appVariant)
+      .filter((classroom) => sameSchool(classroom, profile))
       .filter((classroom) =>
         Object.values(store.memberships).some(
           (membership) => membership.classId === classroom.id && membership.profileId === profile.id
         )
       )
       .sort((left, right) => right.createdAt - left.createdAt)
-      .map((classroom) => buildClassroomSummary(store, classroom));
+      .map((classroom) => {
+        const summary = buildClassroomSummary(store, classroom);
+        // A join request is not permission to read other people's invitations.
+        return classroom.teacherProfileId === profile.id ? summary : {
+          ...summary, pendingTeacherApprovals: [], pendingStudentApprovals: [],
+        };
+      });
 
     return classes;
   });
@@ -1033,6 +1137,7 @@ export async function listActivitiesForProfile(profile, appVariant) {
 
     return Object.values(store.activities)
       .filter((activity) => classIds.has(activity.classId))
+      .filter((activity) => store.classrooms[activity.classId]?.appVariant === appVariant && sameSchool(store.classrooms[activity.classId], profile))
       .sort((left, right) => right.createdAt - left.createdAt)
       .map((activity) => buildActivitySummary(store, activity, profile.id));
   });

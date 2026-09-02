@@ -5,6 +5,7 @@ import { AppBackground } from "../components/AppBackground";
 import { appVariant } from "../lib/app-variant";
 import { getAuthenticatedAccount } from "../lib/firebase";
 import { syncAdministrativeProfileForAccount } from "../lib/school-identity";
+import { setCurrentProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import { enrolInSchool, getSchoolPublicDetails } from "../services/ai";
 import type { SchoolMemberRole, SchoolProfileFieldDefinition, SchoolPublicDetails } from "../types/app";
@@ -39,8 +40,9 @@ export default function SchoolEnrolScreen() {
     try {
       const result = await enrolInSchool({ schoolCode: school.schoolCode, role, appVariant: appVariant.id, profileData: values, invitationCode: school.invitationCode });
       const account = getAuthenticatedAccount();
-      if (account && result.membership.role === "school_admin" && result.membership.status === "active") {
+      if (account && result.membership.status === "active") {
         await syncAdministrativeProfileForAccount(account).catch(() => undefined);
+        await setCurrentProfile(`school-${appVariant.id}-${result.membership.membershipId}`);
       }
       Alert.alert("Quiks School", result.membership.status === "active" ? "You have joined the school." : "Your request has been sent to the school administrator for approval.");
       router.replace("/school" as never);
