@@ -96,7 +96,7 @@ export default function ProfileEditorScreen() {
 
     if (!editingProfile) {
       const state = await readAppState();
-      if (!canCreateAnotherProfile(state.subscriptionTier, countLearnerProfiles(state.profiles))) {
+      if (!canCreateAnotherProfile(state.subscriptionTier, countLearnerProfiles(state.profiles), state.subscriptionProfileLimit)) {
         setShowProfileUpgrade(true);
         return;
       }
@@ -113,7 +113,7 @@ export default function ProfileEditorScreen() {
       preferredCurriculum:
         !isTeacher && appVariant.id !== "uni" ? form.preferredCurriculum.trim() : "",
       dailyGoalMinutes: isTeacher ? 0 : goal,
-      schoolName: isTeacher ? form.schoolName.trim() : "",
+      schoolName: form.schoolName.trim(),
       teachingFocus: isTeacher ? form.teachingFocus.trim() : "",
       language: form.language,
       role: form.role,
@@ -224,6 +224,15 @@ export default function ProfileEditorScreen() {
               onChangeText={(value) => setForm((current) => ({ ...current, targetExam: value }))}
               style={styles.input}
               placeholder={appVariant.targetExamPlaceholder}
+              placeholderTextColor="#7C8EA3"
+            />
+
+            <Text style={styles.label}>{t(form.language, "schoolName")}</Text>
+            <TextInput
+              value={form.schoolName}
+              onChangeText={(value) => setForm((current) => ({ ...current, schoolName: value }))}
+              style={styles.input}
+              placeholder={t(form.language, "optional")}
               placeholderTextColor="#7C8EA3"
             />
 

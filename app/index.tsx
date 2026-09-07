@@ -148,6 +148,7 @@ export default function HomeScreen() {
   const [currentProfileId, setCurrentProfileIdState] = useState<string | null>(null);
   const [resultsByProfile, setResultsByProfile] = useState<Record<string, SessionResult[]>>({});
   const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
+  const [subscriptionProfileLimit, setSubscriptionProfileLimit] = useState(1);
   const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
 
   const loadData = useCallback(async () => {
@@ -189,6 +190,7 @@ export default function HomeScreen() {
     setCurrentProfileIdState(resolvedProfileId);
     setResultsByProfile(state.results);
     setSubscriptionTier(state.subscriptionTier);
+    setSubscriptionProfileLimit(state.subscriptionProfileLimit);
     setAuthChecked(true);
     if (classroomJoinCode) {
       if (canUseClassroom(state.subscriptionTier)) {
@@ -277,7 +279,7 @@ export default function HomeScreen() {
   };
 
   const learnerProfileCount = countLearnerProfiles(profiles);
-  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, learnerProfileCount);
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, learnerProfileCount, subscriptionProfileLimit);
   const showWideActions = width >= 900;
 
   if (!authChecked) {

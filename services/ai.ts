@@ -101,6 +101,8 @@ import type {
   SchoolMembershipListResponse,
   SchoolMembershipStatusUpdateRequest,
   SchoolOwnerDashboardResponse,
+  OwnerIssuedIndividualLicenceCreateRequest,
+  OwnerIssuedIndividualLicenceCreateResponse,
   SchoolOwnerLicenceUpdateRequest,
   SchoolProfileFieldsUpdateRequest,
   SchoolPublicDetails,
@@ -342,6 +344,10 @@ export async function getSchoolOwnerDashboard(): Promise<SchoolOwnerDashboardRes
 
 export async function createSchool(request: SchoolCreateRequest): Promise<SchoolCreateResponse> {
   return postJson("/school/owner/create", request);
+}
+
+export async function createOwnerIssuedIndividualLicence(request: OwnerIssuedIndividualLicenceCreateRequest): Promise<OwnerIssuedIndividualLicenceCreateResponse> {
+  return postJson("/school/owner/individual-licence", request);
 }
 
 export async function updateSchoolLicence(request: SchoolOwnerLicenceUpdateRequest): Promise<SchoolDetailsResponse["school"]> {

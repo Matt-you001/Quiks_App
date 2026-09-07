@@ -13,9 +13,10 @@ for (const variant of ["children", "teens", "uni"]) {
   assert.equal(entries.length, 1, `${variant}: exactly one current entry bundle`);
   const bundle = readFileSync(join(jsDir, entries[0]), "utf8");
   assert.ok(bundle.replaceAll("\\", "").includes(`"APP_VARIANT":"${variant}"`), `${variant}: compiled variant configuration`);
-  for (const marker of ["https://quiks-app.onrender.com", "/school/admin/classes/create", "/school/admin/results/list", "Classes & records", "Open school class"]) {
+  for (const marker of ["https://quiks-app.onrender.com", "/school/admin/classes/create", "/school/admin/results/list", "/school/owner/individual-licence", "Classes & records", "Open school class", "Issue individual licence", "Individual licences", "Toggle school menu", "subscriptionProfileLimit"]) {
     assert.ok(bundle.includes(marker), `${variant}: missing ${marker}`);
   }
+  assert.ok(!bundle.includes("Collapse Menu") && !bundle.includes("Collapse menu"), `${variant}: obsolete labelled menu control`);
   assert.ok(!bundle.includes("https://quiks-openai-proxy.onrender.com"), `${variant}: obsolete backend URL`);
   for (const route of pages) {
     const page = join(base, route, "index.html");

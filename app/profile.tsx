@@ -104,6 +104,7 @@ export default function ProfileScreen() {
   const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<"free" | "pro">("free");
+  const [subscriptionProfileLimit, setSubscriptionProfileLimit] = useState(1);
   const [subscriptionExpiresAt, setSubscriptionExpiresAt] = useState<string | null>(null);
   const [subscriptionUpdatedAt, setSubscriptionUpdatedAt] = useState(0);
   const [profileCount, setProfileCount] = useState(0);
@@ -128,22 +129,21 @@ export default function ProfileScreen() {
     setActiveProfile(profile);
     setResults(profile ? state.results[profile.id] ?? [] : []);
     setSubscriptionTier(state.subscriptionTier);
+    setSubscriptionProfileLimit(state.subscriptionProfileLimit);
     setSubscriptionExpiresAt(state.subscriptionExpiresAt);
     setSubscriptionUpdatedAt(state.subscriptionUpdatedAt);
     setProfileCount(countLearnerProfiles(state.profiles));
 
     if (state.account) {
-      const refreshSubscription =
-        Platform.OS === "web"
-          ? getAccountSubscriptionStatus({ accountUid: state.account.uid }).then(async (status) => {
-              await storeSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
-            })
-          : syncRevenueCatIdentity(state.account).then(() => undefined);
+      const refreshSubscription = getAccountSubscriptionStatus({ accountUid: state.account.uid }).then(async (status) => {
+        await storeSubscriptionTier(status.active ? "pro" : "free", status.expiresAt, status.profileLimit);
+      });
 
       void refreshSubscription
         .then(async () => {
           const refreshedState = await readAppState();
           setSubscriptionTier(refreshedState.subscriptionTier);
+          setSubscriptionProfileLimit(refreshedState.subscriptionProfileLimit);
           setSubscriptionExpiresAt(refreshedState.subscriptionExpiresAt);
           setSubscriptionUpdatedAt(refreshedState.subscriptionUpdatedAt);
         })
@@ -261,7 +261,7 @@ export default function ProfileScreen() {
   const goalSeconds = goalMinutes * 60;
   const competitionResults = results.filter((result) => Boolean(result.competitionId));
   const competitionWins = competitionResults.filter((result) => result.competitionOutcome === "won").length;
-  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profileCount);
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, profileCount, subscriptionProfileLimit);
   const isMobile = Platform.OS !== "web";
   const subscriptionExpiryLabel = useMemo(() => {
     if (subscriptionTier !== "pro") {

@@ -19,6 +19,7 @@ export default function SelectProfileScreen() {
   const { subject } = useLocalSearchParams<{ subject?: string }>();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
+  const [subscriptionProfileLimit, setSubscriptionProfileLimit] = useState(1);
   const [showProfileUpgrade, setShowProfileUpgrade] = useState(false);
   const language = profiles[0]?.language ?? "en";
   const selectedSubject = getSubjectById(subject, language);
@@ -27,6 +28,7 @@ export default function SelectProfileScreen() {
     const state = await readAppState({ awaitCloudRefresh: true });
     setProfiles(state.profiles);
     setSubscriptionTier(state.subscriptionTier);
+    setSubscriptionProfileLimit(state.subscriptionProfileLimit);
     if (state.profiles.length === 0 && subject) {
       router.replace({ pathname: "/profile-editor", params: { mode: "create" } } as never);
     }
@@ -46,7 +48,7 @@ export default function SelectProfileScreen() {
     }
   };
 
-  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, countLearnerProfiles(profiles));
+  const canCreateMoreProfiles = canCreateAnotherProfile(subscriptionTier, countLearnerProfiles(profiles), subscriptionProfileLimit);
 
   return (
     <AppBackground webContentWidth="standard">

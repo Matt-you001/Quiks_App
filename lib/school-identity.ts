@@ -89,7 +89,10 @@ export function isAdministrativeProfile(profile: UserProfile) {
 }
 
 export function countLearnerProfiles(profiles: UserProfile[]) {
-  return profiles.filter((profile) => !isAdministrativeProfile(profile) && !profile.schoolMembershipId).length;
+  // School student/teacher profiles are real usable profiles and count toward
+  // the licence allowance. Only the automatically-created owner/admin control
+  // identity is excluded from learner-profile limits.
+  return profiles.filter((profile) => !isAdministrativeProfile(profile)).length;
 }
 
 export function describeAdministrativeIdentity(identity: SchoolIdentityResponse) {

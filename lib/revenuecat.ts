@@ -277,12 +277,13 @@ export async function syncRevenueCatIdentity(account: AppAccount | null) {
 }
 
 export async function syncRevenueCatIdentityForAuthentication(account: AppAccount) {
-  const syncPromise =
-    Platform.OS === "web"
-      ? getAccountSubscriptionStatus({ accountUid: account.uid })
-          .then((status) => setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt))
-          .catch(() => undefined)
-      : syncRevenueCatIdentity(account).catch(() => undefined);
+  // The server combines store purchases, school access and owner-issued
+  // individual licences. Use it on every platform so mobile and web receive
+  // the same entitlement and profile limit; fall back to the native store SDK
+  // only when the server cannot be reached.
+  const syncPromise = getAccountSubscriptionStatus({ accountUid: account.uid })
+    .then((status) => setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt, status.profileLimit))
+    .catch(() => Platform.OS === "web" ? undefined : syncRevenueCatIdentity(account).catch(() => undefined));
   await Promise.race([
     syncPromise,
     new Promise<void>((resolve) => {

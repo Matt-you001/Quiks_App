@@ -942,7 +942,7 @@ const english: TranslationMap = {
   subscriptionNotSupported: "Store purchases are not available in Expo Go. Use a preview or production build to test subscriptions.",
   childrenAdFreeNote: "Quiks Children stays ad-free for a safer child learning experience.",
   profileLimitReachedTitle: "Profile limit reached",
-  profileLimitReachedMessage: "You have reached your plan's profile limit. Free allows one learner profile, while Pro allows up to two.",
+  profileLimitReachedMessage: "You have reached your profile allowance. Store subscriptions allow up to two profiles; free and owner-issued licences allow one.",
   freeAiLimitReached: "You have used today's free AI practice limit. Upgrade to Pro to continue using AI-generated questions.",
   freeCompetitionLimitReached: "You have reached today's free competition limit. Upgrade to Pro for unlimited competitions and rematches.",
   freePlanStatus: "You are on the Free plan.",

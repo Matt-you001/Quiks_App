@@ -88,16 +88,20 @@ export function canUseClassroom(subscriptionTier: SubscriptionTier) {
   return isProTier(subscriptionTier);
 }
 
-export function getProfileLimit(subscriptionTier: SubscriptionTier) {
+export function getProfileLimit(subscriptionTier: SubscriptionTier, effectiveProfileLimit?: number) {
   if (!subscriptionRestrictionsEnabled) {
     return Number.POSITIVE_INFINITY;
   }
 
-  return isProTier(subscriptionTier) ? PRO_PROFILE_LIMIT : FREE_PROFILE_LIMIT;
+  if (!isProTier(subscriptionTier)) return FREE_PROFILE_LIMIT;
+  if (Number.isFinite(effectiveProfileLimit)) {
+    return Math.max(1, Math.min(PRO_PROFILE_LIMIT, Math.floor(effectiveProfileLimit!)));
+  }
+  return PRO_PROFILE_LIMIT;
 }
 
-export function canCreateAnotherProfile(subscriptionTier: SubscriptionTier, profileCount: number) {
-  return profileCount < getProfileLimit(subscriptionTier);
+export function canCreateAnotherProfile(subscriptionTier: SubscriptionTier, profileCount: number, effectiveProfileLimit?: number) {
+  return profileCount < getProfileLimit(subscriptionTier, effectiveProfileLimit);
 }
 
 export function getDailyAiSessionLimit(subscriptionTier: SubscriptionTier) {

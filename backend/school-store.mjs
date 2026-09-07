@@ -18,6 +18,7 @@ const temporaryBackupStorePath = `${backupStorePath}.tmp`;
 
 const defaultStore = {
   schools: {},
+  individualLicences: {},
   memberships: {},
   invitations: {},
   auditEvents: {},
@@ -71,6 +72,7 @@ function normalizeStore(value) {
   }
   return {
     schools: value.schools && typeof value.schools === "object" ? value.schools : {},
+    individualLicences: value.individualLicences && typeof value.individualLicences === "object" ? value.individualLicences : {},
     memberships: value.memberships && typeof value.memberships === "object" ? value.memberships : {},
     invitations: value.invitations && typeof value.invitations === "object" ? value.invitations : {},
     auditEvents: value.auditEvents && typeof value.auditEvents === "object" ? value.auditEvents : {},
@@ -182,6 +184,10 @@ function getEffectiveLicenceStatus(licence) {
   if (now < licence.startAt) return "draft";
   if (now >= licence.endAt) return "expired";
   return "active";
+}
+
+function buildIndividualLicence(licence) {
+  return { ...licence, status: getEffectiveLicenceStatus(licence) };
 }
 
 function membershipsForSchool(store, schoolId) {
@@ -492,6 +498,34 @@ export async function createSchool(principal, payload) {
   });
 }
 
+export async function createIndividualLicence(principal, payload) {
+  requireOwner(principal);
+  return mutateStore(async (store) => {
+    const email = String(payload.email ?? "").trim().toLowerCase();
+    const startAt = Number(payload.startAt);
+    const endAt = Number(payload.endAt);
+    if (!email.includes("@") || !Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      throw new Error("A valid email and licence period are required.");
+    }
+    const existing = Object.values(store.individualLicences).find((entry) => entry.email === email);
+    const licence = existing ?? {
+      licenceId: randomUUID(),
+      email,
+      createdAt: Date.now(),
+      createdByPrincipalId: principal.principalId,
+    };
+    Object.assign(licence, { email, startAt, endAt, status: "active" });
+    store.individualLicences[licence.licenceId] = licence;
+    recordAudit(store, principal, existing ? "individual_licence.updated" : "individual_licence.created", null, {
+      licenceId: licence.licenceId,
+      email,
+      startAt,
+      endAt,
+    });
+    return buildIndividualLicence(licence);
+  });
+}
+
 export async function updateSchoolLicence(principal, schoolId, licencePatch) {
   requireOwner(principal);
   return mutateStore(async (store) => {
@@ -518,6 +552,7 @@ export async function getOwnerDashboard(principal) {
   const schools = Object.values(store.schools).map((school) => buildSchoolSummary(store, school));
   const now = Date.now();
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  const individualLicences = Object.values(store.individualLicences).map(buildIndividualLicence);
   return {
     totals: {
       schools: schools.length,
@@ -528,8 +563,11 @@ export async function getOwnerDashboard(principal) {
       expiringWithin30Days: schools.filter(
         (school) => school.status === "active" && school.licence.endAt >= now && school.licence.endAt <= now + thirtyDays
       ).length,
+      individualLicences: individualLicences.length,
+      activeIndividualLicences: individualLicences.filter((licence) => licence.status === "active").length,
     },
     schools: schools.sort((left, right) => left.name.localeCompare(right.name)),
+    individualLicences: individualLicences.sort((left, right) => left.email.localeCompare(right.email)),
   };
 }
 
@@ -725,6 +763,24 @@ export async function getInstitutionalEntitlement(principal, appVariant) {
     .filter(Boolean)
     .sort((left, right) => Number(right.active) - Number(left.active) || new Date(right.expiresAt).getTime() - new Date(left.expiresAt).getTime());
   return entitlements[0] ?? null;
+}
+
+export async function getOwnerIssuedIndividualEntitlement(principal) {
+  const store = await ensureStore();
+  const email = String(principal.email ?? "").trim().toLowerCase();
+  if (!email) return null;
+  const matches = Object.values(store.individualLicences)
+    .filter((licence) => licence.email === email)
+    .map(buildIndividualLicence)
+    .sort((left, right) => right.endAt - left.endAt);
+  const licence = matches.find((entry) => entry.status === "active") ?? matches[0];
+  if (!licence) return null;
+  return {
+    licenceId: licence.licenceId,
+    active: licence.status === "active",
+    expiresAt: new Date(licence.endAt).toISOString(),
+    status: licence.status,
+  };
 }
 
 export async function assertInstitutionalFeature(principal, schoolId, feature, appVariant) {

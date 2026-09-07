@@ -30,6 +30,7 @@ const defaultState: StoredAppState = {
   reviewCompletedAt: null,
   subscriptionTier: "free",
   subscriptionExpiresAt: null,
+  subscriptionProfileLimit: 1,
   subscriptionUpdatedAt: 0,
 };
 
@@ -88,6 +89,9 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
     subscriptionTier === "pro" && typeof state.subscriptionExpiresAt === "string"
       ? state.subscriptionExpiresAt
       : null;
+  const subscriptionProfileLimit = subscriptionTier === "pro"
+    ? Math.max(1, Math.min(2, Math.floor(Number(state.subscriptionProfileLimit ?? 2))))
+    : 1;
   const reviewPromptLastShownAt =
     typeof state.reviewPromptLastShownAt === "string" && Number.isFinite(new Date(state.reviewPromptLastShownAt).getTime())
       ? state.reviewPromptLastShownAt
@@ -115,6 +119,7 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
     reviewCompletedAt,
     subscriptionTier,
     subscriptionExpiresAt,
+    subscriptionProfileLimit,
     subscriptionUpdatedAt:
       typeof state.subscriptionUpdatedAt === "number" && Number.isFinite(state.subscriptionUpdatedAt)
         ? state.subscriptionUpdatedAt
@@ -217,6 +222,7 @@ function mergeStoredStates(
     reviewCompletedAt: latestReviewCompletionTime,
     subscriptionTier: selectedSubscription.subscriptionTier,
     subscriptionExpiresAt: selectedSubscription.subscriptionExpiresAt,
+    subscriptionProfileLimit: selectedSubscription.subscriptionProfileLimit,
     subscriptionUpdatedAt: selectedSubscription.subscriptionUpdatedAt,
   });
 }
@@ -530,7 +536,8 @@ export async function upsertResult(profileId: string, result: SessionResult) {
 
 export async function setSubscriptionTier(
   subscriptionTier: SubscriptionTier,
-  subscriptionExpiresAt: string | null = null
+  subscriptionExpiresAt: string | null = null,
+  subscriptionProfileLimit: number = subscriptionTier === "pro" ? 2 : 1
 ) {
   // Subscription refreshes can happen immediately after authentication. Merge
   // the latest cloud state first so updating the plan never publishes a stale
@@ -538,6 +545,9 @@ export async function setSubscriptionTier(
   const state = await readAppState({ awaitCloudRefresh: true });
   state.subscriptionTier = subscriptionTier;
   state.subscriptionExpiresAt = subscriptionTier === "pro" ? subscriptionExpiresAt : null;
+  state.subscriptionProfileLimit = subscriptionTier === "pro"
+    ? Number.isFinite(subscriptionProfileLimit) ? Math.max(1, Math.min(2, Math.floor(subscriptionProfileLimit))) : 2
+    : 1;
   state.subscriptionUpdatedAt = Date.now();
   const normalized = normalizeState(state);
   await writeAppState(normalized);

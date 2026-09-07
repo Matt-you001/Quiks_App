@@ -889,6 +889,7 @@ export default function CompetitionScreen() {
                   </View>
                   <View style={styles.performerMeta}>
                     <Text style={styles.performerName}>{performer.playerName}</Text>
+                    {performer.schoolName ? <Text style={styles.performerSchool}>{performer.schoolName}</Text> : null}
                     <Text style={styles.performerWins}>{t(language, "dailyWins", { count: performer.wins })}</Text>
                   </View>
                 </View>
@@ -1306,6 +1307,11 @@ const styles = StyleSheet.create({
     color: palette.ink,
     fontSize: 16,
     fontWeight: "800",
+  },
+  performerSchool: {
+    color: palette.navy,
+    marginTop: 2,
+    fontWeight: "700",
   },
   performerWins: {
     color: palette.slate,

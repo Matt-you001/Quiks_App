@@ -38,9 +38,11 @@ import { schoolResultsRequest } from "./school-results-api.mjs";
 import { schoolClassroomsRequest } from "./school-classrooms-api.mjs";
 import { getSchoolEmailDiagnostics, sendSchoolInvitationEmail } from "./school-email.mjs";
 import {
+  createIndividualLicence,
   createSchool,
   enrolInSchool,
   getInstitutionalEntitlement,
+  getOwnerIssuedIndividualEntitlement,
   getOwnerDashboard,
   getPrincipalSchoolIdentity,
   getSchoolDetails,
@@ -173,16 +175,22 @@ async function handleSubscriptionStatus(request, body, response) {
   }
   const appVariant = body.appVariant ?? "children";
   const school = await getInstitutionalEntitlement(principal, appVariant);
+  const ownerIssued = await getOwnerIssuedIndividualEntitlement(principal);
   let individual = { active: false, expiresAt: null, managementUrl: null };
   try {
     const subscriber = await fetchRevenueCatSubscriber(body.accountUid.trim(), appVariant);
     individual = parseRevenueCatSubscriptionStatus(subscriber, appVariant);
   } catch (error) {
-    if (!school?.active) throw error;
+    if (!school?.active && !ownerIssued?.active) throw error;
   }
-  const active = individual.active || Boolean(school?.active);
-  const source = individual.active && school?.active ? "individual_and_school" : individual.active ? "individual" : school?.active ? "school" : "none";
-  const expirations = [individual.expiresAt, school?.active ? school.expiresAt : null]
+  const active = individual.active || Boolean(ownerIssued?.active) || Boolean(school?.active);
+  const activeSources = [individual.active ? "individual" : null, ownerIssued?.active ? "owner_issued" : null, school?.active ? "school" : null].filter(Boolean);
+  const source = activeSources.length === 3
+    ? "individual_owner_issued_and_school"
+    : activeSources.length === 2
+      ? `${activeSources[0]}_and_${activeSources[1]}`
+      : activeSources[0] ?? "none";
+  const expirations = [individual.expiresAt, ownerIssued?.active ? ownerIssued.expiresAt : null, school?.active ? school.expiresAt : null]
     .filter(Boolean)
     .sort((left, right) => new Date(right).getTime() - new Date(left).getTime());
   sendJson(response, 200, {
@@ -190,6 +198,7 @@ async function handleSubscriptionStatus(request, body, response) {
     expiresAt: expirations[0] ?? null,
     managementUrl: individual.managementUrl,
     source,
+    profileLimit: individual.active ? 2 : 1,
     school,
   });
 }
@@ -225,7 +234,7 @@ async function handlePaddleSubscriptionSync(body, response) {
   }
 
   const receiptPayload = await receiptResponse.json();
-  sendJson(response, 200, parseRevenueCatSubscriptionStatus(receiptPayload, appVariant));
+  sendJson(response, 200, { ...parseRevenueCatSubscriptionStatus(receiptPayload, appVariant), source: "individual", profileLimit: 2 });
 }
 
 function isSameUtcDay(leftTimestamp, rightTimestamp) {
@@ -1435,12 +1444,14 @@ function buildCompetitionLeaderboard() {
       const existing = winMap.get(player.playerId);
       if (existing) {
         existing.wins += 1;
+        if (!existing.schoolName && player.schoolName) existing.schoolName = player.schoolName;
         continue;
       }
 
       winMap.set(player.playerId, {
         playerId: player.playerId,
         playerName: player.name,
+        schoolName: player.schoolName || undefined,
         wins: 1,
       });
     }
@@ -1526,8 +1537,8 @@ async function createCompetitionMatch(waiter, challenger) {
     topicLabel: challenger.body.topicLabel,
     questions,
     players: [
-      { playerId: waiter.playerId, name: waiter.name },
-      { playerId: challenger.playerId, name: challenger.name },
+      { playerId: waiter.playerId, name: waiter.name, schoolName: waiter.body.profile?.schoolName || undefined },
+      { playerId: challenger.playerId, name: challenger.name, schoolName: challenger.body.profile?.schoolName || undefined },
     ],
     chats: [],
     liveProgress: {
@@ -1585,8 +1596,8 @@ async function createChallengeCompetition(challenge, accepterProfile) {
     topicLabel: challenge.topicLabel,
     questions,
     players: [
-      { playerId: challenge.creatorId, name: challenge.creatorName },
-      { playerId: accepterProfile.id, name: accepterProfile.name ?? "Learner" },
+      { playerId: challenge.creatorId, name: challenge.creatorName, schoolName: challenge.creatorSchoolName || undefined },
+      { playerId: accepterProfile.id, name: accepterProfile.name ?? "Learner", schoolName: accepterProfile.schoolName || undefined },
     ],
     chats: [],
     liveProgress: {
@@ -1641,8 +1652,8 @@ async function createRematchCompetition(rematch) {
     topicLabel: rematch.topicLabel,
     questions,
     players: [
-      { playerId: rematch.requesterId, name: rematch.requesterName },
-      { playerId: rematch.targetId, name: rematch.targetName },
+      { playerId: rematch.requesterId, name: rematch.requesterName, schoolName: rematch.requesterSchoolName || undefined },
+      { playerId: rematch.targetId, name: rematch.targetName, schoolName: rematch.targetSchoolName || undefined },
     ],
     chats: [],
     liveProgress: {
@@ -2220,6 +2231,7 @@ function startGroupCompetition(group) {
   const players = group.participants.map((participant) => ({
     playerId: participant.playerId,
     name: participant.playerName,
+    schoolName: participant.schoolName || undefined,
   }));
   const liveProgress = Object.fromEntries(
     players.map((player) => [
@@ -2319,6 +2331,7 @@ async function handleGroupCompetitionCreate(body, response) {
       {
         playerId: profile.id,
         playerName: profile.name ?? "Learner",
+        schoolName: profile.schoolName || undefined,
         joinedAt: now,
       },
     ],
@@ -2358,6 +2371,7 @@ async function handleGroupCompetitionJoin(body, response) {
     group.participants.push({
       playerId: profile.id,
       playerName: profile.name ?? "Learner",
+      schoolName: profile.schoolName || undefined,
       joinedAt: Date.now(),
     });
   }
@@ -2399,6 +2413,7 @@ async function handleChallengeCreate(body, response) {
     status: "open",
     creatorId: profile.id,
     creatorName: profile.name ?? "Learner",
+    creatorSchoolName: profile.schoolName || undefined,
     subjectId: body.subject.id,
     subjectName: body.subject.name,
     grade: body.grade,
@@ -2459,6 +2474,7 @@ async function handleChallengeAccept(body, response) {
   challenge.acceptedAt = Date.now();
   challenge.acceptedById = body.profile.id;
   challenge.acceptedByName = body.profile.name ?? "Learner";
+  challenge.acceptedBySchoolName = body.profile.schoolName || undefined;
   challenge.competitionId = undefined;
   void notifyChallengeCreatorAccepted(challenge, body.profile).catch(() => undefined);
   sendJson(response, 200, {
@@ -2539,6 +2555,7 @@ async function handleChallengeCreatorDecision(body, response) {
   const accepterProfile = {
     id: challenge.acceptedById,
     name: challenge.acceptedByName ?? "Learner",
+    schoolName: challenge.acceptedBySchoolName,
   };
   const match = await createChallengeCompetition(challenge, accepterProfile);
   void notifyChallengeAccepterConfirmed(challenge, match).catch(() => undefined);
@@ -2617,8 +2634,10 @@ async function handleCompetitionRematchRequest(body, response) {
     sourceCompetitionId,
     requesterId: requester.playerId,
     requesterName: requester.name,
+    requesterSchoolName: requester.schoolName || profile.schoolName || undefined,
     targetId: target.playerId,
     targetName: target.name,
+    targetSchoolName: target.schoolName || undefined,
     subjectId: body.subject?.id ?? match.subjectId,
     grade: body.grade ?? match.grade,
     level: body.level ?? ((match.level ?? 1) + 1),
@@ -3397,6 +3416,11 @@ const server = http.createServer(async (request, response) => {
         ...created,
         administratorInvitation: { ...created.administratorInvitation, emailDelivery },
       });
+      return;
+    }
+
+    if (url.pathname === "/school/owner/individual-licence") {
+      sendJson(response, 200, { licence: await createIndividualLicence(await requireFirebasePrincipal(request), body) });
       return;
     }
 

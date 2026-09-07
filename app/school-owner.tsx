@@ -5,13 +5,16 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View 
 import { AppBackground } from "../components/AppBackground";
 import { CalendarDateField, getTodayDateValue } from "../components/CalendarDateField";
 import { palette, shadows } from "../lib/theme";
-import { createSchool, getSchoolOwnerDashboard } from "../services/ai";
+import { createOwnerIssuedIndividualLicence, createSchool, getSchoolOwnerDashboard } from "../services/ai";
 import type { SchoolEnrolmentMode, SchoolOwnerDashboardResponse } from "../types/app";
 
 export default function SchoolOwnerScreen() {
   const [data, setData] = useState<SchoolOwnerDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [licenceType, setLicenceType] = useState<"school" | "individual">("school");
+  const [individualEmail, setIndividualEmail] = useState("");
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const [administratorEmail, setAdministratorEmail] = useState("");
   const [enrolmentMode, setEnrolmentMode] = useState<SchoolEnrolmentMode>("shared_code");
   const [enrolmentModeOpen, setEnrolmentModeOpen] = useState(false);
@@ -27,6 +30,7 @@ export default function SchoolOwnerScreen() {
     administratorInvitationCode: string;
     emailStatus: "sent" | "not_configured" | "failed";
   } | null>(null);
+  const [individualCreationNotice, setIndividualCreationNotice] = useState<{ email: string; endAt: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -50,6 +54,7 @@ export default function SchoolOwnerScreen() {
     if (busy) return;
     setError("");
     setCreationNotice(null);
+    setIndividualCreationNotice(null);
     if (!name.trim() || !administratorEmail.trim() || !endDate) {
       const message = "Enter the school name, administrator email, and licence expiry date.";
       setError(message);
@@ -107,6 +112,36 @@ export default function SchoolOwnerScreen() {
     }
   }
 
+  async function addIndividualLicence() {
+    if (busy) return;
+    setError("");
+    setCreationNotice(null);
+    setIndividualCreationNotice(null);
+    if (!individualEmail.trim() || !endDate) {
+      setError("Enter the individual's email address and licence expiry date.");
+      return;
+    }
+    const startAt = new Date(`${startDate}T00:00:00`).getTime();
+    const endAt = new Date(`${endDate}T23:59:59`).getTime();
+    if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      setError("Select a licence expiry date after the licence start date.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { licence } = await createOwnerIssuedIndividualLicence({ email: individualEmail.trim().toLowerCase(), startAt, endAt });
+      setIndividualCreationNotice({ email: licence.email, endAt: licence.endAt });
+      setIndividualEmail("");
+      setEndDate("");
+      await load();
+      Alert.alert("Individual licence issued", `${licence.email} now has premium access for the licence period and may create one profile.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to issue the individual licence.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AppBackground webContentWidth="wide">
       <View style={styles.hero}>
@@ -136,7 +171,11 @@ export default function SchoolOwnerScreen() {
       ) : null}
       {data ? <View style={styles.grid}>
         <View style={styles.card}>
-          <Text style={styles.heading}>Create school licence</Text>
+          <Text style={styles.heading}>{licenceType === "school" ? "Create school licence" : "Create individual licence"}</Text>
+          <View style={styles.typeSelector}>
+            {(["school", "individual"] as const).map((value) => <Pressable key={value} onPress={() => { setLicenceType(value); setError(""); setCreationNotice(null); setIndividualCreationNotice(null); }} style={[styles.typeOption, licenceType === value && styles.typeOptionActive]}><Text style={[styles.typeOptionText, licenceType === value && styles.typeOptionTextActive]}>{value === "school" ? "School" : "Individual"}</Text></Pressable>)}
+          </View>
+          {licenceType === "school" ? <>
           <Text style={styles.copy}>Choose the first school administrator. They receive a one-time, email-locked invitation and can approve subsequent staff and student requests.</Text>
           <TextInput value={name} onChangeText={setName} placeholder="School name" style={styles.input} />
           <TextInput value={administratorEmail} onChangeText={setAdministratorEmail} autoCapitalize="none" keyboardType="email-address" placeholder="School administrator email" style={styles.input} />
@@ -168,10 +207,11 @@ export default function SchoolOwnerScreen() {
             <TextInput value={students} onChangeText={setStudents} keyboardType="number-pad" placeholder="Student seats" style={[styles.input, styles.flex]} />
             <TextInput value={teachers} onChangeText={setTeachers} keyboardType="number-pad" placeholder="Teacher seats" style={[styles.input, styles.flex]} />
           </View>
+          </> : <TextInput value={individualEmail} onChangeText={setIndividualEmail} autoCapitalize="none" keyboardType="email-address" placeholder="Individual's email address" style={styles.input} />}
           <CalendarDateField label="Starts" value={startDate} onChange={(value) => { setStartDate(value); if (endDate && endDate < value) setEndDate(""); }} minimumDate={getTodayDateValue()} />
           <CalendarDateField label="Expires" value={endDate} onChange={setEndDate} minimumDate={startDate || getTodayDateValue()} />
-          <Pressable disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={addSchool}>
-            <Text style={styles.buttonText}>{busy ? "Creating…" : "Create Quiks School account"}</Text>
+          <Pressable disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={() => void (licenceType === "school" ? addSchool() : addIndividualLicence())}>
+            <Text style={styles.buttonText}>{busy ? "Creating…" : licenceType === "school" ? "Create Quiks School account" : "Issue individual licence"}</Text>
           </Pressable>
           {error ? <Text style={styles.formError}>{error}</Text> : null}
           {creationNotice ? (
@@ -183,13 +223,17 @@ export default function SchoolOwnerScreen() {
               <Text style={styles.creationNoticeText}>{creationNotice.emailStatus === "sent" ? "The invitation code was sent to the administrator by email." : creationNotice.emailStatus === "failed" ? "Email delivery failed. Copy and send the administrator code manually." : "Automatic email is not configured. Copy and send the administrator code manually."}</Text>
             </View>
           ) : null}
+          {individualCreationNotice ? <View style={styles.creationNotice}><Text style={styles.creationNoticeTitle}>Individual licence issued successfully.</Text><Text style={styles.creationNoticeText}>{individualCreationNotice.email}</Text><Text style={styles.creationNoticeText}>Premium access ends {new Date(individualCreationNotice.endAt).toLocaleDateString()} and permits one profile.</Text></View> : null}
         </View>
         <View style={styles.card}>
           <Text style={styles.heading}>Schools and enrolment records</Text>
           <Text style={styles.copy}>Open a school to view administrators, teachers, students, pending requests and configured enrolment fields.</Text>
           {data?.schools.map((school) => (
             <View key={school.schoolId} style={styles.school}>
-              <Text style={styles.schoolName}>{school.name}</Text>
+              <Pressable accessibilityRole="button" onPress={() => setSelectedSchoolId((current) => current === school.schoolId ? null : school.schoolId)} style={styles.schoolNameButton}>
+                <Text style={styles.schoolName}>{school.name}</Text><MaterialIcons name={selectedSchoolId === school.schoolId ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={24} color={palette.navy}/>
+              </Pressable>
+              {selectedSchoolId === school.schoolId ? <View style={styles.schoolDetails}>
               <Text style={styles.meta}>School code {school.schoolCode} · {school.status}</Text>
               <Text style={styles.meta}>Enrolment: {school.enrolmentMode === "individual_codes" ? "unique individual codes" : "one shared school code"}</Text>
               <Text style={styles.meta}>{school.studentCount}/{school.licence.studentSeatLimit} students · {school.teacherCount}/{school.licence.teacherSeatLimit} teachers · {school.pendingCount} pending</Text>
@@ -203,8 +247,13 @@ export default function SchoolOwnerScreen() {
               <Pressable style={styles.secondaryButton} onPress={() => router.push({ pathname: "/school-admin", params: { schoolId: school.schoolId } } as never)}>
                 <Text style={styles.secondaryButtonText}>View enrolment records</Text>
               </Pressable>
+              </View> : null}
             </View>
           ))}
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.heading}>Individual licences</Text>
+          {data.individualLicences.length === 0 ? <Text style={styles.copy}>No individual licences issued yet.</Text> : data.individualLicences.map((licence) => <View key={licence.licenceId} style={styles.school}><Text style={styles.schoolName}>{licence.email}</Text><Text style={styles.meta}>{licence.status} · {new Date(licence.startAt).toLocaleDateString()} to {new Date(licence.endAt).toLocaleDateString()}</Text><Text style={styles.meta}>Profile allowance: 1</Text></View>)}
         </View>
       </View> : null}
     </AppBackground>
@@ -235,6 +284,11 @@ const styles = StyleSheet.create({
   dropdownOptionActive: { backgroundColor: palette.navy },
   dropdownOptionText: { color: palette.navy, fontWeight: "800" },
   dropdownOptionTextActive: { color: "white" },
+  typeSelector: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  typeOption: { flex: 1, padding: 13, borderRadius: 13, backgroundColor: "#EEF3F6", alignItems: "center" },
+  typeOptionActive: { backgroundColor: palette.navy },
+  typeOptionText: { color: palette.navy, fontWeight: "900" },
+  typeOptionTextActive: { color: "white" },
   row: { flexDirection: "row", gap: 8 },
   flex: { flex: 1 },
   button: { backgroundColor: palette.navy, borderRadius: 14, padding: 15, alignItems: "center", marginTop: 10 },
@@ -246,6 +300,8 @@ const styles = StyleSheet.create({
   creationNoticeText: { color: "#125C45", fontWeight: "700", marginTop: 3 },
   school: { paddingVertical: 15, borderTopColor: "#E4ECF1", borderTopWidth: 1 },
   schoolName: { color: palette.navy, fontSize: 17, fontWeight: "900" },
+  schoolNameButton: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  schoolDetails: { paddingBottom: 3 },
   meta: { color: "#587180", marginTop: 4 },
   adminSetup: { backgroundColor: "#F0F8FA", borderRadius: 12, padding: 11, marginTop: 10 },
   adminText: { color: palette.navy, fontWeight: "800" },

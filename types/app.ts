@@ -187,6 +187,7 @@ export interface StoredAppState {
   reviewCompletedAt: string | null;
   subscriptionTier: SubscriptionTier;
   subscriptionExpiresAt: string | null;
+  subscriptionProfileLimit: number;
   subscriptionUpdatedAt: number;
 }
 
@@ -342,7 +343,8 @@ export interface AccountSubscriptionStatusResponse {
   active: boolean;
   expiresAt: string | null;
   managementUrl: string | null;
-  source?: "individual" | "school" | "individual_and_school" | "none";
+  source?: "individual" | "owner_issued" | "school" | "individual_and_school" | "individual_and_owner_issued" | "owner_issued_and_school" | "individual_owner_issued_and_school" | "none";
+  profileLimit: number;
   school?: SchoolEntitlementSummary | null;
 }
 
@@ -448,8 +450,30 @@ export interface SchoolOwnerDashboardResponse {
     teachers: number;
     administrators: number;
     expiringWithin30Days: number;
+    individualLicences: number;
+    activeIndividualLicences: number;
   };
   schools: SchoolSummary[];
+  individualLicences: OwnerIssuedIndividualLicence[];
+}
+
+export interface OwnerIssuedIndividualLicence {
+  licenceId: string;
+  email: string;
+  status: SchoolLicenceStatus;
+  startAt: number;
+  endAt: number;
+  createdAt: number;
+}
+
+export interface OwnerIssuedIndividualLicenceCreateRequest {
+  email: string;
+  startAt: number;
+  endAt: number;
+}
+
+export interface OwnerIssuedIndividualLicenceCreateResponse {
+  licence: OwnerIssuedIndividualLicence;
 }
 
 export interface SchoolCreateRequest {
@@ -1172,6 +1196,7 @@ export interface CompetitionProgressUpdateResponse {
 export interface CompetitionTopPerformer {
   playerId: string;
   playerName: string;
+  schoolName?: string;
   wins: number;
 }
 

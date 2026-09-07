@@ -90,7 +90,7 @@ export default function SubscriptionScreen() {
       if (state.account?.uid) {
         try {
           const status = await getAccountSubscriptionStatus({ accountUid: state.account.uid });
-          await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+          await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt, status.profileLimit);
           setSubscriptionTierState(status.active ? "pro" : "free");
           setManagementUrl(status.managementUrl);
           setStoreMessage(null);
@@ -154,7 +154,7 @@ export default function SubscriptionScreen() {
         }
 
         const status = await resolvePaddlePurchaseStatus(account.uid, transactionId);
-        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt, status.profileLimit);
         setSubscriptionTierState(status.active ? "pro" : "free");
         setManagementUrl(status.managementUrl);
         setStoreMessage(
@@ -198,7 +198,7 @@ export default function SubscriptionScreen() {
           throw new Error(t(language, "authRequiredMessage"));
         }
         const status = await getAccountSubscriptionStatus({ accountUid: account.uid });
-        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt, status.profileLimit);
         setSubscriptionTierState(status.active ? "pro" : "free");
         setManagementUrl(status.managementUrl);
         Alert.alert(
@@ -234,7 +234,7 @@ export default function SubscriptionScreen() {
       let nextManagementUrl = managementUrl;
       if (!nextManagementUrl) {
         const status = await getAccountSubscriptionStatus({ accountUid: account.uid });
-        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt);
+        await setSubscriptionTier(status.active ? "pro" : "free", status.expiresAt, status.profileLimit);
         setSubscriptionTierState(status.active ? "pro" : "free");
         setManagementUrl(status.managementUrl);
         nextManagementUrl = status.managementUrl;

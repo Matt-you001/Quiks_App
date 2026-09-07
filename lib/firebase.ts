@@ -423,6 +423,7 @@ export async function saveCloudState(userId: string, state: StoredAppState) {
           results,
           subscriptionTier: state.subscriptionTier,
           subscriptionExpiresAt: state.subscriptionExpiresAt,
+          subscriptionProfileLimit: state.subscriptionProfileLimit,
           subscriptionUpdatedAt: state.subscriptionUpdatedAt,
         },
         updatedAt: Date.now(),
