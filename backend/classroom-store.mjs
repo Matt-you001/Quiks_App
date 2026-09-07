@@ -316,6 +316,33 @@ function validateLessonNoteAttachment(attachment) {
   if (attachment.dataBase64.length > 7_500_000) throw new Error("The lesson-note attachment must be 5 MB or smaller.");
 }
 
+function normalizeLessonNoteIllustrations(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 3).map((illustration) => {
+    const points = Array.isArray(illustration?.points)
+      ? illustration.points.slice(0, 8).map((point) => String(point ?? "").trim()).filter(Boolean)
+      : [];
+    const normalized = {
+      title: String(illustration?.title ?? "Lesson illustration").trim().slice(0, 200),
+      caption: String(illustration?.caption ?? "").trim().slice(0, 1000),
+      points,
+    };
+    const imageDataBase64 = typeof illustration?.imageDataBase64 === "string" ? illustration.imageDataBase64 : "";
+    const allowedImageTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+    if (imageDataBase64) {
+      if (imageDataBase64.length > 10_000_000) throw new Error("A lesson-note illustration is too large.");
+      const imageMimeType = allowedImageTypes.has(illustration.imageMimeType) ? illustration.imageMimeType : "image/png";
+      Object.assign(normalized, {
+        imageMimeType,
+        imageDataBase64,
+        imageAltText: String(illustration.imageAltText ?? normalized.title).trim().slice(0, 500),
+        imageSource: illustration.imageSource === "uploaded" ? "uploaded" : "generated",
+      });
+    }
+    return normalized;
+  });
+}
+
 function cleanStoredLessonNoteText(value) {
   return String(value ?? "")
     .replace(/^\s{0,3}#{1,6}\s*/gm, "")
@@ -893,7 +920,7 @@ export async function createLessonNote(payload, appVariant) {
       topic: String(payload.topic ?? "").trim(),
       originalContent: content,
       content,
-      illustrations: Array.isArray(payload.illustrations) ? payload.illustrations : [],
+      illustrations: normalizeLessonNoteIllustrations(payload.illustrations),
       refinementLevel: payload.refinementLevel ?? "none",
       status: payload.status === "published" ? "published" : "draft",
       studentAccess: payload.studentAccess === "read_only" ? "read_only" : "allow_download",
@@ -922,7 +949,7 @@ export async function updateLessonNote(payload, appVariant) {
     if (typeof payload.subject === "string") note.subject = payload.subject.trim();
     if (typeof payload.topic === "string") note.topic = payload.topic.trim();
     if (typeof payload.content === "string") note.content = cleanStoredLessonNoteText(payload.content);
-    if (Array.isArray(payload.illustrations)) note.illustrations = payload.illustrations;
+    if (Array.isArray(payload.illustrations)) note.illustrations = normalizeLessonNoteIllustrations(payload.illustrations);
     if (payload.attachment?.dataBase64) {
       validateLessonNoteAttachment(payload.attachment);
       note.attachmentName = String(payload.attachment.name ?? "lesson-note");

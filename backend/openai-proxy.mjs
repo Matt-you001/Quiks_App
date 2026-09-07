@@ -58,6 +58,7 @@ import {
 const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
 const openAiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const openAiImageModel = String(process.env.OPENAI_IMAGE_MODEL || "").trim();
 const openAiVerifierModel = process.env.OPENAI_VERIFIER_MODEL || "gpt-5.6-terra";
 const openAiVerifierReasoningEffort = process.env.OPENAI_VERIFIER_REASONING_EFFORT || "medium";
 const questionCandidateMultiplier = readPositiveNumber(process.env.QUESTION_CANDIDATE_MULTIPLIER, 1.5, 1);
@@ -2877,9 +2878,59 @@ function buildLessonNoteRefinementSchema() {
           required: ["title", "caption", "points"],
         },
       },
+      imageRequests: {
+        type: "array",
+        maxItems: 2,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            prompt: { type: "string" },
+            altText: { type: "string" },
+          },
+          required: ["prompt", "altText"],
+        },
+      },
     },
-    required: ["title", "content", "illustrations"],
+    required: ["title", "content", "illustrations", "imageRequests"],
   };
+}
+
+async function generateLessonNoteImage({ prompt, title, subject, topic, altText }) {
+  if (!openAiImageModel) return null;
+  const imagePrompt = [
+    "Create one accurate, age-appropriate educational illustration for a classroom lesson note.",
+    "Use a clean textbook-diagram style, a plain light background, clear shapes, and high visual contrast.",
+    "Do not include written labels, letters, numbers, captions, logos, watermarks, decorative text, or unsafe content.",
+    "The app will display the verified labels and explanation separately, so prioritise scientific and conceptual accuracy.",
+    `Lesson: ${title}. Subject: ${subject || "Not specified"}. Topic: ${topic || "Not specified"}.`,
+    `Illustration required: ${prompt}.`,
+    altText ? `The intended meaning is: ${altText}.` : "",
+  ].filter(Boolean).join(" ");
+  const imageResponse = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openAiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: openAiImageModel,
+      prompt: imagePrompt,
+      size: "1024x1024",
+      quality: "medium",
+      output_format: "jpeg",
+      output_compression: 82,
+    }),
+  });
+  if (!imageResponse.ok) {
+    const errorText = await imageResponse.text();
+    throw new Error(`Image generation failed with status ${imageResponse.status}: ${errorText}`);
+  }
+  const payload = await imageResponse.json();
+  const dataBase64 = payload?.data?.[0]?.b64_json;
+  if (typeof dataBase64 !== "string" || !dataBase64) throw new Error("Image generation returned no image data.");
+  if (dataBase64.length > 10_000_000) throw new Error("The generated illustration is too large to store safely.");
+  return { imageMimeType: "image/jpeg", imageDataBase64: dataBase64, imageAltText: altText || title, imageSource: "generated" };
 }
 
 function cleanLessonNoteText(value) {
@@ -2909,7 +2960,7 @@ async function handleLessonNoteRefine(body, response) {
     ? "Correct spelling, grammar, factual slips, and formatting. Make only small additions needed for clarity."
     : level === "rich"
       ? "Develop the supplied material into a richer, well-structured, complete lesson note while preserving the teacher's intent. Add useful explanations and examples."
-      : "Deeply develop the note into a detailed, elaborate, complete, and engaging lesson. Add thorough explanations, relevant examples, and 1 to 3 lightweight visual illustration plans represented as titled diagrams with a caption and labelled points.";
+      : "Deeply develop the note into a detailed, elaborate, complete, and engaging lesson. Add thorough explanations and relevant examples. Add up to three structured visual plans only where they materially improve understanding.";
   const data = await createOpenAiResponse({
     schemaName: "classroom_lesson_note_refinement",
     schema: buildLessonNoteRefinementSchema(),
@@ -2918,7 +2969,9 @@ async function handleLessonNoteRefine(body, response) {
       "Preserve the teacher's meaning and never invent unverifiable claims.",
       "Return polished plain text with clear section headings and readable paragraphs.",
       "Do not use Markdown symbols such as #, *, _, backticks, or Markdown links in the title or content.",
-      "For minimal and rich refinement return an empty illustrations array. For deep refinement return practical visual diagram plans that the app can render as pictorial learning cards.",
+      "For minimal and rich refinement return empty illustrations and imageRequests arrays.",
+      "For deep refinement, return practical structured visual plans only where they materially improve understanding. Add an image request only if a real diagram, sketch, or illustration is necessary to teach a spatial, visual, biological, scientific, geographic, geometric, procedural, or similarly visual concept that prose and the structured cards cannot explain adequately. Do not request images merely for decoration. Return zero, one, or at most two imageRequests, in the same order as the corresponding illustrations.",
+      "For each necessary image provide a precise prompt describing the most suitable educational visual style, such as a textbook-style sketch, clean line drawing, schematic diagram, or realistic illustration, plus concise accessible altText. Do not ask the image itself to contain text or labels; the app renders verified labelled points separately.",
       levelGuidance,
     ].join(" "),
     input: [{ role: "user", content: [{ type: "input_text", text: [
@@ -2930,10 +2983,42 @@ async function handleLessonNoteRefine(body, response) {
       `Teacher's lesson note:\n${body.content}`,
     ].join("\n") }] }],
   });
+  const illustrations = Array.isArray(data.illustrations) ? data.illustrations : [];
+  let imageGenerationWarning;
+  const imageRequests = level === "deep" && Array.isArray(data.imageRequests) ? data.imageRequests.slice(0, 2) : [];
+  if (imageRequests.length) {
+    if (!openAiImageModel) {
+      imageGenerationWarning = "One or more visuals would improve this lesson, but OPENAI_IMAGE_MODEL is not configured.";
+    } else {
+      let failedImages = 0;
+      for (let index = 0; index < imageRequests.length; index += 1) {
+        const request = imageRequests[index];
+        try {
+          const generatedImage = await generateLessonNoteImage({
+            prompt: request.prompt,
+            altText: request.altText,
+            title: data.title || lessonNoteDerivedTitle(body),
+            subject: body.subject,
+            topic: body.topic,
+          });
+          if (generatedImage) {
+            const target = illustrations[index] || { title: `Lesson illustration ${index + 1}`, caption: request.altText, points: [] };
+            if (illustrations[index]) illustrations[index] = { ...target, ...generatedImage };
+            else illustrations.push({ ...target, ...generatedImage });
+          }
+        } catch (error) {
+          failedImages += 1;
+          console.error(`Lesson-note image generation ${index + 1} failed:`, error);
+        }
+      }
+      if (failedImages) imageGenerationWarning = `The refined text is ready, but ${failedImages === imageRequests.length ? "the optional illustrations could not" : "one optional illustration could not"} be generated. Review the available content before publishing or try refining again.`;
+    }
+  }
   sendJson(response, 200, {
-    ...data,
     title: cleanLessonNoteText(data.title || lessonNoteDerivedTitle(body)),
     content: cleanLessonNoteText(data.content),
+    illustrations,
+    ...(imageGenerationWarning ? { imageGenerationWarning } : {}),
   });
 }
 
@@ -3163,6 +3248,8 @@ const server = http.createServer(async (request, response) => {
       model: openAiModel,
       verifierModel: openAiVerifierModel,
       verifierReasoningEffort: openAiVerifierReasoningEffort,
+      imageModel: openAiImageModel || null,
+      imageGenerationConfigured: Boolean(openAiApiKey && openAiImageModel),
       classroomStore: getClassroomStoreDiagnostics(),
       schoolStore: getSchoolStoreDiagnostics(),
       schoolEmail: getSchoolEmailDiagnostics(),

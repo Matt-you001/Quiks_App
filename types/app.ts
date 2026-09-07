@@ -742,6 +742,10 @@ export interface LessonNoteIllustration {
   title: string;
   caption: string;
   points: string[];
+  imageMimeType?: "image/png" | "image/jpeg" | "image/webp";
+  imageDataBase64?: string;
+  imageAltText?: string;
+  imageSource?: "generated" | "uploaded";
 }
 
 export interface LessonNoteAttachmentInput {
@@ -825,6 +829,7 @@ export interface ClassroomLessonNoteRefineResponse {
   title: string;
   content: string;
   illustrations: LessonNoteIllustration[];
+  imageGenerationWarning?: string;
 }
 
 export interface ClassroomLessonNoteAttachmentRequest {

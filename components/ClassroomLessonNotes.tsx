@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -110,11 +110,12 @@ function buildLessonNoteDocument(note: ClassroomLessonNote) {
   const visuals = (note.illustrations ?? []).map((illustration) => `
     <section class="visual">
       <h2>◉ ${escapeHtml(illustration.title)}</h2>
+      ${illustration.imageDataBase64 ? `<img class="lesson-image" src="data:${escapeHtml(illustration.imageMimeType || "image/png")};base64,${illustration.imageDataBase64}" alt="${escapeHtml(illustration.imageAltText || illustration.title)}">` : ""}
       <div class="steps">${illustration.points.map((point, index) => `<div class="step"><div class="icon">${index + 1}</div><strong>${escapeHtml(cleanNoteText(point))}</strong></div>${index < illustration.points.length - 1 ? '<div class="arrow">↓</div>' : ""}`).join("")}</div>
       <p class="caption">${escapeHtml(illustration.caption)}</p>
     </section>`).join("");
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(note.title)}</title><style>
-    body{font-family:Arial,sans-serif;color:#163845;max-width:820px;margin:0 auto;padding:36px;line-height:1.55}h1{color:#075e66;margin-bottom:4px}.meta{color:#17a99d;font-weight:700;margin-bottom:28px}p{white-space:normal}.visual{background:#eef9fa;border:1px solid #cfe9e8;border-radius:22px;padding:24px;margin:28px 0;page-break-inside:avoid}.visual h2{text-align:center;color:#075e66}.steps{display:flex;flex-direction:column;align-items:center;gap:8px}.step{text-align:center;max-width:560px}.icon{width:52px;height:52px;border-radius:50%;background:#17b8aa;color:white;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;margin:0 auto 8px}.arrow{font-size:30px;color:#17b8aa}.caption{text-align:center;color:#536d79;font-style:italic}.footer{margin-top:36px;border-top:1px solid #d8e7ea;padding-top:12px;color:#6a7f88;font-size:12px}@media print{body{padding:10mm}.visual{break-inside:avoid}}</style></head><body>
+    body{font-family:Arial,sans-serif;color:#163845;max-width:820px;margin:0 auto;padding:36px;line-height:1.55}h1{color:#075e66;margin-bottom:4px}.meta{color:#17a99d;font-weight:700;margin-bottom:28px}p{white-space:normal}.visual{background:#eef9fa;border:1px solid #cfe9e8;border-radius:22px;padding:24px;margin:28px 0;page-break-inside:avoid}.visual h2{text-align:center;color:#075e66}.lesson-image{display:block;width:100%;max-width:640px;height:auto;max-height:640px;object-fit:contain;margin:16px auto;border-radius:16px;background:white}.steps{display:flex;flex-direction:column;align-items:center;gap:8px}.step{text-align:center;max-width:560px}.icon{width:52px;height:52px;border-radius:50%;background:#17b8aa;color:white;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;margin:0 auto 8px}.arrow{font-size:30px;color:#17b8aa}.caption{text-align:center;color:#536d79;font-style:italic}.footer{margin-top:36px;border-top:1px solid #d8e7ea;padding-top:12px;color:#6a7f88;font-size:12px}@media print{body{padding:10mm}.visual{break-inside:avoid}}</style></head><body>
     <h1>${escapeHtml(note.title)}</h1><div class="meta">${escapeHtml([note.subject, note.topic].filter(Boolean).join(" · "))}</div>${paragraphs}${visuals}<div class="footer">Prepared in Quiks Classroom</div>
   </body></html>`;
 }
@@ -271,7 +272,7 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
       setContent(cleanNoteText(refined.content));
       setIllustrations(refined.illustrations);
       setReviewReady(true);
-      Alert.alert("Refinement ready", "Review and edit the refined lesson note before publishing it.");
+      Alert.alert("Refinement ready", refined.imageGenerationWarning || "Review and edit the refined lesson note and any illustration before publishing it.");
     } catch (caught) {
       Alert.alert("Refinement failed", caught instanceof Error ? caught.message : "Please try again.");
     } finally {
@@ -535,6 +536,20 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
           {refinementLevel === "none" && !reviewReady ? <PrimaryButton label="Review note" onPress={() => content.trim() || attachment ? setReviewReady(true) : Alert.alert("Note details needed", "Enter or upload lesson-note content first.")} /> : null}
           {reviewReady || editingNoteId ? (
             <>
+              {(illustrations ?? []).length ? (
+                <View style={styles.reviewVisuals}>
+                  <Text style={styles.label}>Illustration review</Text>
+                  <Text style={styles.optionHint}>Check every illustration and its labelled points before publishing. Remove any visual that is unnecessary or inaccurate.</Text>
+                  {illustrations.map((illustration, index) => (
+                    <View key={`review-illustration-${index}`} style={styles.illustration}>
+                      <Text style={styles.illustrationTitle}>{illustration.title}</Text>
+                      {illustration.imageDataBase64 ? <Image source={{ uri: `data:${illustration.imageMimeType || "image/png"};base64,${illustration.imageDataBase64}` }} accessibilityLabel={illustration.imageAltText || illustration.title} resizeMode="contain" style={styles.generatedImage} /> : null}
+                      <Text style={styles.caption}>{illustration.caption}</Text>
+                      <PrimaryButton label="Remove illustration" variant="ghost" onPress={() => setIllustrations((current) => current.filter((_, itemIndex) => itemIndex !== index))} compact />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
               <Text style={styles.label}>Student permission</Text>
               <View style={styles.actionRow}>
                 <PrimaryButton label="Read Only" variant={studentAccess === "read_only" ? "primary" : "secondary"} onPress={() => setStudentAccess("read_only")} style={styles.actionButton} />
@@ -578,6 +593,7 @@ export function ClassroomLessonNotes({ profile, classId, className, onActivityCr
                 <MaterialCommunityIcons name={illustrationIcon(illustration.title)} size={30} color={palette.aqua} />
                 <Text style={styles.illustrationTitle}>{illustration.title}</Text>
               </View>
+              {illustration.imageDataBase64 ? <Image source={{ uri: `data:${illustration.imageMimeType || "image/png"};base64,${illustration.imageDataBase64}` }} accessibilityLabel={illustration.imageAltText || illustration.title} resizeMode="contain" style={styles.generatedImage} /> : null}
               <View style={styles.diagramColumn}>
                 {illustration.points.map((point, pointIndex) => <View key={point} style={styles.diagramStep}>
                   <View style={styles.diagramIcon}><MaterialCommunityIcons name={illustrationIcon(point)} size={24} color="#FFFFFF" /></View>
@@ -739,8 +755,10 @@ const styles = StyleSheet.create({
   date: { color: "#718696", fontSize: 12 },
   noteContent: { color: "#263E4D", fontSize: 15, lineHeight: 23 },
   illustration: { backgroundColor: "#EFF8FA", borderRadius: 16, padding: 14, gap: 10 },
+  reviewVisuals: { gap: 10, borderTopWidth: 1, borderTopColor: "#D8E8ED", paddingTop: 12 },
   illustrationHeading: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
   illustrationTitle: { flexShrink: 1, color: palette.navy, fontWeight: "900", textAlign: "center" },
+  generatedImage: { width: "100%", height: 320, maxHeight: 420, borderRadius: 14, backgroundColor: "#FFFFFF" },
   diagramColumn: { alignItems: "center", gap: 2 },
   diagramStep: { width: "100%", alignItems: "center" },
   diagramIcon: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: palette.aqua, marginBottom: 6 },

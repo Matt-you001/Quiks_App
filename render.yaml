@@ -17,6 +17,8 @@ services:
         value: 10000
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
+      - key: OPENAI_IMAGE_MODEL
+        value: gpt-image-2
       - key: OPENAI_VERIFIER_MODEL
         value: gpt-5.6-terra
       - key: OPENAI_VERIFIER_REASONING_EFFORT

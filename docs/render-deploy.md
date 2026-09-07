@@ -28,6 +28,7 @@ Make sure your OpenAI key is valid and active. For safety, if you pasted a key i
 ```text
 OPENAI_API_KEY=your_real_openai_key
 OPENAI_MODEL=gpt-4.1-mini
+OPENAI_IMAGE_MODEL=gpt-image-2
 OPENAI_VERIFIER_MODEL=gpt-5.6-terra
 OPENAI_VERIFIER_REASONING_EFFORT=medium
 QUESTION_CANDIDATE_MULTIPLIER=1.5
