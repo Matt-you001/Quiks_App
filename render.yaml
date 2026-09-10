@@ -39,8 +39,6 @@ services:
         sync: false
       - key: QUIKS_SCHOOL_ENROLMENT_URL
         value: https://quiks.site/school-enrol.html
-      - key: QUIKS_SCHOOL_BILLING_ENVIRONMENT
-        value: production
       - key: PADDLE_API_KEY
         sync: false
       - key: PADDLE_SANDBOX_API_KEY
