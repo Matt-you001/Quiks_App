@@ -39,5 +39,17 @@ services:
         sync: false
       - key: QUIKS_SCHOOL_ENROLMENT_URL
         value: https://quiks.site/school-enrol.html
+      - key: QUIKS_SCHOOL_BILLING_ENVIRONMENT
+        value: production
+      - key: PADDLE_API_KEY
+        sync: false
+      - key: PADDLE_SANDBOX_API_KEY
+        sync: false
+      - key: QUIKS_SCHOOL_SANDBOX_PRICE_IDS_JSON
+        sync: false
+      - key: REVENUECAT_SCHOOL_WEBHOOK_AUTH
+        sync: false
+      - key: REVENUECAT_SCHOOL_WEBHOOK_SIGNING_SECRET
+        sync: false
       - key: OPENAI_API_KEY
         sync: false

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -22,6 +22,9 @@ const defaultStore = {
   memberships: {},
   invitations: {},
   auditEvents: {},
+  pendingSchoolPurchases: {},
+  schoolBillingPurchases: {},
+  schoolBillingWebhookEvents: {},
 };
 
 const defaultProfileFields = [
@@ -47,6 +50,48 @@ const defaultFeatures = {
   reports: true,
   integrations: false,
 };
+
+const SCHOOL_PRICE_CATALOGUE = Object.freeze({
+  pri_01m22sf7c2yapaxmrsqvcc4q26: { packageId: "per-learner", packageName: "Per Learner Access", period: "term" },
+  pri_01m23awdptxksm2xxwkv1pcy6y: { packageId: "per-learner", packageName: "Per Learner Access", period: "session" },
+  pri_01m22zx25r919nw4xgcnshxpet: { packageId: "starter", packageName: "Essential School", period: "term", learnerRange: [10, 100] },
+  pri_01m2309pdzp0kf8s4ccrcemt6d: { packageId: "starter", packageName: "Essential School", period: "session", learnerRange: [10, 100] },
+  pri_01m231caaj1z0fn97rppasvmfm: { packageId: "growth", packageName: "Growth School", period: "term", learnerRange: [101, 200] },
+  pri_01m231pt3qdw4gr25jzwv8taev: { packageId: "growth", packageName: "Growth School", period: "session", learnerRange: [101, 200] },
+  pri_01m231zmgwx166gnx1dtnnqxrs: { packageId: "complete", packageName: "Comprehensive School", period: "term", learnerRange: [201, 500] },
+  pri_01m232j0rbgyfdvf4gvz1sheb8: { packageId: "complete", packageName: "Comprehensive School", period: "session", learnerRange: [201, 500] },
+  pri_01m232tp79qtbh6w4p9y8v1d0h: { packageId: "enterprise", packageName: "Enterprise Network", period: "term" },
+  pri_01m2335zfhpsxgame479sf0tz2: { packageId: "enterprise", packageName: "Enterprise Network", period: "session" },
+});
+
+const SCHOOL_PRICE_BY_SELECTION = Object.freeze(
+  Object.fromEntries(Object.entries(SCHOOL_PRICE_CATALOGUE).map(([priceId, entry]) => [`${entry.packageId}:${entry.period}`, { ...entry, priceId }]))
+);
+const TERM_DURATION_MS = 120 * 24 * 60 * 60 * 1000;
+const PENDING_PURCHASE_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
+function configuredSchoolPriceCatalogue() {
+  const environment = String(process.env.QUIKS_SCHOOL_BILLING_ENVIRONMENT ?? "production").trim().toUpperCase();
+  if (environment !== "SANDBOX") return SCHOOL_PRICE_CATALOGUE;
+  let overrides;
+  try {
+    overrides = JSON.parse(String(process.env.QUIKS_SCHOOL_SANDBOX_PRICE_IDS_JSON ?? "{}"));
+  } catch {
+    throw new Error("QUIKS_SCHOOL_SANDBOX_PRICE_IDS_JSON must be valid JSON.");
+  }
+  const catalogue = {};
+  for (const [selection, productionEntry] of Object.entries(SCHOOL_PRICE_BY_SELECTION)) {
+    const priceId = String(overrides?.[selection] ?? "").trim();
+    if (/^pri_[a-z0-9]+$/i.test(priceId)) catalogue[priceId] = { ...productionEntry, priceId: undefined };
+  }
+  return catalogue;
+}
+
+function configuredSchoolPriceBySelection() {
+  return Object.fromEntries(
+    Object.entries(configuredSchoolPriceCatalogue()).map(([priceId, entry]) => [`${entry.packageId}:${entry.period}`, { ...entry, priceId }])
+  );
+}
 
 let storeCache = null;
 let writeQueue = Promise.resolve();
@@ -76,6 +121,12 @@ function normalizeStore(value) {
     memberships: value.memberships && typeof value.memberships === "object" ? value.memberships : {},
     invitations: value.invitations && typeof value.invitations === "object" ? value.invitations : {},
     auditEvents: value.auditEvents && typeof value.auditEvents === "object" ? value.auditEvents : {},
+    pendingSchoolPurchases:
+      value.pendingSchoolPurchases && typeof value.pendingSchoolPurchases === "object" ? value.pendingSchoolPurchases : {},
+    schoolBillingPurchases:
+      value.schoolBillingPurchases && typeof value.schoolBillingPurchases === "object" ? value.schoolBillingPurchases : {},
+    schoolBillingWebhookEvents:
+      value.schoolBillingWebhookEvents && typeof value.schoolBillingWebhookEvents === "object" ? value.schoolBillingWebhookEvents : {},
   };
 }
 
@@ -184,6 +235,63 @@ function getEffectiveLicenceStatus(licence) {
   if (now < licence.startAt) return "draft";
   if (now >= licence.endAt) return "expired";
   return "active";
+}
+
+function hashPurchaseStatusToken(token) {
+  return createHash("sha256").update(String(token)).digest("hex");
+}
+
+function addOneUtcCalendarYear(timestamp) {
+  const source = new Date(timestamp);
+  const targetYear = source.getUTCFullYear() + 1;
+  const month = source.getUTCMonth();
+  const lastDay = new Date(Date.UTC(targetYear, month + 1, 0)).getUTCDate();
+  return Date.UTC(
+    targetYear,
+    month,
+    Math.min(source.getUTCDate(), lastDay),
+    source.getUTCHours(),
+    source.getUTCMinutes(),
+    source.getUTCSeconds(),
+    source.getUTCMilliseconds()
+  );
+}
+
+function addSchoolLicencePeriod(timestamp, period) {
+  return period === "session" ? addOneUtcCalendarYear(timestamp) : timestamp + TERM_DURATION_MS;
+}
+
+function validateSchoolPurchaseInput(payload) {
+  const schoolName = String(payload.schoolName ?? "").trim().slice(0, 120);
+  const administratorName = String(payload.administratorName ?? "").trim().slice(0, 100);
+  const administratorEmail = String(payload.administratorEmail ?? "").trim().toLowerCase().slice(0, 160);
+  const enrolmentMode = payload.enrolmentMode === "individual_codes" ? "individual_codes" : "shared_code";
+  const packageId = String(payload.packageId ?? "").trim();
+  const period = payload.period === "session" ? "session" : "term";
+  const learnerCount = Number(payload.learnerCount);
+  const catalogueEntry = configuredSchoolPriceBySelection()[`${packageId}:${period}`];
+  if (!schoolName || !administratorName || !administratorEmail.includes("@") || !catalogueEntry) {
+    throw Object.assign(new Error("Provide valid school, administrator and package details."), { statusCode: 400 });
+  }
+  if (!Number.isInteger(learnerCount) || learnerCount < 1 || learnerCount > 100000) {
+    throw Object.assign(new Error("Enter a valid whole-number learner allocation."), { statusCode: 400 });
+  }
+  if (catalogueEntry.learnerRange) {
+    const [minimum, maximum] = catalogueEntry.learnerRange;
+    if (learnerCount < minimum || learnerCount > maximum) {
+      throw Object.assign(new Error(`${catalogueEntry.packageName} covers ${minimum}–${maximum} learners.`), { statusCode: 400 });
+    }
+  }
+  return { schoolName, administratorName, administratorEmail, enrolmentMode, packageId, period, learnerCount, catalogueEntry };
+}
+
+function findRenewalSchool(store, pending) {
+  const normalizedName = pending.schoolName.toLowerCase();
+  return Object.values(store.schools).find(
+    (school) =>
+      school.name.toLowerCase() === normalizedName &&
+      school.administratorSetup?.email === pending.administratorEmail
+  );
 }
 
 function buildIndividualLicence(licence) {
@@ -401,6 +509,7 @@ function buildEntitlement(store, membership, appVariant) {
 }
 
 export function getSchoolStoreDiagnostics() {
+  const billingEnvironment = String(process.env.QUIKS_SCHOOL_BILLING_ENVIRONMENT ?? "production").trim().toUpperCase();
   return {
     configured: Boolean(configuredStorePath),
     persistentPathExpected: storePath.startsWith("/var/data/"),
@@ -411,6 +520,16 @@ export function getSchoolStoreDiagnostics() {
       ownerValues("QUIKS_OWNER_PRINCIPAL_IDS").size > 0 ||
       ownerValues("QUIKS_OWNER_UIDS").size > 0 ||
       ownerValues("QUIKS_OWNER_EMAILS").size > 0,
+    billing: {
+      environment: billingEnvironment,
+      fixedTermDays: 120,
+      sessionCalendarYears: 1,
+      paddleVerificationConfigured: Boolean(
+        billingEnvironment === "SANDBOX" ? process.env.PADDLE_SANDBOX_API_KEY : process.env.PADDLE_API_KEY
+      ),
+      revenueCatWebhookAuthorizationConfigured: Boolean(String(process.env.REVENUECAT_SCHOOL_WEBHOOK_AUTH ?? "").trim()),
+      revenueCatWebhookSigningConfigured: Boolean(String(process.env.REVENUECAT_SCHOOL_WEBHOOK_SIGNING_SECRET ?? "").trim()),
+    },
   };
 }
 
@@ -433,6 +552,261 @@ export async function getSchoolPublicDetails(schoolCode) {
     enrolmentMode: school.enrolmentMode ?? (school.enrolmentOpen ? "shared_code" : "individual_codes"),
     ...(invitation ? { invitationCode: invitation.invitationCode, invitationRole: invitation.role } : {}),
   };
+}
+
+export async function createPendingSchoolPurchase(payload) {
+  const details = validateSchoolPurchaseInput(payload);
+  return mutateStore(async (store) => {
+    const now = Date.now();
+    for (const [reference, purchase] of Object.entries(store.pendingSchoolPurchases)) {
+      if (purchase.status === "pending_payment" && purchase.createdAt <= now - 90 * 24 * 60 * 60 * 1000) {
+        delete store.pendingSchoolPurchases[reference];
+      }
+    }
+    const purchaseReference = `school_${randomUUID()}`;
+    const statusToken = `${randomUUID()}${randomUUID()}`.replaceAll("-", "");
+    store.pendingSchoolPurchases[purchaseReference] = {
+      purchaseReference,
+      statusTokenHash: hashPurchaseStatusToken(statusToken),
+      status: "pending_payment",
+      schoolName: details.schoolName,
+      administratorName: details.administratorName,
+      administratorEmail: details.administratorEmail,
+      enrolmentMode: details.enrolmentMode,
+      packageId: details.packageId,
+      packageName: details.catalogueEntry.packageName,
+      period: details.period,
+      learnerCount: details.learnerCount,
+      expectedPriceId: details.catalogueEntry.priceId,
+      createdAt: now,
+      expiresAt: now + PENDING_PURCHASE_LIFETIME_MS,
+    };
+    return {
+      purchaseReference,
+      statusToken,
+      priceId: details.catalogueEntry.priceId,
+      expiresAt: now + PENDING_PURCHASE_LIFETIME_MS,
+    };
+  });
+}
+
+export async function getSchoolPurchaseStatus(purchaseReference, statusToken) {
+  const store = await ensureStore();
+  const pending = store.pendingSchoolPurchases[String(purchaseReference ?? "").trim()];
+  if (!pending || pending.statusTokenHash !== hashPurchaseStatusToken(statusToken)) {
+    throw Object.assign(new Error("Purchase status was not found."), { statusCode: 404 });
+  }
+  const status = pending.status === "pending_payment" && pending.expiresAt <= Date.now() ? "expired" : pending.status;
+  return {
+    purchaseReference: pending.purchaseReference,
+    status,
+    packageName: pending.packageName,
+    period: pending.period,
+    ...(pending.schoolId ? { schoolId: pending.schoolId } : {}),
+    ...(pending.licenceStartAt ? { licenceStartAt: pending.licenceStartAt, licenceEndAt: pending.licenceEndAt } : {}),
+    ...(pending.failureReason ? { failureReason: pending.failureReason } : {}),
+  };
+}
+
+function createBillingSchool(store, pending, purchasedAt) {
+  const schoolId = randomUUID();
+  const schoolCode = generateCode(new Set(Object.values(store.schools).map((school) => school.schoolCode)), 7);
+  const invitationCode = generateCode(new Set(Object.keys(store.invitations)), 10);
+  const invitationExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const school = {
+    id: schoolId,
+    schoolCode,
+    name: pending.schoolName,
+    enrolmentOpen: pending.enrolmentMode === "shared_code",
+    enrolmentMode: pending.enrolmentMode,
+    profileFields: cloneValue(defaultProfileFields),
+    licence: {
+      plan: pending.period,
+      packageId: pending.packageId,
+      packageName: pending.packageName,
+      status: "active",
+      startAt: purchasedAt,
+      endAt: purchasedAt,
+      studentSeatLimit: pending.learnerCount,
+      teacherSeatLimit: pending.learnerCount,
+      allowedVariants: ["children", "teens", "uni"],
+      gracePeriodDays: 0,
+      features: { ...defaultFeatures },
+      billingSource: "revenuecat_paddle",
+    },
+    billingBaselineAt: purchasedAt,
+    createdAt: Date.now(),
+    createdByPrincipalId: "billing:revenuecat",
+    administratorSetup: {
+      name: pending.administratorName,
+      email: pending.administratorEmail,
+      invitationCode,
+    },
+  };
+  store.schools[schoolId] = school;
+  store.invitations[invitationCode] = {
+    invitationCode,
+    schoolId,
+    email: pending.administratorEmail,
+    role: "school_admin",
+    createdAt: Date.now(),
+    expiresAt: invitationExpiresAt,
+    createdByPrincipalId: "billing:revenuecat",
+  };
+  return {
+    school,
+    administratorInvitation: {
+      email: pending.administratorEmail,
+      invitationCode,
+      expiresAt: invitationExpiresAt,
+    },
+  };
+}
+
+function recalculateSchoolBillingLicence(store, school) {
+  const purchases = Object.values(store.schoolBillingPurchases)
+    .filter((purchase) => purchase.schoolId === school.id && purchase.status === "active")
+    .sort((left, right) => left.purchasedAt - right.purchasedAt || left.createdAt - right.createdAt);
+  let cursor = Number(school.billingBaselineAt);
+  if (!Number.isFinite(cursor)) cursor = purchases[0]?.purchasedAt ?? Date.now();
+  for (const purchase of purchases) {
+    purchase.licenceStartAt = Math.max(cursor, purchase.purchasedAt);
+    purchase.licenceEndAt = addSchoolLicencePeriod(purchase.licenceStartAt, purchase.period);
+    cursor = purchase.licenceEndAt;
+  }
+  const latest = purchases.at(-1);
+  school.licence.endAt = cursor;
+  if (latest) {
+    school.licence.plan = latest.period;
+    school.licence.packageId = latest.packageId;
+    school.licence.packageName = latest.packageName;
+    school.licence.studentSeatLimit = latest.learnerCount;
+    school.licence.teacherSeatLimit = Math.max(school.licence.teacherSeatLimit || 1, latest.learnerCount);
+    school.licence.billingSource = "revenuecat_paddle";
+  }
+  if (school.licence.status !== "suspended") school.licence.status = cursor > Date.now() ? "active" : "expired";
+  return latest;
+}
+
+export async function activateSchoolPurchase(payload) {
+  const eventId = String(payload.eventId ?? "").trim();
+  const transactionId = String(payload.transactionId ?? "").trim();
+  const purchaseReference = String(payload.purchaseReference ?? "").trim();
+  const priceId = String(payload.priceId ?? "").trim();
+  const purchasedAt = Number(payload.purchasedAt);
+  const quantity = Number(payload.quantity);
+  if (!eventId || !transactionId || !purchaseReference || !configuredSchoolPriceCatalogue()[priceId] || !Number.isFinite(purchasedAt)) {
+    throw Object.assign(new Error("The verified school purchase is incomplete."), { statusCode: 400 });
+  }
+  return mutateStore(async (store) => {
+    const processed = store.schoolBillingWebhookEvents[eventId];
+    if (processed) return { ...processed.result, idempotent: true };
+    const pending = store.pendingSchoolPurchases[purchaseReference];
+    if (!pending) throw Object.assign(new Error("The pending school purchase was not found."), { statusCode: 404 });
+    if ((purchasedAt < pending.createdAt - 5 * 60 * 1000 || purchasedAt > pending.expiresAt) && pending.status === "pending_payment") {
+      throw Object.assign(new Error("The pending school purchase has expired."), { statusCode: 409 });
+    }
+    if (pending.expectedPriceId !== priceId) throw Object.assign(new Error("The purchased price does not match the pending school package."), { statusCode: 409 });
+    const expectedQuantity = pending.packageId === "per-learner" ? pending.learnerCount : 1;
+    if (!Number.isInteger(quantity) || quantity !== expectedQuantity) {
+      throw Object.assign(new Error("The verified purchase quantity does not match the learner allocation."), { statusCode: 409 });
+    }
+    const duplicateTransaction = Object.values(store.schoolBillingPurchases).find((purchase) => purchase.transactionId === transactionId);
+    if (duplicateTransaction) {
+      if (duplicateTransaction.purchaseReference !== purchaseReference) throw Object.assign(new Error("This payment is already linked to another school purchase."), { statusCode: 409 });
+      const duplicateResult = { school: buildSchoolSummary(store, store.schools[duplicateTransaction.schoolId]), administratorInvitation: null, purchase: duplicateTransaction };
+      store.schoolBillingWebhookEvents[eventId] = { eventId, type: "NON_RENEWING_PURCHASE", processedAt: Date.now(), result: duplicateResult };
+      return { ...duplicateResult, idempotent: true };
+    }
+
+    let school = findRenewalSchool(store, pending);
+    let administratorInvitation = null;
+    if (!school) {
+      const created = createBillingSchool(store, pending, purchasedAt);
+      school = created.school;
+      administratorInvitation = created.administratorInvitation;
+    } else if (!Number.isFinite(Number(school.billingBaselineAt))) {
+      school.billingBaselineAt = Math.max(Number(school.licence.endAt) || purchasedAt, purchasedAt);
+    }
+
+    const purchaseId = randomUUID();
+    const purchase = {
+      purchaseId,
+      eventId,
+      transactionId,
+      purchaseReference,
+      schoolId: school.id,
+      priceId,
+      packageId: pending.packageId,
+      packageName: pending.packageName,
+      period: pending.period,
+      learnerCount: pending.learnerCount,
+      quantity,
+      environment: String(payload.environment ?? "").toUpperCase(),
+      purchasedAt,
+      status: "active",
+      createdAt: Date.now(),
+    };
+    store.schoolBillingPurchases[purchaseId] = purchase;
+    recalculateSchoolBillingLicence(store, school);
+    pending.status = "active";
+    pending.schoolId = school.id;
+    pending.transactionId = transactionId;
+    pending.activatedAt = Date.now();
+    pending.licenceStartAt = purchase.licenceStartAt;
+    pending.licenceEndAt = purchase.licenceEndAt;
+    recordAudit(store, { principalId: "billing:revenuecat", email: pending.administratorEmail }, "school.licence.purchased", school.id, {
+      purchaseId,
+      transactionId,
+      packageId: purchase.packageId,
+      period: purchase.period,
+      learnerCount: purchase.learnerCount,
+      licenceEndAt: purchase.licenceEndAt,
+    });
+    const result = { school: buildSchoolSummary(store, school), administratorInvitation, purchase: { ...purchase } };
+    store.schoolBillingWebhookEvents[eventId] = { eventId, type: "NON_RENEWING_PURCHASE", processedAt: Date.now(), result };
+    return result;
+  });
+}
+
+export async function refundSchoolPurchase(payload) {
+  const eventId = String(payload.eventId ?? "").trim();
+  const transactionId = String(payload.transactionId ?? "").trim();
+  if (!eventId || !transactionId) throw Object.assign(new Error("The school refund event is incomplete."), { statusCode: 400 });
+  return mutateStore(async (store) => {
+    const processed = store.schoolBillingWebhookEvents[eventId];
+    if (processed) return { ...processed.result, idempotent: true };
+    const purchase = Object.values(store.schoolBillingPurchases).find((entry) => entry.transactionId === transactionId);
+    if (!purchase) {
+      const result = { ignored: true, reason: "purchase_not_managed_by_quiks_school" };
+      store.schoolBillingWebhookEvents[eventId] = { eventId, type: "CANCELLATION", processedAt: Date.now(), result };
+      return result;
+    }
+    purchase.status = "refunded";
+    purchase.refundedAt = Number(payload.eventTimestamp) || Date.now();
+    purchase.refundReason = String(payload.reason ?? "refund").slice(0, 120);
+    const school = store.schools[purchase.schoolId];
+    if (school) recalculateSchoolBillingLicence(store, school);
+    const pending = store.pendingSchoolPurchases[purchase.purchaseReference];
+    if (pending) pending.status = "refunded";
+    recordAudit(store, { principalId: "billing:revenuecat", email: "" }, "school.licence.refunded", purchase.schoolId, {
+      purchaseId: purchase.purchaseId,
+      transactionId,
+      licenceEndAt: school?.licence.endAt,
+    });
+    const result = { refunded: true, school: school ? buildSchoolSummary(store, school) : null, purchase: { ...purchase } };
+    store.schoolBillingWebhookEvents[eventId] = { eventId, type: "CANCELLATION", processedAt: Date.now(), result };
+    return result;
+  });
+}
+
+export async function recordIgnoredSchoolBillingWebhook(eventId, type, reason) {
+  return mutateStore(async (store) => {
+    if (store.schoolBillingWebhookEvents[eventId]) return { ...store.schoolBillingWebhookEvents[eventId].result, idempotent: true };
+    const result = { ignored: true, reason };
+    store.schoolBillingWebhookEvents[eventId] = { eventId, type, processedAt: Date.now(), result };
+    return result;
+  });
 }
 
 export async function createSchool(principal, payload) {
@@ -553,6 +927,7 @@ export async function getOwnerDashboard(principal) {
   const now = Date.now();
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   const individualLicences = Object.values(store.individualLicences).map(buildIndividualLicence);
+  const billingPurchases = Object.values(store.schoolBillingPurchases).sort((left, right) => right.purchasedAt - left.purchasedAt);
   return {
     totals: {
       schools: schools.length,
@@ -565,9 +940,11 @@ export async function getOwnerDashboard(principal) {
       ).length,
       individualLicences: individualLicences.length,
       activeIndividualLicences: individualLicences.filter((licence) => licence.status === "active").length,
+      schoolBillingPurchases: billingPurchases.length,
     },
     schools: schools.sort((left, right) => left.name.localeCompare(right.name)),
     individualLicences: individualLicences.sort((left, right) => left.email.localeCompare(right.email)),
+    billingPurchases: billingPurchases.map((purchase) => ({ ...purchase })),
   };
 }
 
@@ -619,6 +996,10 @@ export async function getSchoolDetails(principal, schoolId) {
     memberships: membershipsForSchool(store, schoolId)
       .map((membership) => buildMembership(store, membership))
       .sort((left, right) => left.displayName.localeCompare(right.displayName)),
+    billingHistory: Object.values(store.schoolBillingPurchases)
+      .filter((purchase) => purchase.schoolId === schoolId)
+      .sort((left, right) => right.purchasedAt - left.purchasedAt)
+      .map((purchase) => ({ ...purchase })),
   };
 }
 

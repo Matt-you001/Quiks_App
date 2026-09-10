@@ -1,5 +1,5 @@
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { URL } from "node:url";
 import {
   acceptClassInviteLink,
@@ -39,17 +39,22 @@ import { schoolClassroomsRequest } from "./school-classrooms-api.mjs";
 import { getSchoolEmailDiagnostics, sendSchoolInvitationEmail } from "./school-email.mjs";
 import {
   createIndividualLicence,
+  createPendingSchoolPurchase,
   createSchool,
+  activateSchoolPurchase,
   enrolInSchool,
   getInstitutionalEntitlement,
   getOwnerIssuedIndividualEntitlement,
   getOwnerDashboard,
   getPrincipalSchoolIdentity,
   getSchoolDetails,
+  getSchoolPurchaseStatus,
   getSchoolPublicDetails,
   getSchoolStoreDiagnostics,
   inviteSchoolMember,
   listPrincipalMemberships,
+  recordIgnoredSchoolBillingWebhook,
+  refundSchoolPurchase,
   updateMembershipStatus,
   updateSchoolLicence,
   updateSchoolProfileFields,
@@ -236,6 +241,141 @@ async function handlePaddleSubscriptionSync(body, response) {
 
   const receiptPayload = await receiptResponse.json();
   sendJson(response, 200, { ...parseRevenueCatSubscriptionStatus(receiptPayload, appVariant), source: "individual", profileLimit: 2 });
+}
+
+function configuredSchoolBillingEnvironment() {
+  return String(process.env.QUIKS_SCHOOL_BILLING_ENVIRONMENT ?? "production").trim().toUpperCase() === "SANDBOX"
+    ? "SANDBOX"
+    : "PRODUCTION";
+}
+
+function timingSafeTextEqual(left, right) {
+  const leftBytes = Buffer.from(String(left));
+  const rightBytes = Buffer.from(String(right));
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
+}
+
+function verifyRevenueCatSchoolWebhook(request, rawBody) {
+  const expectedAuthorization = String(process.env.REVENUECAT_SCHOOL_WEBHOOK_AUTH ?? "").trim();
+  const signingSecret = String(process.env.REVENUECAT_SCHOOL_WEBHOOK_SIGNING_SECRET ?? "").trim();
+  if (!expectedAuthorization || !signingSecret) {
+    throw Object.assign(new Error("The Quiks School billing webhook is not configured."), { statusCode: 503 });
+  }
+  if (!timingSafeTextEqual(request.headers.authorization ?? "", expectedAuthorization)) {
+    throw Object.assign(new Error("The billing webhook authorization is invalid."), { statusCode: 401 });
+  }
+  const signatureHeader = String(request.headers["x-revenuecat-webhook-signature"] ?? "");
+  const parts = Object.fromEntries(
+    signatureHeader.split(",").map((part) => {
+      const separator = part.indexOf("=");
+      return separator > 0 ? [part.slice(0, separator).trim(), part.slice(separator + 1).trim()] : ["", ""];
+    })
+  );
+  const timestamp = Number(parts.t);
+  if (!Number.isInteger(timestamp) || !parts.v1 || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300) {
+    throw Object.assign(new Error("The billing webhook signature timestamp is invalid."), { statusCode: 401 });
+  }
+  const expectedSignature = createHmac("sha256", signingSecret).update(`${parts.t}.${rawBody}`).digest("hex");
+  if (!timingSafeTextEqual(expectedSignature, parts.v1)) {
+    throw Object.assign(new Error("The billing webhook signature is invalid."), { statusCode: 401 });
+  }
+}
+
+async function verifyPaddleSchoolTransaction(transactionId, expectedEnvironment, purchaseReference, expectedPriceId) {
+  const apiKey = String(
+    expectedEnvironment === "SANDBOX" ? process.env.PADDLE_SANDBOX_API_KEY ?? "" : process.env.PADDLE_API_KEY ?? ""
+  ).trim();
+  if (!apiKey) throw Object.assign(new Error("Paddle transaction verification is not configured."), { statusCode: 503 });
+  if (!/^txn_[a-z0-9]+$/i.test(transactionId)) throw Object.assign(new Error("The Paddle transaction ID is invalid."), { statusCode: 400 });
+  const baseUrl = expectedEnvironment === "SANDBOX" ? "https://sandbox-api.paddle.com" : "https://api.paddle.com";
+  const providerResponse = await fetch(`${baseUrl}/transactions/${encodeURIComponent(transactionId)}`, {
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!providerResponse.ok) {
+    throw Object.assign(new Error(`Paddle could not verify the school payment (${providerResponse.status}).`), { statusCode: 503 });
+  }
+  const transaction = (await providerResponse.json())?.data;
+  if (!transaction || transaction.status !== "completed") {
+    throw Object.assign(new Error("The Paddle school payment is not completed."), { statusCode: 409 });
+  }
+  if (transaction.custom_data?.app_user_id !== purchaseReference || transaction.custom_data?.quiks_purchase_kind !== "school") {
+    throw Object.assign(new Error("The Paddle payment reference does not match the pending school purchase."), { statusCode: 409 });
+  }
+  const items = Array.isArray(transaction.items) ? transaction.items : [];
+  const matchingItems = items.filter((item) => (item.price?.id ?? item.price_id) === expectedPriceId);
+  if (matchingItems.length !== 1 || items.length !== 1) {
+    throw Object.assign(new Error("The Paddle transaction does not contain the expected single school package."), { statusCode: 409 });
+  }
+  const quantity = Number(matchingItems[0].quantity);
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    throw Object.assign(new Error("The Paddle transaction quantity is invalid."), { statusCode: 409 });
+  }
+  return { quantity };
+}
+
+async function handleRevenueCatSchoolWebhook(request, rawBody, body, response) {
+  verifyRevenueCatSchoolWebhook(request, rawBody);
+  const event = body?.event;
+  const eventId = String(event?.id ?? "").trim();
+  const type = String(event?.type ?? "").trim().toUpperCase();
+  if (!eventId || !type) throw Object.assign(new Error("The RevenueCat webhook event is incomplete."), { statusCode: 400 });
+  if (type === "TEST") {
+    sendJson(response, 200, { ok: true, test: true });
+    return;
+  }
+  const environment = String(event.environment ?? "").toUpperCase();
+  if (environment !== configuredSchoolBillingEnvironment()) {
+    throw Object.assign(new Error(`A ${environment || "missing-environment"} purchase cannot activate this billing environment.`), { statusCode: 409 });
+  }
+  const store = String(event.store ?? "").toUpperCase();
+  if (store && store !== "PADDLE") {
+    const result = await recordIgnoredSchoolBillingWebhook(eventId, type, "not_a_paddle_purchase");
+    sendJson(response, 200, { ok: true, ...result });
+    return;
+  }
+  const transactionId = String(event.transaction_id ?? event.original_transaction_id ?? "").trim();
+  if (type === "CANCELLATION") {
+    const result = await refundSchoolPurchase({
+      eventId,
+      transactionId,
+      eventTimestamp: event.event_timestamp_ms,
+      reason: event.cancel_reason,
+    });
+    sendJson(response, 200, { ok: true, ...result });
+    return;
+  }
+  if (type !== "NON_RENEWING_PURCHASE") {
+    const result = await recordIgnoredSchoolBillingWebhook(eventId, type, "event_type_not_used_for_fixed_term_school_licences");
+    sendJson(response, 200, { ok: true, ...result });
+    return;
+  }
+  const purchaseReference = String(event.app_user_id ?? "").trim();
+  const priceId = String(event.product_id ?? "").trim();
+  const verified = await verifyPaddleSchoolTransaction(transactionId, environment, purchaseReference, priceId);
+  const result = await activateSchoolPurchase({
+    eventId,
+    transactionId,
+    purchaseReference,
+    priceId,
+    purchasedAt: Number(event.purchased_at_ms),
+    environment,
+    quantity: verified.quantity,
+  });
+  let emailDelivery = null;
+  if (result.administratorInvitation) {
+    emailDelivery = await sendSchoolInvitationEmail({
+      email: result.administratorInvitation.email,
+      schoolName: result.school.name,
+      invitationCode: result.administratorInvitation.invitationCode,
+      role: "school_admin",
+      expiresAt: result.administratorInvitation.expiresAt,
+    }).catch((error) => {
+      console.error("Purchased school administrator invitation email could not be sent:", error);
+      return { status: "failed" };
+    });
+  }
+  sendJson(response, 200, { ok: true, schoolId: result.school.schoolId, licenceEndAt: result.school.licence.endAt, emailDelivery });
 }
 
 function isSameUtcDay(leftTimestamp, rightTimestamp) {
@@ -493,12 +633,15 @@ async function sendExpoPushNotification({ to, title, body, data }) {
 
 async function readJsonBody(request) {
   const chunks = [];
+  let size = 0;
   for await (const chunk of request) {
+    size += chunk.length;
+    if (size > 1_000_000) throw Object.assign(new Error("The request body is too large."), { statusCode: 400 });
     chunks.push(chunk);
   }
 
   const raw = Buffer.concat(chunks).toString("utf8");
-  return raw ? JSON.parse(raw) : {};
+  return { raw, body: raw ? JSON.parse(raw) : {} };
 }
 
 function extractOutputText(payload) {
@@ -3265,7 +3408,13 @@ const server = http.createServer(async (request, response) => {
   }
 
   try {
-    let body = await readJsonBody(request);
+    const requestPayload = await readJsonBody(request);
+    const rawBody = requestPayload.raw;
+    let body = requestPayload.body;
+    if (url.pathname === "/webhooks/revenuecat/school") {
+      await handleRevenueCatSchoolWebhook(request, rawBody, body, response);
+      return;
+    }
     // All classroom, lesson-note, chat and CBT endpoints share the school
     // Firebase principal. Validate before reading records or calling AI.
     if (url.pathname.startsWith("/classroom/")) {
@@ -3419,6 +3568,16 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/school/public") {
       sendJson(response, 200, await getSchoolPublicDetails(body.code));
+      return;
+    }
+
+    if (url.pathname === "/school/purchases/pending") {
+      sendJson(response, 200, await createPendingSchoolPurchase(body));
+      return;
+    }
+
+    if (url.pathname === "/school/purchases/status") {
+      sendJson(response, 200, await getSchoolPurchaseStatus(body.purchaseReference, body.statusToken));
       return;
     }
 

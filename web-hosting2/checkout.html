@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quiks | Checkout</title>
-  <meta name="description" content="Checkout entry page for Quiks subscriptions and premium plans." />
+  <meta name="description" content="Secure checkout entry page for individual and institutional Quiks subscriptions." />
   <link rel="icon" href="./logo.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="./logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -36,15 +36,21 @@
     <main>
       <section class="inner-hero">
         <span class="eyebrow">Secure billing</span>
-        <h1>Choose the Quiks plan you want to purchase.</h1>
-        <p>Quiks web subscriptions are billed through Paddle. Select the variant you want to subscribe to, then continue inside that product experience.</p>
+        <h1>Choose who the subscription is for.</h1>
+        <p>Individual subscriptions continue through the selected Quiks app. Institutional checkout collects the school details needed to create the licence and its first administrator invitation after payment is verified.</p>
       </section>
 
       <section class="content-panel">
+        <div class="audience-tabs" role="tablist" aria-label="Choose subscription type">
+          <button class="audience-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="individual-checkout" data-audience-tab="individual">Individual</button>
+          <button class="audience-tab" type="button" role="tab" aria-selected="false" aria-controls="school-checkout" data-audience-tab="schools">Schools / Institutions</button>
+        </div>
+
+        <div id="individual-checkout" data-audience-panel="individual">
         <div class="section-heading">
-          <span class="eyebrow pricing-eyebrow">Checkout destinations</span>
-          <h2>Variant checkout entry points</h2>
-          <p>Use the pricing page for plan details, then open the matching variant checkout page to complete your subscription through Paddle.</p>
+          <span class="eyebrow pricing-eyebrow">Individual checkout</span>
+          <h2>Choose your Quiks learning stage</h2>
+          <p>Open the matching app to sign in and complete the existing individual Paddle checkout.</p>
         </div>
         <div class="variant-grid">
           <article class="variant-card children-card">
@@ -66,6 +72,66 @@
             <a class="variant-link" href="https://uni.quiks.site/checkout.html">Open Uni checkout</a>
           </article>
         </div>
+        </div>
+
+        <div id="school-checkout" data-audience-panel="schools" hidden>
+          <div class="section-heading">
+            <span class="eyebrow pricing-eyebrow">Institutional checkout</span>
+            <h2>Prepare your Quiks School licence</h2>
+            <p>Provide the school and administrator details below, then select a package. These details will be attached to the payment so the verified purchase can create the correct school licence.</p>
+          </div>
+
+          <form id="school-checkout-form" class="school-checkout-form" novalidate>
+            <div class="school-form-grid">
+              <label class="school-field">
+                <span>School or institution name</span>
+                <input id="school-name" name="schoolName" type="text" autocomplete="organization" required maxlength="120" placeholder="Enter the registered school name" />
+              </label>
+              <label class="school-field">
+                <span>First administrator's name</span>
+                <input id="administrator-name" name="administratorName" type="text" autocomplete="name" required maxlength="100" placeholder="Enter the administrator's name" />
+              </label>
+              <label class="school-field">
+                <span>Administrator's email address</span>
+                <input id="administrator-email" name="administratorEmail" type="email" autocomplete="email" required maxlength="160" placeholder="admin@school.example" />
+              </label>
+              <label class="school-field">
+                <span>Student and staff enrolment codes</span>
+                <select id="enrolment-mode" name="enrolmentMode" required>
+                  <option value="shared_code">One shared code</option>
+                  <option value="individual_codes">Unique individual codes</option>
+                </select>
+              </label>
+              <label class="school-field">
+                <span>Expected number of learners</span>
+                <input id="learner-count" name="learnerCount" type="number" inputmode="numeric" required min="1" step="1" placeholder="Enter the learner count" />
+              </label>
+            </div>
+
+            <fieldset class="school-package-fieldset">
+              <legend>Select a school package and billing period</legend>
+              <div class="school-package-table-wrap">
+                <table class="school-package-table">
+                  <thead><tr><th>Package</th><th>Learner coverage</th><th>Term</th><th>Session / year</th></tr></thead>
+                  <tbody>
+                    <tr><th>Per Learner Access</th><td>Any approved school size</td><td><label><input type="radio" name="schoolPackageSelection" value="per-learner:term" /><span>$3.50 per learner</span></label></td><td><label><input type="radio" name="schoolPackageSelection" value="per-learner:session" /><span>$10 per learner</span></label></td></tr>
+                    <tr class="featured-plan"><th>Essential School</th><td>10–100 learners</td><td><label><input type="radio" name="schoolPackageSelection" value="starter:term" checked /><span>$225</span></label></td><td><label><input type="radio" name="schoolPackageSelection" value="starter:session" /><span>$550</span></label></td></tr>
+                    <tr><th>Growth School</th><td>101–200 learners</td><td><label><input type="radio" name="schoolPackageSelection" value="growth:term" /><span>$370</span></label></td><td><label><input type="radio" name="schoolPackageSelection" value="growth:session" /><span>$926</span></label></td></tr>
+                    <tr><th>Comprehensive School</th><td>201–500 learners</td><td><label><input type="radio" name="schoolPackageSelection" value="complete:term" /><span>$593</span></label></td><td><label><input type="radio" name="schoolPackageSelection" value="complete:session" /><span>$1,445</span></label></td></tr>
+                    <tr class="enterprise-plan"><th>Enterprise Network</th><td>Group or multi-campus schools</td><td><label><input type="radio" name="schoolPackageSelection" value="enterprise:term" /><span>$741</span></label></td><td><label><input type="radio" name="schoolPackageSelection" value="enterprise:session" /><span>$1,852</span></label></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </fieldset>
+
+            <p class="pricing-note"><strong>Billing currency:</strong> these school packages are charged in US dollars through Paddle. Applicable taxes are calculated at checkout. Any onboarding fee is collected separately because RevenueCat's Paddle integration supports one product per purchase.</p>
+            <p id="school-checkout-status" class="checkout-status" role="status" aria-live="polite">School checkout is being connected to Paddle. No charge will be attempted until the selected school price has been configured.</p>
+            <div class="school-checkout-actions">
+              <button id="start-school-checkout" class="primary-link checkout-button" type="submit">Continue to secure payment</button>
+              <a class="secondary-dark-link" href="./contact.html">Request an invoice instead</a>
+            </div>
+          </form>
+        </div>
       </section>
     </main>
 
@@ -85,5 +151,9 @@
     </footer>
   </div>
   <script src="./menu.js"></script>
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+  <script src="./school-paddle-config.js"></script>
+  <script src="./subscription-options.js"></script>
+  <script src="./school-checkout.js"></script>
 </body>
 </html>

@@ -235,6 +235,7 @@ export default function SchoolOwnerScreen() {
               </Pressable>
               {selectedSchoolId === school.schoolId ? <View style={styles.schoolDetails}>
               <Text style={styles.meta}>School code {school.schoolCode} · {school.status}</Text>
+              {school.licence.packageName ? <Text style={styles.meta}>{school.licence.packageName} · {school.licence.plan === "session" ? "Session / year" : "Term"}</Text> : null}
               <Text style={styles.meta}>Enrolment: {school.enrolmentMode === "individual_codes" ? "unique individual codes" : "one shared school code"}</Text>
               <Text style={styles.meta}>{school.studentCount}/{school.licence.studentSeatLimit} students · {school.teacherCount}/{school.licence.teacherSeatLimit} teachers · {school.pendingCount} pending</Text>
               <Text style={styles.meta}>Expires {new Date(school.licence.endAt).toLocaleDateString()} · {school.seatUsagePercent}% seats used</Text>
@@ -254,6 +255,19 @@ export default function SchoolOwnerScreen() {
         <View style={styles.card}>
           <Text style={styles.heading}>Individual licences</Text>
           {data.individualLicences.length === 0 ? <Text style={styles.copy}>No individual licences issued yet.</Text> : data.individualLicences.map((licence) => <View key={licence.licenceId} style={styles.school}><Text style={styles.schoolName}>{licence.email}</Text><Text style={styles.meta}>{licence.status} · {new Date(licence.startAt).toLocaleDateString()} to {new Date(licence.endAt).toLocaleDateString()}</Text><Text style={styles.meta}>Profile allowance: 1</Text></View>)}
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.heading}>Online school licence payments</Text>
+          <Text style={styles.copy}>Verified Paddle purchases and the fixed licence periods granted by Quiks.</Text>
+          {(data.billingPurchases ?? []).length === 0 ? <Text style={styles.copy}>No verified online school payments yet.</Text> : (data.billingPurchases ?? []).map((purchase) => {
+            const schoolName = data.schools.find((school) => school.schoolId === purchase.schoolId)?.name ?? "School";
+            return <View key={purchase.purchaseId} style={styles.school}>
+              <Text style={styles.schoolName}>{schoolName}</Text>
+              <Text style={styles.meta}>{purchase.packageName} · {purchase.period === "session" ? "Session / year" : "Term"} · {purchase.learnerCount} learners</Text>
+              <Text style={styles.meta}>{purchase.status} · {new Date(purchase.licenceStartAt).toLocaleDateString()} to {new Date(purchase.licenceEndAt).toLocaleDateString()}</Text>
+              <Text style={styles.meta}>Paddle transaction: {purchase.transactionId}</Text>
+            </View>;
+          })}
         </View>
       </View> : null}
     </AppBackground>

@@ -367,6 +367,9 @@ export interface SchoolProfileFieldDefinition {
 
 export interface SchoolLicence {
   plan: "term" | "session" | "pilot" | "custom";
+  packageId?: "per-learner" | "starter" | "growth" | "complete" | "enterprise";
+  packageName?: string;
+  billingSource?: "revenuecat_paddle";
   status: SchoolLicenceStatus;
   startAt: number;
   endAt: number;
@@ -452,9 +455,28 @@ export interface SchoolOwnerDashboardResponse {
     expiringWithin30Days: number;
     individualLicences: number;
     activeIndividualLicences: number;
+    schoolBillingPurchases?: number;
   };
   schools: SchoolSummary[];
   individualLicences: OwnerIssuedIndividualLicence[];
+  billingPurchases?: SchoolBillingPurchase[];
+}
+
+export interface SchoolBillingPurchase {
+  purchaseId: string;
+  transactionId: string;
+  schoolId: string;
+  packageId: string;
+  packageName: string;
+  period: "term" | "session";
+  learnerCount: number;
+  quantity: number;
+  environment: "SANDBOX" | "PRODUCTION";
+  purchasedAt: number;
+  licenceStartAt: number;
+  licenceEndAt: number;
+  status: "active" | "refunded";
+  refundedAt?: number;
 }
 
 export interface OwnerIssuedIndividualLicence {
@@ -532,6 +554,7 @@ export interface SchoolDetailsResponse {
   school: SchoolSummary;
   profileFields: SchoolProfileFieldDefinition[];
   memberships: SchoolMembership[];
+  billingHistory?: SchoolBillingPurchase[];
 }
 
 export interface SchoolProfileFieldsUpdateRequest {

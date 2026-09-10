@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "web:fix-exports": "node scripts/fix-web-export-paths.mjs",
     "web:prepare-hosting": "node scripts/prepare-hostable-web-builds.mjs",
+    "web:verify-school-checkout": "node scripts/verify-school-checkout.mjs",
     "proxy": "node backend/openai-proxy.mjs",
     "proxy:local": "node --env-file=.env backend/openai-proxy.mjs",
     "lint": "expo lint",

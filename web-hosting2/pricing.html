@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quiks | Pricing</title>
-  <meta name="description" content="Pricing overview for Quiks Children, Quiks Teens, and Quiks Uni." />
+  <meta name="description" content="Individual and institutional pricing for Quiks Children, Quiks Teens, and Quiks Uni." />
   <link rel="icon" href="./logo.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="./logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -38,15 +38,21 @@
     <main>
       <section class="inner-hero">
         <span class="eyebrow">Plans and billing</span>
-        <h1>Simple premium access across the Quiks family.</h1>
-        <p>Exact checkout pricing is shown inside the selected Quiks variant and may vary by region, billing period, taxes, and offers.</p>
+        <h1>Choose individual or institutional access.</h1>
+        <p>Individual subscriptions continue through the selected Quiks app. Schools and institutions can choose a term or full-session licence for their learners and staff.</p>
       </section>
 
       <section class="content-panel">
+        <div class="audience-tabs" role="tablist" aria-label="Choose subscription type">
+          <button class="audience-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="individual-pricing" data-audience-tab="individual">Individual</button>
+          <button class="audience-tab" type="button" role="tab" aria-selected="false" aria-controls="school-pricing" data-audience-tab="schools">Schools / Institutions</button>
+        </div>
+
+        <div id="individual-pricing" data-audience-panel="individual">
         <div class="section-heading">
-          <span class="eyebrow pricing-eyebrow">Subscription overview</span>
-          <h2>Premium plans by variant</h2>
-          <p>Each variant has its own premium plan with monthly or yearly billing where available.</p>
+          <span class="eyebrow pricing-eyebrow">Individual subscriptions</span>
+          <h2>Quiks Pro by learning stage</h2>
+          <p>Choose the appropriate variant, then review the current monthly or yearly price before completing checkout.</p>
         </div>
         <div class="variant-grid">
           <article class="variant-card children-card">
@@ -54,7 +60,7 @@
             <h3>Primary learners</h3>
             <p>Premium guided learning for younger learners with cleaner access and stronger continuity.</p>
             <ul>
-              <li>Multiple learner profiles for one account</li>
+              <li>Up to two learner profiles for one account</li>
               <li>Unlimited AI-generated practice and Learning Hub lessons</li>
               <li>Paid-subscriber Classroom access</li>
               <li>Unlimited competitions, group challenges, and rematches</li>
@@ -68,7 +74,7 @@
             <h3>Secondary learners</h3>
             <p>Premium support for stronger revision, deeper practice, and classroom continuity.</p>
             <ul>
-              <li>Multiple learner profiles for one account</li>
+              <li>Up to two learner profiles for one account</li>
               <li>Unlimited AI-generated revision and Learning Hub lessons</li>
               <li>Paid-subscriber Classroom access</li>
               <li>Unlimited competitions, group challenges, and rematches</li>
@@ -82,7 +88,7 @@
             <h3>Tertiary learners</h3>
             <p>Premium academic support for higher-level practice, advanced questions, and focused study workflows.</p>
             <ul>
-              <li>Multiple learner profiles for one account</li>
+              <li>Up to two learner profiles for one account</li>
               <li>Unlimited AI-generated study and Learning Hub lessons</li>
               <li>Paid-subscriber Classroom access</li>
               <li>Unlimited competitions, group challenges, and rematches</li>
@@ -91,6 +97,28 @@
             </ul>
             <a class="variant-link" href="https://uni.quiks.site/checkout.html">Upgrade Quiks Uni</a>
           </article>
+        </div>
+        </div>
+
+        <div id="school-pricing" data-audience-panel="schools" hidden>
+          <div class="section-heading">
+            <span class="eyebrow pricing-eyebrow">Institutional subscriptions</span>
+            <h2>Quiks School packages</h2>
+            <p>Every institutional package includes school-managed access to the licensed Quiks variants, Classroom, lesson notes, school enrolment, CBT activities, and central activity records. No advertisements are shown under school packages.</p>
+          </div>
+          <div class="school-plan-table-wrap">
+            <table class="school-plan-table">
+              <thead><tr><th>Package</th><th>Learner coverage</th><th>Per term</th><th>Per session / year</th></tr></thead>
+              <tbody>
+                <tr><th>Per Learner Access</th><td>Any approved school size</td><td><strong>$3.50 per learner</strong><a href="./checkout.html?audience=schools&amp;plan=per-learner&amp;period=term">Choose term</a></td><td><strong>$10 per learner</strong><a href="./checkout.html?audience=schools&amp;plan=per-learner&amp;period=session">Choose session</a></td></tr>
+                <tr class="featured-plan"><th>Essential School</th><td>10–100 learners</td><td><strong>$225</strong><a href="./checkout.html?audience=schools&amp;plan=starter&amp;period=term">Choose term</a></td><td><strong>$550</strong><a href="./checkout.html?audience=schools&amp;plan=starter&amp;period=session">Choose session</a></td></tr>
+                <tr><th>Growth School</th><td>101–200 learners</td><td><strong>$370</strong><a href="./checkout.html?audience=schools&amp;plan=growth&amp;period=term">Choose term</a></td><td><strong>$926</strong><a href="./checkout.html?audience=schools&amp;plan=growth&amp;period=session">Choose session</a></td></tr>
+                <tr><th>Comprehensive School</th><td>201–500 learners</td><td><strong>$593</strong><a href="./checkout.html?audience=schools&amp;plan=complete&amp;period=term">Choose term</a></td><td><strong>$1,445</strong><a href="./checkout.html?audience=schools&amp;plan=complete&amp;period=session">Choose session</a></td></tr>
+                <tr class="enterprise-plan"><th>Enterprise Network</th><td>Group or multi-campus schools</td><td><strong>$741</strong><a href="./checkout.html?audience=schools&amp;plan=enterprise&amp;period=term">Choose term</a></td><td><strong>$1,852</strong><a href="./checkout.html?audience=schools&amp;plan=enterprise&amp;period=session">Choose session</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="pricing-note"><strong>Billing currency:</strong> Paddle charges the school-package prices above in US dollars. Applicable taxes and any separately agreed implementation services are confirmed before payment. The one-time onboarding fee is collected separately after a successful pilot if the school proceeds.</p>
         </div>
       </section>
     </main>
@@ -112,5 +140,6 @@
     </footer>
   </div>
   <script src="./menu.js"></script>
+  <script src="./subscription-options.js"></script>
 </body>
 </html>

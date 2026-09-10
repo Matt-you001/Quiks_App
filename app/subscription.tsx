@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { Alert, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -24,6 +24,14 @@ import { getAccountSubscriptionStatus, syncPaddleSubscriptionPurchase } from "..
 import type { AppAccount, AppLanguage, SubscriptionTier } from "../types/app";
 
 const PADDLE_SYNC_RETRY_DELAYS_MS = [750, 1500, 3000];
+
+const schoolPlans = [
+  { name: "Per Learner Access", learners: "Any approved school size", term: "$3.50 per learner", session: "$10 per learner", note: "Prices are charged in US dollars by Paddle." },
+  { name: "Essential School", learners: "10–100 learners", term: "$225", session: "$550" },
+  { name: "Growth School", learners: "101–200 learners", term: "$370", session: "$926" },
+  { name: "Comprehensive School", learners: "201–500 learners", term: "$593", session: "$1,445" },
+  { name: "Enterprise Network", learners: "Group or multi-campus schools", term: "$741", session: "$1,852" },
+] as const;
 
 function wait(milliseconds: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -60,6 +68,7 @@ export default function SubscriptionScreen() {
   const [account, setAccount] = useState<AppAccount | null>(null);
   const [managementUrl, setManagementUrl] = useState<string | null>(null);
   const [openingManagement, setOpeningManagement] = useState(false);
+  const [billingAudience, setBillingAudience] = useState<"individual" | "school">("individual");
 
   const load = useCallback(async () => {
     const state = await readAppState();
@@ -294,6 +303,58 @@ export default function SubscriptionScreen() {
         <Text style={styles.title}>{t(language, "manageSubscription")}</Text>
       </View>
 
+      {Platform.OS === "web" ? (
+        <View style={styles.audienceSelector} accessibilityRole="tablist">
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: billingAudience === "individual" }}
+            onPress={() => setBillingAudience("individual")}
+            style={[styles.audienceOption, billingAudience === "individual" ? styles.audienceOptionActive : null]}
+          >
+            <Text style={[styles.audienceOptionText, billingAudience === "individual" ? styles.audienceOptionTextActive : null]}>Individual</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: billingAudience === "school" }}
+            onPress={() => setBillingAudience("school")}
+            style={[styles.audienceOption, billingAudience === "school" ? styles.audienceOptionActive : null]}
+          >
+            <Text style={[styles.audienceOptionText, billingAudience === "school" ? styles.audienceOptionTextActive : null]}>Schools / Institutions</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {billingAudience === "school" && Platform.OS === "web" ? (
+        <>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Quiks School plans</Text>
+            <Text style={styles.cardText}>Institutional access includes the school portal, Classroom, lesson notes, school enrolment and central activity records. School-issued licences permit one profile per licensed account.</Text>
+            <View style={[styles.planList, styles.planListWeb]}>
+              {schoolPlans.map((plan) => (
+                <View key={plan.name} style={[styles.planCard, styles.planCardWeb]}>
+                  <Text style={styles.planTitle}>{plan.name}</Text>
+                  <Text style={styles.schoolLearners}>{plan.learners}</Text>
+                  <Text style={styles.planPrice}>Per term: {plan.term}</Text>
+                  <Text style={styles.planPrice}>Per session/year: {plan.session}</Text>
+                  {"note" in plan ? <Text style={styles.planText}>{plan.note}</Text> : null}
+                </View>
+              ))}
+            </View>
+            <Text style={styles.schoolFee}>A one-time ₦50,000 onboarding fee applies after a successful pilot when the school proceeds with adoption.</Text>
+            <PrimaryButton
+              label="Continue to school checkout"
+              onPress={() => {
+                if (typeof window !== "undefined") window.location.assign("https://quiks.site/checkout.html?audience=schools");
+              }}
+            />
+          </View>
+          <View style={styles.actionColumn}>
+            <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
+          </View>
+        </>
+      ) : (
+        <>
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t(language, "freePlan")}</Text>
         <Text style={styles.cardText}>{t(language, "subscriptionFreeFeatures")}</Text>
@@ -397,6 +458,8 @@ export default function SubscriptionScreen() {
         ) : null}
         <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
       </View>
+        </>
+      )}
     </AppBackground>
   );
 }
@@ -412,6 +475,33 @@ const styles = StyleSheet.create({
     color: palette.white,
     fontSize: 32,
     fontWeight: "800",
+  },
+  audienceSelector: {
+    marginTop: 18,
+    flexDirection: "row",
+    gap: 8,
+    padding: 6,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.92)",
+  },
+  audienceOption: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+  },
+  audienceOptionActive: {
+    backgroundColor: palette.navy,
+  },
+  audienceOptionText: {
+    color: palette.navy,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  audienceOptionTextActive: {
+    color: palette.white,
   },
   subtitle: {
     marginTop: 10,
@@ -535,6 +625,17 @@ const styles = StyleSheet.create({
   planText: {
     color: palette.slate,
     lineHeight: 20,
+  },
+  schoolLearners: {
+    color: palette.aqua,
+    fontWeight: "800",
+  },
+  schoolFee: {
+    marginTop: 16,
+    marginBottom: 14,
+    color: palette.slate,
+    lineHeight: 21,
+    fontWeight: "600",
   },
   storeMessage: {
     marginTop: 10,
