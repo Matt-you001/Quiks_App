@@ -21,6 +21,9 @@ function formatDateTime(timestamp: number) {
 
 function sortByScore(entries: ClassroomSubmissionSummary[]) {
   return [...entries].sort((left, right) => {
+    const leftPending = left.gradingStatus === "awaiting_marking";
+    const rightPending = right.gradingStatus === "awaiting_marking";
+    if (leftPending !== rightPending) return leftPending ? 1 : -1;
     if (right.score !== left.score) {
       return right.score - left.score;
     }
@@ -85,7 +88,7 @@ export default function ClassroomResultScreen() {
     [orderedSubmissions, profile?.id]
   );
   const ownRank = useMemo(
-    () => (ownSubmission ? orderedSubmissions.findIndex((entry) => entry.profileId === ownSubmission.profileId) + 1 : null),
+    () => (ownSubmission && ownSubmission.gradingStatus !== "awaiting_marking" ? orderedSubmissions.filter((entry) => entry.gradingStatus !== "awaiting_marking").findIndex((entry) => entry.profileId === ownSubmission.profileId) + 1 : null),
     [orderedSubmissions, ownSubmission]
   );
 
@@ -150,11 +153,13 @@ export default function ClassroomResultScreen() {
           <View style={styles.highlightCard}>
             <Text style={styles.highlightLabel}>Your outcome</Text>
             <Text style={styles.highlightScore}>
-              {ownSubmission.status === "absent" ? "0%" : `${ownSubmission.score}%`}
+              {ownSubmission.status === "absent" ? "0%" : ownSubmission.gradingStatus === "awaiting_marking" ? `${ownSubmission.provisionalScore ?? ownSubmission.score}%*` : `${ownSubmission.score}%`}
             </Text>
             <Text style={styles.highlightMeta}>
               {ownSubmission.status === "absent"
                 ? "You did not participate before the deadline."
+                : ownSubmission.gradingStatus === "awaiting_marking"
+                  ? "Your objective section has been marked. This is a provisional score; your final result will be available after your teacher marks the written answers."
                 : `${ownSubmission.correctAnswers}/${ownSubmission.totalQuestions} correct in ${ownSubmission.timeTakenSeconds}s`}
             </Text>
             {isPublic && ownRank ? (
@@ -177,7 +182,7 @@ export default function ClassroomResultScreen() {
                 const isOwn = submission.profileId === profile.id;
                 return (
                   <View
-                    key={`${submission.profileId}-${submission.status}`}
+                    key={submission.submissionId ?? `${submission.profileId}-${submission.status}`}
                     style={[styles.resultRow, isOwn ? styles.resultRowOwn : null]}
                   >
                     <View style={styles.rankBadge}>
@@ -192,12 +197,14 @@ export default function ClassroomResultScreen() {
                       <Text style={styles.resultSubtext}>
                         {submission.status === "absent"
                           ? "Absent"
+                          : submission.gradingStatus === "awaiting_marking"
+                            ? "Awaiting written marking"
                           : `${submission.correctAnswers}/${submission.totalQuestions} correct`}
                       </Text>
                     </View>
                     <View style={[styles.resultBadge, submission.status === "absent" ? styles.absentBadge : null]}>
                       <Text style={styles.resultBadgeValue}>
-                        {submission.status === "absent" ? "0%" : `${submission.score}%`}
+                        {submission.status === "absent" ? "0%" : submission.gradingStatus === "awaiting_marking" ? "Pending" : `${submission.score}%`}
                       </Text>
                       <Text style={styles.resultBadgeTime}>
                         {submission.status === "absent" ? "Absent" : `${submission.timeTakenSeconds}s`}

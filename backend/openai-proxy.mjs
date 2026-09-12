@@ -25,6 +25,8 @@ import {
   removeClassroomMember,
   requestJoinClass,
   respondToMembershipRequest,
+  recordActivitySecurityEvent,
+  gradeActivitySubmission,
   submitActivity,
   sendClassChatMessage,
   updateClassroomActivity,
@@ -636,7 +638,7 @@ async function readJsonBody(request) {
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > 1_000_000) throw Object.assign(new Error("The request body is too large."), { statusCode: 400 });
+    if (size > 4_000_000) throw Object.assign(new Error("The request body is too large."), { statusCode: 400 });
     chunks.push(chunk);
   }
 
@@ -762,6 +764,32 @@ function buildQuestionSchema() {
             explanation: { type: "string" },
           },
           required: ["id", "prompt", "options", "answer", "explanation"],
+        },
+      },
+    },
+    required: ["questions"],
+  };
+}
+
+function buildWrittenQuestionSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      questions: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            id: { type: "string" },
+            prompt: { type: "string" },
+            markingGuide: { type: "string" },
+            points: { type: "number" },
+            maxWords: { type: "integer" },
+          },
+          required: ["id", "prompt", "markingGuide", "points", "maxWords"],
         },
       },
     },
@@ -1609,6 +1637,52 @@ function buildCompetitionLeaderboard() {
       return left.playerName.localeCompare(right.playerName);
     })
     .slice(0, 5);
+}
+
+async function generateWrittenQuestionSet(body) {
+  const requestedCount = Math.max(1, Math.min(Number(body.questionCount ?? 3), 6));
+  const data = await createOpenAiResponse({
+    schemaName: "classroom_written_questions",
+    schema: buildWrittenQuestionSchema(),
+    instructions: [
+      "Generate teacher-reviewed written-answer questions for a school assessment.",
+      "Match the requested curriculum, learner stage, difficulty and topic coverage.",
+      "Every question must be clear, independently answerable and free of trick wording.",
+      "Provide a concrete marking guide listing the concepts or steps that earn credit.",
+      "Choose a fair mark value from 1 to 20 and a sensible maximum response length from 20 to 2000 words.",
+      "Do not include a model answer in the learner-facing prompt.",
+      "Return learner-facing content in the learner's selected language.",
+    ].join(" "),
+    input: [{
+      role: "user",
+      content: [{
+        type: "input_text",
+        text: [
+          ...buildQuestionPromptLines({ ...body, mode: "quiz" }),
+          `Generate exactly ${requestedCount} distinct written-answer questions for teacher review.`,
+        ].join("\n"),
+      }],
+    }],
+  });
+  const seen = new Set();
+  return (Array.isArray(data.questions) ? data.questions : []).flatMap((question, index) => {
+    const prompt = String(question?.prompt ?? "").trim();
+    const markingGuide = String(question?.markingGuide ?? "").trim();
+    const key = prompt.toLowerCase();
+    if (!prompt || !markingGuide || seen.has(key)) return [];
+    seen.add(key);
+    return [{
+      id: String(question?.id ?? `written-${Date.now()}-${index}`),
+      prompt,
+      type: "written",
+      options: [],
+      answer: "",
+      explanation: "",
+      markingGuide,
+      points: Math.max(1, Math.min(20, Number(question?.points) || 1)),
+      maxWords: Math.max(20, Math.min(2000, Math.round(Number(question?.maxWords) || 500))),
+    }];
+  }).slice(0, requestedCount);
 }
 
 async function generateQuestionSet(body) {
@@ -2965,7 +3039,8 @@ async function handleAssignmentCandidates(body, response) {
   }
 
   const batchCount = Math.max(1, Math.min(Number(body.batchCount ?? 3), Number(body.questionCount ?? 3), 6));
-  const questions = await generateQuestionSet({
+  const wantsWritten = body.assessmentFormat === "written" || (body.assessmentFormat === "mixed" && body.candidateType === "written");
+  const questions = await (wantsWritten ? generateWrittenQuestionSet : generateQuestionSet)({
     ...body,
     questionCount: batchCount,
   });
@@ -3361,14 +3436,36 @@ async function handleAssignmentSubmit(body, response) {
     body.profile,
     body.activityId,
     {
-      score: body.score ?? 0,
-      correctAnswers: body.correctAnswers ?? 0,
-      totalQuestions: body.totalQuestions ?? 0,
+      answers: body.answers,
       timeTakenSeconds: body.timeTakenSeconds ?? 0,
+      autoSubmitted: body.autoSubmitted,
+      exitReason: body.exitReason,
     },
     body.appVariant ?? "children"
   );
   sendJson(response, 200, payload);
+}
+
+async function handleAssignmentSecurityEvent(body, response) {
+  if (!body.profile?.id || !body.activityId || !body.event) {
+    sendJson(response, 400, { error: "Profile, activity and security event are required." });
+    return;
+  }
+  sendJson(response, 200, await recordActivitySecurityEvent(body.profile, body.activityId, body.event, body.appVariant ?? "children"));
+}
+
+async function handleAssignmentGrade(body, response) {
+  if (!body.teacherProfile?.id || !body.activityId || !body.submissionId) {
+    sendJson(response, 400, { error: "Teacher, activity and submission are required." });
+    return;
+  }
+  sendJson(response, 200, await gradeActivitySubmission(
+    body.teacherProfile,
+    body.activityId,
+    body.submissionId,
+    { grades: body.grades, teacherFeedback: body.teacherFeedback },
+    body.appVariant ?? "children"
+  ));
 }
 
 const server = http.createServer(async (request, response) => {
@@ -3808,6 +3905,16 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/assignments/submit") {
       await handleAssignmentSubmit(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/security-event") {
+      await handleAssignmentSecurityEvent(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/grade") {
+      await handleAssignmentGrade(body, response);
       return;
     }
 

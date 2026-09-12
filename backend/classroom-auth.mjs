@@ -72,7 +72,7 @@ export async function authenticateClassroomRequest(request, path, body, dependen
   if (!actor.name || !actor.quiksId) throw accessError("Complete and sync the profile before opening Classroom.", 400);
   actor.principalId = principal.principalId;
   if (key === "teacherProfile" && actor.role !== "teacher") throw accessError("Only teachers can perform this classroom action.");
-  if ((key === "studentProfile" || path.endsWith("/assignments/submit")) && actor.role !== "student") throw accessError("Only students can perform this classroom action.");
+  if ((key === "studentProfile" || path.endsWith("/assignments/submit") || path.endsWith("/assignments/security-event")) && actor.role !== "student") throw accessError("Only students can perform this classroom action.");
   if (actor.schoolId) {
     const check = dependencies.feature ?? assertInstitutionalFeature;
     await check(principal, actor.schoolId, "classroom", variant);

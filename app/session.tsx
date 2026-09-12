@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, AppState, BackHandler, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
@@ -33,6 +33,7 @@ import {
   getCompetitionRematchStatus,
   getCompetitionStatus,
   requestCompetitionRematch,
+  recordClassroomActivitySecurityEvent,
   sendCompetitionChat,
   submitClassroomActivity,
   submitCompetitionResult,
@@ -43,6 +44,7 @@ import type {
   CompetitionLiveProgress,
   CompetitionRematchResponse,
   Difficulty,
+  ClassroomExitPolicy,
   Question,
   QuestionFocusMode,
   QuestionRequest,
@@ -110,6 +112,9 @@ export default function SessionScreen() {
   const [pendingLocalRequest, setPendingLocalRequest] = useState<QuestionRequest | null>(null);
   const [activitySubjectName, setActivitySubjectName] = useState<string | null>(subject?.name ?? null);
   const [activityTopicLabel, setActivityTopicLabel] = useState<string | null>(null);
+  const [activityExitPolicy, setActivityExitPolicy] = useState<ClassroomExitPolicy>("warn_record");
+  const [activityHasWrittenQuestions, setActivityHasWrittenQuestions] = useState(false);
+  const [skippedQuestionIds, setSkippedQuestionIds] = useState<string[]>([]);
   const [competitionChats, setCompetitionChats] = useState<CompetitionChatMessage[]>([]);
   const [competitionLiveProgress, setCompetitionLiveProgress] = useState<CompetitionLiveProgress[]>([]);
   const [competitionStartAt, setCompetitionStartAt] = useState<number | null>(null);
@@ -121,6 +126,9 @@ export default function SessionScreen() {
   const hasAutoStartedRef = useRef(false);
   const lastScheduledCompetitionRef = useRef<string | null>(null);
   const isFinishingRef = useRef(false);
+  const activitySubmittedRef = useRef(false);
+  const activePhaseRef = useRef<SessionPhase>("setup");
+  const answersRef = useRef<Array<string | null>>([]);
   const initialTimedSessionSecondsRef = useRef(0);
   const sessionResultIdRef = useRef<string>(`${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
   const competitionOpponentName =
@@ -350,7 +358,7 @@ export default function SessionScreen() {
         setTimeLeft((value) => {
           if (value <= 1) {
             clearInterval(interval);
-            finishSession();
+            void finishSession(answersRef.current, { autoSubmitted: true, exitReason: "time_expired" });
             return 0;
           }
           return value - 1;
@@ -672,11 +680,21 @@ export default function SessionScreen() {
           return;
         }
 
-        const nextQuestions = normalizeQuestions(assignment.questions);
+        const nextQuestions = assignment.questions.map((question) => ({
+          ...question,
+          type: question.type === "written" ? "written" as const : "objective" as const,
+          points: Math.max(1, Number(question.points ?? 1)),
+          options: Array.isArray(question.options) ? question.options : [],
+          answer: "",
+          explanation: "",
+        }));
         setActivitySubjectName(
           getSubjectDisplayName(assignment.activity.subjectId, assignment.activity.subjectName, language)
         );
         setActivityTopicLabel(assignment.activity.topicLabel ?? null);
+        setActivityExitPolicy(assignment.activity.exitPolicy ?? "warn_record");
+        setActivityHasWrittenQuestions(nextQuestions.some((question) => question.type === "written"));
+        setSkippedQuestionIds([]);
         setQuestionSource("remote");
         setCompetitionChats([]);
         setCompetitionLiveProgress([]);
@@ -789,6 +807,11 @@ export default function SessionScreen() {
     nextAnswers[currentIndex] = option;
     setAnswers(nextAnswers);
     setSelectedAnswer(option);
+    if (isClassroomActivity) {
+      setSkippedQuestionIds((current) => current.filter((id) => id !== currentQuestion?.id));
+      setTimeout(() => advance(nextAnswers), 180);
+      return;
+    }
     setPhase("review");
     void syncCompetitionProgress(nextAnswers);
 
@@ -840,6 +863,21 @@ export default function SessionScreen() {
 
   const advance = (nextAnswers = answers) => {
     setSelectedAnswer(null);
+    if (isClassroomActivity) {
+      const unanswered = questions
+        .map((question, index) => ({ question, index }))
+        .filter(({ index }) => !String(nextAnswers[index] ?? "").trim());
+      const ordinary = unanswered.find(({ question }) => !skippedQuestionIds.includes(question.id));
+      const deferred = unanswered.find(({ question }) => skippedQuestionIds.includes(question.id));
+      const next = ordinary ?? deferred;
+      if (next) {
+        setCurrentIndex(next.index);
+        setPhase("active");
+      } else {
+        void finishSession(nextAnswers);
+      }
+      return;
+    }
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((value) => value + 1);
       setPhase("active");
@@ -848,7 +886,39 @@ export default function SessionScreen() {
     }
   };
 
-  const finishSession = async (finalAnswers = answers) => {
+  const saveWrittenAnswer = () => {
+    if (phase !== "active" || currentQuestion?.type !== "written") return;
+    const nextAnswers = [...answers];
+    nextAnswers[currentIndex] = String(nextAnswers[currentIndex] ?? "").trim();
+    setAnswers(nextAnswers);
+    setSkippedQuestionIds((current) => current.filter((id) => id !== currentQuestion.id));
+    advance(nextAnswers);
+  };
+
+  const skipClassroomQuestion = () => {
+    if (!isClassroomActivity || phase !== "active" || !currentQuestion) return;
+    const nextSkipped = skippedQuestionIds.includes(currentQuestion.id)
+      ? skippedQuestionIds
+      : [...skippedQuestionIds, currentQuestion.id];
+    setSkippedQuestionIds(nextSkipped);
+    const next = questions
+      .map((question, index) => ({ question, index }))
+      .find(({ question, index }) => index !== currentIndex && !String(answers[index] ?? "").trim() && !nextSkipped.includes(question.id))
+      ?? questions
+        .map((question, index) => ({ question, index }))
+        .find(({ index }) => index !== currentIndex && !String(answers[index] ?? "").trim());
+    if (!next) {
+      Alert.alert("Question review", "This is the remaining unanswered question. Answer it or submit your activity from the review controls.");
+      return;
+    }
+    setSelectedAnswer(null);
+    setCurrentIndex(next.index);
+  };
+
+  const finishSession = async (
+    finalAnswers = answers,
+    completion: { autoSubmitted?: boolean; exitReason?: string } = {}
+  ) => {
     if (!profile || questions.length === 0) {
       return;
     }
@@ -887,7 +957,7 @@ export default function SessionScreen() {
       `Move steadily and focus on accuracy first, then speed.`,
     ];
 
-    if (hasProAccess(subscriptionTier)) {
+    if (hasProAccess(subscriptionTier) && !isClassroomActivity) {
       try {
           feedback = await generateFeedback({
             score: score.score,
@@ -982,16 +1052,27 @@ export default function SessionScreen() {
 
     if (isClassroomActivity && params.classroomActivityId) {
       try {
-        await submitClassroomActivity({
+        const submitted = await submitClassroomActivity({
           profile,
           activityId: params.classroomActivityId,
-          score: score.score,
-          correctAnswers: score.correctAnswers,
-          totalQuestions: score.totalQuestions,
+          answers: questions.map((question, index) => ({ questionId: question.id, answer: String(finalAnswers[index] ?? "").trim() })),
           timeTakenSeconds,
+          autoSubmitted: completion.autoSubmitted,
+          exitReason: completion.exitReason,
         });
-      } catch {
-        // Keep the normal local results flow if backend submission is temporarily unavailable.
+        result.score = submitted.submission.score;
+        result.correctAnswers = submitted.submission.correctAnswers;
+        result.totalQuestions = submitted.submission.totalQuestions;
+        result.aiFeedback = submitted.submission.gradingStatus === "awaiting_marking"
+          ? "Your objective answers have been marked. Your final score will be available after your teacher marks the written section."
+          : completion.autoSubmitted
+            ? "Your saved work was automatically submitted under the activity exit policy."
+            : result.aiFeedback;
+        activitySubmittedRef.current = true;
+      } catch (error) {
+        isFinishingRef.current = false;
+        Alert.alert("Submission not completed", error instanceof Error ? error.message : "Reconnect and submit again.");
+        return;
       }
     }
 
@@ -1018,6 +1099,118 @@ export default function SessionScreen() {
       },
     });
   };
+
+  useEffect(() => {
+    activePhaseRef.current = phase;
+    answersRef.current = answers;
+  }, [answers, phase]);
+
+  const recordSecurityEvent = async (eventType: "exit_attempt" | "app_background" | "tab_hidden") => {
+    if (!profile || !params.classroomActivityId || activitySubmittedRef.current) return;
+    try {
+      await recordClassroomActivitySecurityEvent({
+        profile,
+        activityId: params.classroomActivityId,
+        event: { eventId: `${profile.id}-${Date.now()}-${eventType}`, eventType, occurredAt: Date.now() },
+      });
+    } catch {
+      // A temporary event-log failure must not erase the student's saved answers.
+    }
+  };
+
+  const requestClassroomExit = () => {
+    if (!isClassroomActivity || !["active", "review"].includes(activePhaseRef.current) || activitySubmittedRef.current) return false;
+    if (activityExitPolicy === "strict_submit") {
+      void finishSession(answersRef.current, { autoSubmitted: true, exitReason: "strict_exit" });
+      return true;
+    }
+    void recordSecurityEvent("exit_attempt");
+    const submitAndExit = activityExitPolicy === "confirm_submit";
+    Alert.alert(
+      submitAndExit ? "Submit and leave activity?" : "Leave activity?",
+      submitAndExit
+        ? "Your saved answers will be submitted and this attempt will end."
+        : "This exit will be recorded. You may return while the activity remains open.",
+      [
+        { text: "Stay", style: "cancel" },
+        {
+          text: submitAndExit ? "Submit and leave" : "Leave",
+          style: submitAndExit ? "destructive" : "default",
+          onPress: () => submitAndExit
+            ? void finishSession(answersRef.current, { autoSubmitted: true, exitReason: "confirmed_exit" })
+            : router.replace("/classroom"),
+        },
+      ]
+    );
+    return true;
+  };
+
+  const confirmClassroomSubmission = () => {
+    const unanswered = answersRef.current.filter((answer) => !String(answer ?? "").trim()).length;
+    Alert.alert(
+      "Submit activity?",
+      unanswered > 0
+        ? `${unanswered} question(s) are unanswered. Submitting now will end this attempt.`
+        : "Your answers will be submitted for marking and this attempt will end.",
+      [
+        { text: "Continue activity", style: "cancel" },
+        { text: "Submit", onPress: () => void finishSession(answersRef.current) },
+      ]
+    );
+  };
+
+  useEffect(() => {
+    if (!isClassroomActivity) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", requestClassroomExit);
+    return () => subscription.remove();
+  }, [activityExitPolicy, isClassroomActivity, profile, params.classroomActivityId]);
+
+  useEffect(() => {
+    if (!isClassroomActivity) return;
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const leaving = previousState === "active" && nextState !== "active";
+      previousState = nextState;
+      if (!leaving || !["active", "review"].includes(activePhaseRef.current) || activitySubmittedRef.current) return;
+      if (activityExitPolicy === "strict_submit") {
+        void finishSession(answersRef.current, { autoSubmitted: true, exitReason: "app_background" });
+      } else {
+        void recordSecurityEvent("app_background");
+      }
+    });
+    return () => subscription.remove();
+  }, [activityExitPolicy, isClassroomActivity, profile, params.classroomActivityId]);
+
+  useEffect(() => {
+    if (!isClassroomActivity || Platform.OS !== "web" || typeof document === "undefined") return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden" || !["active", "review"].includes(activePhaseRef.current) || activitySubmittedRef.current) return;
+      if (activityExitPolicy === "strict_submit") {
+        void finishSession(answersRef.current, { autoSubmitted: true, exitReason: "tab_hidden" });
+      } else {
+        void recordSecurityEvent("tab_hidden");
+      }
+    };
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!["active", "review"].includes(activePhaseRef.current) || activitySubmittedRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const onHistoryBack = () => {
+      if (!["active", "review"].includes(activePhaseRef.current) || activitySubmittedRef.current) return;
+      globalThis.history.pushState({ quiksActivityGuard: true }, "", globalThis.location.href);
+      requestClassroomExit();
+    };
+    globalThis.history.pushState({ quiksActivityGuard: true }, "", globalThis.location.href);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    globalThis.addEventListener("beforeunload", onBeforeUnload);
+    globalThis.addEventListener("popstate", onHistoryBack);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      globalThis.removeEventListener("beforeunload", onBeforeUnload);
+      globalThis.removeEventListener("popstate", onHistoryBack);
+    };
+  }, [activityExitPolicy, isClassroomActivity, profile, params.classroomActivityId]);
 
   if (!effectiveSubject) {
     return (
@@ -1376,13 +1569,35 @@ export default function SessionScreen() {
         <Text style={styles.progressText}>
           {t(language, "questionCount", { current: currentIndex + 1, total: questions.length })}
         </Text>
+        {isClassroomActivity && activityExitPolicy !== "warn_record" ? (
+          <View style={styles.securityNotice}>
+            <Text style={styles.securityNoticeTitle}>{activityExitPolicy === "strict_submit" ? "Strict CBT mode" : "Protected activity"}</Text>
+            <Text style={styles.securityNoticeText}>{activityExitPolicy === "strict_submit" ? "Leaving this screen, changing tabs or placing the app in the background automatically submits your saved work." : "If you confirm an in-app exit, your saved work will be submitted and the attempt will end."}</Text>
+          </View>
+        ) : null}
+        {currentQuestion?.image ? <Image source={{ uri: `data:${currentQuestion.image.mimeType};base64,${currentQuestion.image.dataBase64}` }} style={styles.questionImage} resizeMode="contain" accessibilityLabel={currentQuestion.image.altText ?? "Question illustration"}/> : null}
         <MathText
           value={currentQuestion?.prompt}
           textStyle={styles.question}
           containerStyle={styles.questionContainer}
         />
 
-        <View style={styles.optionList}>
+        {currentQuestion?.type === "written" ? (
+          <View style={styles.writtenAnswerCard}>
+            <Text style={styles.writtenAnswerLabel}>Written answer · {currentQuestion.points ?? 1} mark(s)</Text>
+            <TextInput
+              value={String(answers[currentIndex] ?? "")}
+              onChangeText={(value) => setAnswers((current) => current.map((answer, index) => index === currentIndex ? value : answer))}
+              placeholder="Type your answer here"
+              placeholderTextColor="#7C8EA3"
+              multiline
+              textAlignVertical="top"
+              style={styles.writtenAnswerInput}
+            />
+            <Text style={styles.writtenAnswerHint}>Maximum suggested length: {currentQuestion.maxWords ?? 500} words. Your response is preserved when you move to another question.</Text>
+            <PrimaryButton label="Save and continue" onPress={saveWrittenAnswer}/>
+          </View>
+        ) : <View style={styles.optionList}>
           {currentQuestion?.options.map((option, optionIndex) => {
             const isCorrect = option === currentQuestion.answer;
             const isChosen = option === selectedAnswer;
@@ -1405,7 +1620,17 @@ export default function SessionScreen() {
               </Pressable>
             );
           })}
-        </View>
+        </View>}
+
+        {isClassroomActivity && phase === "active" ? (
+          <View style={styles.classroomNavigationActions}>
+            <PrimaryButton label="Skip and return later" variant="secondary" onPress={skipClassroomQuestion} style={styles.classroomNavigationButton}/>
+            <PrimaryButton label="Submit activity" onPress={confirmClassroomSubmission} style={styles.classroomNavigationButton}/>
+            <PrimaryButton label="Leave activity" variant="ghost" onPress={requestClassroomExit} style={styles.classroomNavigationButton}/>
+          </View>
+        ) : null}
+
+        {isClassroomActivity && activityHasWrittenQuestions ? <Text style={styles.pendingMarkingHint}>This activity contains written answers. Your final score will be available after your teacher completes the marking.</Text> : null}
 
         {phase === "review" ? (
           <View style={styles.explanationCard}>
@@ -1730,6 +1955,23 @@ const styles = StyleSheet.create({
     color: palette.slate,
     fontWeight: "700",
   },
+  securityNotice: {
+    marginTop: 14,
+    borderRadius: 16,
+    padding: 13,
+    backgroundColor: "#FFF4E8",
+    borderWidth: 1,
+    borderColor: "#F0B36B",
+  },
+  securityNoticeTitle: {
+    color: "#8A4300",
+    fontWeight: "900",
+  },
+  securityNoticeText: {
+    color: "#70451D",
+    lineHeight: 20,
+    marginTop: 4,
+  },
   chatCard: {
     marginTop: 18,
     borderRadius: 20,
@@ -1832,6 +2074,56 @@ const styles = StyleSheet.create({
   },
   questionContainer: {
     marginTop: 12,
+  },
+  questionImage: {
+    width: "100%",
+    height: 280,
+    marginTop: 16,
+    borderRadius: 18,
+    backgroundColor: "#F4F8FA",
+  },
+  writtenAnswerCard: {
+    marginTop: 18,
+    gap: 10,
+  },
+  writtenAnswerLabel: {
+    color: palette.navy,
+    fontWeight: "900",
+  },
+  writtenAnswerInput: {
+    minHeight: 170,
+    borderWidth: 1,
+    borderColor: "#C9D7E2",
+    borderRadius: 16,
+    padding: 14,
+    color: palette.ink,
+    backgroundColor: "#FBFDFF",
+    textAlignVertical: "top",
+  },
+  writtenAnswerHint: {
+    color: palette.slate,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  classroomNavigationActions: {
+    marginTop: 16,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  classroomNavigationButton: {
+    flexGrow: 1,
+    flexBasis: 210,
+    marginTop: 0,
+  },
+  pendingMarkingHint: {
+    marginTop: 14,
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: "#EEF7FB",
+    color: palette.navy,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   optionList: {
     gap: 12,

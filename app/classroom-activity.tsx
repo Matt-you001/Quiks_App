@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
@@ -9,9 +9,10 @@ import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getSubjectDisplayName } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
-import { getClassroomActivityDetails } from "../services/ai";
+import { getClassroomActivityDetails, gradeClassroomActivitySubmission } from "../services/ai";
 import type {
   ClassroomActivityDetailsResponse,
+  ClassroomSubmissionDetail,
   ClassroomSubmissionSummary,
   UserProfile,
 } from "../types/app";
@@ -48,6 +49,10 @@ export default function ClassroomActivityScreen() {
   const [details, setDetails] = useState<ClassroomActivityDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [premiumBlocked, setPremiumBlocked] = useState(false);
+  const [markingSubmissionId, setMarkingSubmissionId] = useState<string | null>(null);
+  const [writtenMarks, setWrittenMarks] = useState<Record<string, { awardedPoints: string; feedback: string }>>({});
+  const [teacherFeedback, setTeacherFeedback] = useState("");
+  const [savingMarks, setSavingMarks] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -100,9 +105,62 @@ export default function ClassroomActivityScreen() {
     () => submissions.filter((entry) => entry.status === "absent"),
     [submissions]
   );
-  const highestScore = submittedLearners.length > 0 ? Math.max(...submittedLearners.map((entry) => entry.score)) : 0;
-  const averageScore = getAverageScore(submissions);
+  const finalizedLearners = useMemo(
+    () => submittedLearners.filter((entry) => entry.gradingStatus !== "awaiting_marking"),
+    [submittedLearners]
+  );
+  const highestScore = finalizedLearners.length > 0 ? Math.max(...finalizedLearners.map((entry) => entry.score)) : 0;
+  const averageScore = getAverageScore(finalizedLearners);
   const isTeacher = details?.activity.teacherProfileId === profile?.id;
+  const selectedSubmission = useMemo(
+    () => details?.submissionDetails?.find((entry) => entry.submissionId === markingSubmissionId) ?? null,
+    [details?.submissionDetails, markingSubmissionId]
+  );
+
+  const openMarking = (submission: ClassroomSubmissionDetail) => {
+    if (!submission.submissionId) return;
+    const nextMarks: Record<string, { awardedPoints: string; feedback: string }> = {};
+    submission.responses.filter((response) => response.type === "written").forEach((response) => {
+      nextMarks[response.questionId] = {
+        awardedPoints: response.awardedPoints == null ? "" : String(response.awardedPoints),
+        feedback: response.teacherFeedback ?? "",
+      };
+    });
+    setWrittenMarks(nextMarks);
+    setTeacherFeedback(submission.teacherFeedback ?? "");
+    setMarkingSubmissionId(submission.submissionId);
+  };
+
+  const saveWrittenMarks = async () => {
+    if (!profile || !details || !selectedSubmission?.submissionId) return;
+    const writtenResponses = selectedSubmission.responses.filter((response) => response.type === "written");
+    const grades = writtenResponses.map((response) => ({
+      questionId: response.questionId,
+      awardedPoints: Number(writtenMarks[response.questionId]?.awardedPoints),
+      feedback: writtenMarks[response.questionId]?.feedback?.trim() || undefined,
+    }));
+    if (grades.some((grade, index) => !Number.isFinite(grade.awardedPoints) || grade.awardedPoints < 0 || grade.awardedPoints > writtenResponses[index].points)) {
+      Alert.alert("Check written marks", "Enter a mark from zero up to the maximum shown for every written question.");
+      return;
+    }
+    setSavingMarks(true);
+    try {
+      await gradeClassroomActivitySubmission({
+        teacherProfile: profile,
+        activityId: details.activity.activityId,
+        submissionId: selectedSubmission.submissionId,
+        grades,
+        teacherFeedback: teacherFeedback.trim() || undefined,
+      });
+      setMarkingSubmissionId(null);
+      await loadData();
+      Alert.alert("Marking saved", "The final combined result is now available to the student and school.");
+    } catch (error) {
+      Alert.alert("Could not save marks", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setSavingMarks(false);
+    }
+  };
 
   if (premiumBlocked) {
     return (
@@ -158,6 +216,8 @@ export default function ClassroomActivityScreen() {
           <Text style={styles.cardTitle}>Activity setup</Text>
           <Text style={styles.bodyText}>Teacher: {details.teacherName}</Text>
           <Text style={styles.bodyText}>Questions: {details.activity.questionCount}</Text>
+          <Text style={styles.bodyText}>Answer format: {details.activity.assessmentFormat === "written" ? "Written answers" : details.activity.assessmentFormat === "mixed" ? "Objective and written" : "Objective"}</Text>
+          <Text style={styles.bodyText}>Leaving activity: {details.activity.exitPolicy === "strict_submit" ? "Strict CBT mode" : details.activity.exitPolicy === "confirm_submit" ? "Auto-submit on confirmed exit" : "Warn and record"}</Text>
           <Text style={styles.bodyText}>Duration: {details.activity.durationMinutes} minutes</Text>
           <Text style={styles.bodyText}>Starts: {formatDateTime(details.activity.startAt)}</Text>
           <Text style={styles.bodyText}>Ends: {formatDateTime(details.activity.endAt)}</Text>
@@ -192,6 +252,12 @@ export default function ClassroomActivityScreen() {
                 <Text style={styles.statValue}>{highestScore}%</Text>
               </View>
             </View>
+            {submittedLearners.some((entry) => entry.gradingStatus === "awaiting_marking") ? (
+              <View style={styles.pendingCard}>
+                <Text style={styles.pendingTitle}>Written marking required</Text>
+                <Text style={styles.bodyText}>{submittedLearners.filter((entry) => entry.gradingStatus === "awaiting_marking").length} submission(s) are awaiting final marking. Pending provisional scores are excluded from the average and highest score.</Text>
+              </View>
+            ) : null}
           </>
         ) : null}
 
@@ -210,23 +276,50 @@ export default function ClassroomActivityScreen() {
 
                 return left.timeTakenSeconds - right.timeTakenSeconds;
               })
-              .map((submission) => (
-                <View key={`${submission.profileId}-${submission.status}`} style={styles.resultRow}>
+              .map((submission) => {
+                const detail = details.submissionDetails?.find((entry) => entry.submissionId === submission.submissionId);
+                const pending = submission.gradingStatus === "awaiting_marking";
+                return <View key={submission.submissionId ?? `${submission.profileId}-${submission.status}`} style={styles.resultRow}>
                   <View style={styles.resultMeta}>
                     <Text style={styles.resultName}>{submission.studentName}</Text>
                     <Text style={styles.resultSubtext}>{submission.quiksId}</Text>
                     <Text style={styles.resultSubtext}>
-                      {submission.correctAnswers}/{submission.totalQuestions} correct
+                      {pending ? "Written answers awaiting teacher marking" : `${submission.correctAnswers}/${submission.totalQuestions} objective answers correct`}
                     </Text>
+                    {submission.securityEventCount ? <Text style={styles.warningText}>{submission.securityEventCount} activity exit/security event(s) recorded</Text> : null}
+                    {isTeacher && pending && detail ? <Pressable onPress={() => openMarking(detail)} style={styles.markButton}><Text style={styles.markButtonText}>Mark written answers</Text></Pressable> : null}
                   </View>
-                  <View style={styles.resultBadge}>
-                    <Text style={styles.resultBadgeValue}>{submission.score}%</Text>
+                  <View style={[styles.resultBadge, pending ? styles.pendingBadge : null]}>
+                    <Text style={styles.resultBadgeValue}>{pending ? `${submission.provisionalScore ?? submission.score}%*` : `${submission.score}%`}</Text>
                     <Text style={styles.resultBadgeTime}>{formatSubmissionTime(submission.submittedAt)}</Text>
                   </View>
                 </View>
-              ))
+              })
           )}
         </View>
+
+        {isTeacher && selectedSubmission ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Mark {selectedSubmission.studentName}'s written answers</Text>
+            <Text style={styles.bodyText}>Objective marks have already been calculated securely. Award each written response up to the displayed maximum.</Text>
+            {selectedSubmission.responses.filter((response) => response.type === "written").map((response, index) => (
+              <View key={response.questionId} style={styles.markingCard}>
+                <Text style={styles.markingQuestion}>Question {index + 1}: {response.prompt}</Text>
+                <Text style={styles.markingLabel}>Student response</Text>
+                <Text style={styles.studentAnswer}>{response.answer || "No answer supplied."}</Text>
+                {response.markingGuide ? <><Text style={styles.markingLabel}>Marking guide</Text><Text style={styles.bodyText}>{response.markingGuide}</Text></> : null}
+                <Text style={styles.markingLabel}>Mark awarded (maximum {response.points})</Text>
+                <TextInput keyboardType="decimal-pad" value={writtenMarks[response.questionId]?.awardedPoints ?? ""} onChangeText={(value) => setWrittenMarks((current) => ({ ...current, [response.questionId]: { awardedPoints: value, feedback: current[response.questionId]?.feedback ?? "" } }))} placeholder={`0 - ${response.points}`} placeholderTextColor="#7C8EA3" style={styles.markInput}/>
+                <Text style={styles.markingLabel}>Question feedback (optional)</Text>
+                <TextInput value={writtenMarks[response.questionId]?.feedback ?? ""} onChangeText={(value) => setWrittenMarks((current) => ({ ...current, [response.questionId]: { awardedPoints: current[response.questionId]?.awardedPoints ?? "", feedback: value } }))} multiline placeholder="Feedback for this response" placeholderTextColor="#7C8EA3" style={[styles.markInput, styles.feedbackInput]}/>
+              </View>
+            ))}
+            <Text style={styles.markingLabel}>Overall feedback (optional)</Text>
+            <TextInput value={teacherFeedback} onChangeText={setTeacherFeedback} multiline placeholder="Overall feedback for the student" placeholderTextColor="#7C8EA3" style={[styles.markInput, styles.feedbackInput]}/>
+            <PrimaryButton label="Save final marks" onPress={saveWrittenMarks} loading={savingMarks}/>
+            <PrimaryButton label="Cancel marking" variant="secondary" onPress={() => setMarkingSubmissionId(null)} disabled={savingMarks}/>
+          </View>
+        ) : null}
 
         {isTeacher ? (
           <View style={styles.card}>
@@ -380,6 +473,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+  pendingCard: {
+    marginTop: 18,
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: "#FFF6D8",
+    borderWidth: 1,
+    borderColor: "#E8C766",
+  },
+  pendingTitle: { color: "#7A5200", fontSize: 17, fontWeight: "900", marginBottom: 6 },
+  pendingBadge: { backgroundColor: "#FFF6D8" },
+  warningText: { color: "#9B3A24", fontWeight: "800", fontSize: 12 },
+  markButton: { alignSelf: "flex-start", marginTop: 6, backgroundColor: palette.navy, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  markButtonText: { color: palette.white, fontWeight: "900" },
+  markingCard: { borderWidth: 1, borderColor: "#D8E3EC", borderRadius: 18, padding: 14, gap: 8 },
+  markingQuestion: { color: palette.ink, fontWeight: "900", fontSize: 16, lineHeight: 23 },
+  markingLabel: { color: palette.navy, fontWeight: "800", marginTop: 5 },
+  studentAnswer: { color: palette.ink, lineHeight: 22, backgroundColor: "#F4F8FA", borderRadius: 12, padding: 12 },
+  markInput: { borderWidth: 1, borderColor: "#C9D7E2", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: palette.ink, backgroundColor: palette.white },
+  feedbackInput: { minHeight: 84, textAlignVertical: "top" },
   actionColumn: {
     marginTop: 18,
     gap: 12,

@@ -20,6 +20,9 @@ import type {
   ClassroomActivityUpdateRequest,
   ClassroomActivitySubmitRequest,
   ClassroomActivitySubmitResponse,
+  ClassroomActivitySecurityEventRequest,
+  ClassroomActivityGradeRequest,
+  ClassroomSubmissionDetail,
   ClassroomClassCreateRequest,
   ClassroomClassCreateResponse,
   ClassroomClassDeleteRequest,
@@ -1231,4 +1234,16 @@ export async function submitClassroomActivity(
   request: ClassroomActivitySubmitRequest
 ): Promise<ClassroomActivitySubmitResponse> {
   return postJson("/classroom/assignments/submit", withVariantMeta(request));
+}
+
+export async function recordClassroomActivitySecurityEvent(
+  request: ClassroomActivitySecurityEventRequest
+): Promise<{ event: { eventId: string; eventType: string; occurredAt: number } }> {
+  return postJson("/classroom/assignments/security-event", withVariantMeta(request));
+}
+
+export async function gradeClassroomActivitySubmission(
+  request: ClassroomActivityGradeRequest
+): Promise<{ submission: ClassroomSubmissionDetail }> {
+  return postJson("/classroom/assignments/grade", withVariantMeta(request));
 }

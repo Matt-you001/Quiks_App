@@ -1,8 +1,10 @@
 import { useFocusEffect, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Linking, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { AppBackground } from "../components/AppBackground";
 import { BackIconButton } from "../components/BackIconButton";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -36,8 +38,11 @@ import {
   updateClassroomActivity,
 } from "../services/ai";
 import { getLocalizedSubjects, getSubjectDisplayName, validateTopicInput } from "../lib/subjects";
+import { parseDocxQuestions, parsePlainTextQuestions } from "../lib/question-document";
 import type {
   ClassroomActivitySummary,
+  ClassroomAssessmentFormat,
+  ClassroomExitPolicy,
   ClassroomActivityType,
   ClassroomClassDetailsResponse,
   ClassroomMemberSummary,
@@ -162,6 +167,10 @@ export default function ClassroomScreen() {
   const [resultVisibility, setResultVisibility] = useState<ClassroomResultVisibility>("private");
   const [questionOrderMode, setQuestionOrderMode] = useState<ClassroomQuestionOrderMode>("same");
   const [assessmentMode, setAssessmentMode] = useState<"standard" | "cbt">("standard");
+  const [assessmentFormat, setAssessmentFormat] = useState<ClassroomAssessmentFormat>("objective");
+  const [exitPolicy, setExitPolicy] = useState<ClassroomExitPolicy>("warn_record");
+  const [assessmentFormatDropdownOpen, setAssessmentFormatDropdownOpen] = useState(false);
+  const [exitPolicyDropdownOpen, setExitPolicyDropdownOpen] = useState(false);
   const [attemptsAllowed, setAttemptsAllowed] = useState("1");
   const [navigationMode, setNavigationMode] = useState<"free" | "linear">("free");
   const [randomizeOptions, setRandomizeOptions] = useState(false);
@@ -179,6 +188,12 @@ export default function ClassroomScreen() {
   const [customQuestionOptions, setCustomQuestionOptions] = useState(["", "", "", ""]);
   const [customQuestionAnswerIndex, setCustomQuestionAnswerIndex] = useState<number | null>(null);
   const [customQuestionExplanation, setCustomQuestionExplanation] = useState("");
+  const [customQuestionType, setCustomQuestionType] = useState<"objective" | "written">("objective");
+  const [customQuestionPoints, setCustomQuestionPoints] = useState("1");
+  const [customQuestionMarkingGuide, setCustomQuestionMarkingGuide] = useState("");
+  const [customQuestionMaxWords, setCustomQuestionMaxWords] = useState("500");
+  const [customQuestionImage, setCustomQuestionImage] = useState<Question["image"]>();
+  const [importingQuestionDocument, setImportingQuestionDocument] = useState(false);
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [hasStartedQuestionSelection, setHasStartedQuestionSelection] = useState(false);
   const [publishingAssignment, setPublishingAssignment] = useState(false);
@@ -539,12 +554,21 @@ export default function ClassroomScreen() {
     setCustomQuestionOptions(["", "", "", ""]);
     setCustomQuestionExplanation("");
     setAssessmentMode("standard");
+    setAssessmentFormat("objective");
+    setExitPolicy("warn_record");
+    setAssessmentFormatDropdownOpen(false);
+    setExitPolicyDropdownOpen(false);
     setAttemptsAllowed("1");
     setNavigationMode("free");
     setRandomizeOptions(false);
     setPassMark("50");
     setCbtInstructions("");
     setCbtAccessCode("");
+    setCustomQuestionType("objective");
+    setCustomQuestionPoints("1");
+    setCustomQuestionMarkingGuide("");
+    setCustomQuestionMaxWords("500");
+    setCustomQuestionImage(undefined);
   };
 
   const copyClassCode = async (classCode: string) => {
@@ -868,6 +892,8 @@ export default function ClassroomScreen() {
         topicLabels: focusMode === "topic" ? requestTopicLabels : undefined,
         questionCount: desiredQuestionCount,
         batchCount: Math.min(10, remainingCount),
+        assessmentFormat,
+        candidateType: assessmentFormat === "mixed" ? customQuestionType : assessmentFormat === "written" ? "written" : "objective",
       });
       if (!Array.isArray(response.questions) || response.questions.length === 0) {
         throw new Error(t(language, "unableLoadCandidateQuestions"));
@@ -912,24 +938,93 @@ export default function ClassroomScreen() {
     setReviewPage(0);
   };
 
+  const chooseCustomQuestionImage = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/png", "image/jpeg", "image/webp"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if ((asset.size ?? 0) > 750_000) {
+        Alert.alert("Image too large", "Choose a PNG, JPEG or WebP image no larger than 750 KB.");
+        return;
+      }
+      const mimeType = asset.mimeType === "image/png" || asset.mimeType === "image/webp" ? asset.mimeType : "image/jpeg";
+      const dataBase64 = Platform.OS === "web" && asset.file
+        ? await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error("The selected image could not be read."));
+            reader.onload = () => resolve(String(reader.result ?? "").split(",")[1] ?? "");
+            reader.readAsDataURL(asset.file!);
+          })
+        : await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+      setCustomQuestionImage({ name: asset.name, mimeType, dataBase64, altText: customQuestionPrompt.trim() || "Question illustration" });
+    } catch (error) {
+      Alert.alert("Unable to add image", error instanceof Error ? error.message : "Please choose the image again.");
+    }
+  };
+
+  const importQuestionDocument = async () => {
+    setImportingQuestionDocument(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if ((asset.size ?? 0) > 6_000_000) throw new Error("Choose a Word or text file no larger than 6 MB.");
+      const isDocx = asset.name.toLowerCase().endsWith(".docx") || asset.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const parsed = isDocx
+        ? await parseDocxQuestions(Platform.OS === "web" && asset.file
+          ? await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onerror = () => reject(new Error("The selected Word document could not be read."));
+              reader.onload = () => resolve(String(reader.result ?? "").split(",")[1] ?? "");
+              reader.readAsDataURL(asset.file!);
+            })
+          : await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 }))
+        : parsePlainTextQuestions(Platform.OS === "web" && asset.file ? await asset.file.text() : await FileSystem.readAsStringAsync(asset.uri));
+      const remaining = Math.max(0, desiredQuestionCount - acceptedQuestions.length);
+      const accepted = parsed.questions.slice(0, remaining);
+      if (!accepted.length) throw new Error(`No complete questions were found. Use numbered questions, A-D options and an Answer: line. Written questions also need Type: Written and Marking guide:. ${parsed.rejected.join(" ")}`);
+      setAcceptedQuestions((current) => [...current, ...accepted]);
+      const combined = [...acceptedQuestions, ...accepted];
+      const hasWritten = combined.some((question) => question.type === "written");
+      const hasObjective = combined.some((question) => question.type !== "written");
+      setAssessmentFormat(hasWritten && hasObjective ? "mixed" : hasWritten ? "written" : "objective");
+      setIsReviewingQuestions(true);
+      setReviewPage(0);
+      const ignored = Math.max(0, parsed.questions.length - accepted.length);
+      Alert.alert("Questions imported", `${accepted.length} question(s) were added to the review queue.${ignored ? ` ${ignored} complete question(s) exceeded the selected question count and were not added.` : ""}${parsed.rejected.length ? ` ${parsed.rejected.length} incomplete question(s) need manual correction.` : ""}`);
+    } catch (error) {
+      Alert.alert("Unable to import questions", error instanceof Error ? error.message : "Please check the document and try again.");
+    } finally {
+      setImportingQuestionDocument(false);
+    }
+  };
+
   const addCustomQuestion = () => {
     if (!customQuestionPrompt.trim()) {
       Alert.alert(t(language, "customQuestionTitle"), t(language, "enterQuestionPrompt"));
       return;
     }
 
-    if (customQuestionOptions.some((option) => !option.trim())) {
+    if (customQuestionType === "objective" && customQuestionOptions.some((option) => !option.trim())) {
       Alert.alert(t(language, "customQuestionTitle"), t(language, "fillAllFourAnswerOptions"));
       return;
     }
 
-    if (customQuestionAnswerIndex === null) {
+    if (customQuestionType === "objective" && customQuestionAnswerIndex === null) {
       Alert.alert(t(language, "customQuestionTitle"), t(language, "chooseCorrectAnswer"));
       return;
     }
 
-    const answer = customQuestionOptions[customQuestionAnswerIndex]?.trim();
-    if (!answer) {
+    const answer = customQuestionType === "objective" && customQuestionAnswerIndex !== null
+      ? customQuestionOptions[customQuestionAnswerIndex]?.trim()
+      : "";
+    if (customQuestionType === "objective" && !answer) {
       Alert.alert(t(language, "customQuestionTitle"), t(language, "markedCorrectOptionEmpty"));
       return;
     }
@@ -939,12 +1034,22 @@ export default function ClassroomScreen() {
       return;
     }
 
+    if (customQuestionType === "written" && !customQuestionMarkingGuide.trim()) {
+      Alert.alert("Written marking guide", "Add a marking guide before saving this written question.");
+      return;
+    }
+
     const customQuestion: Question = {
       id: `custom-${Date.now()}-${acceptedQuestions.length + 1}`,
       prompt: customQuestionPrompt.trim(),
-      options: customQuestionOptions.map((option) => option.trim()),
-      answer,
-      explanation: customQuestionExplanation.trim() || t(language, "teacherAuthoredQuestion"),
+      type: customQuestionType,
+      points: Math.max(1, Math.min(100, Number(customQuestionPoints) || 1)),
+      image: customQuestionImage,
+      options: customQuestionType === "objective" ? customQuestionOptions.map((option) => option.trim()) : [],
+      answer: customQuestionType === "objective" ? answer : "",
+      explanation: customQuestionType === "objective" ? customQuestionExplanation.trim() || t(language, "teacherAuthoredQuestion") : "",
+      markingGuide: customQuestionType === "written" ? customQuestionMarkingGuide.trim() : undefined,
+      maxWords: customQuestionType === "written" ? Math.max(20, Math.min(5000, Number(customQuestionMaxWords) || 500)) : undefined,
     };
 
     setAcceptedQuestions((current) => [...current, customQuestion]);
@@ -952,6 +1057,10 @@ export default function ClassroomScreen() {
     setCustomQuestionOptions(["", "", "", ""]);
     setCustomQuestionAnswerIndex(null);
     setCustomQuestionExplanation("");
+    setCustomQuestionPoints("1");
+    setCustomQuestionMarkingGuide("");
+    setCustomQuestionMaxWords("500");
+    setCustomQuestionImage(undefined);
     setShowCustomQuestionForm(false);
   };
 
@@ -962,6 +1071,14 @@ export default function ClassroomScreen() {
 
     if (acceptedQuestions.length < desiredQuestionCount) {
       Alert.alert(t(language, "publishAssignmentTitle"), t(language, "acceptQuestionsBeforePublishing", { count: desiredQuestionCount }));
+      return;
+    }
+
+    const hasWrittenQuestions = acceptedQuestions.some((question) => question.type === "written");
+    const hasObjectiveQuestions = acceptedQuestions.some((question) => question.type !== "written");
+    if ((assessmentFormat === "written" && hasObjectiveQuestions) || (assessmentFormat === "objective" && hasWrittenQuestions)
+      || (assessmentFormat === "mixed" && (!hasWrittenQuestions || !hasObjectiveQuestions))) {
+      Alert.alert("Assessment format", "Make the selected questions match the assessment format. Mixed activities need at least one objective and one written question.");
       return;
     }
 
@@ -1057,8 +1174,10 @@ export default function ClassroomScreen() {
         resultVisibility,
         questionOrderMode,
         assessmentMode: activityType === "test" ? assessmentMode : "standard",
+        assessmentFormat,
         attemptsAllowed: Math.max(1, Number(attemptsAllowed) || 1),
         navigationMode,
+        exitPolicy,
         randomizeOptions,
         autoSubmit: true,
         passMark: Math.max(0, Math.min(100, Number(passMark) || 0)),
@@ -1162,6 +1281,8 @@ export default function ClassroomScreen() {
       setResultVisibility(activity.resultVisibility);
       setQuestionOrderMode(activity.questionOrderMode);
       setAssessmentMode(activity.assessmentMode ?? "standard");
+      setAssessmentFormat(activity.assessmentFormat ?? "objective");
+      setExitPolicy(activity.exitPolicy ?? "warn_record");
       setAttemptsAllowed(String(activity.attemptsAllowed ?? 1));
       setNavigationMode(activity.navigationMode ?? "free");
       setRandomizeOptions(Boolean(activity.randomizeOptions));
@@ -1179,6 +1300,11 @@ export default function ClassroomScreen() {
       setCustomQuestionPrompt("");
       setCustomQuestionOptions(["", "", "", ""]);
       setCustomQuestionExplanation("");
+      setCustomQuestionType("objective");
+      setCustomQuestionPoints("1");
+      setCustomQuestionMarkingGuide("");
+      setCustomQuestionMaxWords("500");
+      setCustomQuestionImage(undefined);
 
       if (activity.usesCustomSubject) {
         setUseCustomSubject(true);
@@ -1733,6 +1859,37 @@ export default function ClassroomScreen() {
                         <PrimaryButton label={t(language, "publicLabel")} onPress={() => setResultVisibility("public")} variant={resultVisibility === "public" ? "primary" : "secondary"} style={styles.inlineButton} />
                       </View>
 
+                      <Text style={styles.sectionLabel}>Answer format</Text>
+                      <Pressable style={styles.dropdownTrigger} onPress={() => setAssessmentFormatDropdownOpen((current) => !current)}>
+                        <Text style={styles.dropdownValue}>
+                          {assessmentFormat === "objective" ? "Objective only" : assessmentFormat === "written" ? "Written only" : "Objective and written"}
+                        </Text>
+                        <MaterialIcons name={assessmentFormatDropdownOpen ? "expand-less" : "expand-more"} size={24} color={palette.navy} />
+                      </Pressable>
+                      {assessmentFormatDropdownOpen ? (
+                        <View style={styles.dropdownMenu}>
+                          {[
+                            ["objective", "Objective only", "Automatically marked by Quiks"],
+                            ["written", "Written only", "Marked by the teacher"],
+                            ["mixed", "Objective and written", "Final score follows teacher marking"],
+                          ].map(([value, label, hint]) => (
+                            <Pressable key={value} style={styles.dropdownOption} onPress={() => {
+                              setAssessmentFormat(value as ClassroomAssessmentFormat);
+                              setCustomQuestionType(value === "written" ? "written" : "objective");
+                              setAssessmentFormatDropdownOpen(false);
+                            }}>
+                              <Text style={styles.dropdownOptionTitle}>{label}</Text>
+                              <Text style={styles.dropdownOptionHint}>{hint}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      ) : null}
+                      {assessmentFormat === "mixed" ? <><Text style={styles.sectionLabel}>Next AI candidate type</Text><View style={styles.inlineActions}><PrimaryButton label="Objective" onPress={() => setCustomQuestionType("objective")} variant={customQuestionType === "objective" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="Written" onPress={() => setCustomQuestionType("written")} variant={customQuestionType === "written" ? "primary" : "secondary"} style={styles.inlineButton}/></View></> : null}
+
+                      <Text style={styles.sectionLabel}>Import a question paper</Text>
+                      <PrimaryButton label="Upload Word or TXT" variant="secondary" onPress={importQuestionDocument} loading={importingQuestionDocument}/>
+                      <Text style={styles.helperText}>Structured .docx and .txt papers are imported into the review queue. Embedded PNG, JPEG and WebP diagrams are retained from Word files. Use numbered questions, lettered options and an Answer: line; written items also need Type: Written and Marking guide:.</Text>
+
                       <Text style={styles.sectionLabel}>{t(language, "questionOrderLabel")}</Text>
                       <View style={styles.inlineActions}>
                         <PrimaryButton label={t(language, "sameForAll")} onPress={() => setQuestionOrderMode("same")} variant={questionOrderMode === "same" ? "primary" : "secondary"} style={styles.inlineButton} />
@@ -1742,6 +1899,18 @@ export default function ClassroomScreen() {
                       {activityType === "test" ? <>
                         <Text style={styles.sectionLabel}>Assessment delivery</Text>
                         <View style={styles.inlineActions}><PrimaryButton label="Standard test" onPress={() => setAssessmentMode("standard")} variant={assessmentMode === "standard" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="CBT mode" onPress={() => setAssessmentMode("cbt")} variant={assessmentMode === "cbt" ? "primary" : "secondary"} style={styles.inlineButton}/></View>
+                        <Text style={styles.sectionLabel}>Leaving the activity</Text>
+                        <Pressable style={styles.dropdownTrigger} onPress={() => setExitPolicyDropdownOpen((current) => !current)}>
+                          <Text style={styles.dropdownValue}>
+                            {exitPolicy === "warn_record" ? "Warn and record" : exitPolicy === "confirm_submit" ? "Auto-submit on confirmed exit" : "Strict CBT mode"}
+                          </Text>
+                          <MaterialIcons name={exitPolicyDropdownOpen ? "expand-less" : "expand-more"} size={24} color={palette.navy} />
+                        </Pressable>
+                        {exitPolicyDropdownOpen ? <View style={styles.dropdownMenu}>{[
+                          ["warn_record", "Warn and record", "The student may return; every exit is recorded."],
+                          ["confirm_submit", "Auto-submit on confirmed exit", "A confirmed in-app exit submits saved work."],
+                          ["strict_submit", "Strict CBT mode", "Changing screen, tab or app submits saved work."],
+                        ].map(([value, label, hint]) => <Pressable key={value} style={styles.dropdownOption} onPress={() => { setExitPolicy(value as ClassroomExitPolicy); setExitPolicyDropdownOpen(false); }}><Text style={styles.dropdownOptionTitle}>{label}</Text><Text style={styles.dropdownOptionHint}>{hint}</Text></Pressable>)}</View> : null}
                         {assessmentMode === "cbt" ? <View style={styles.questionCard}>
                           <Text style={styles.sectionLabel}>Attempts allowed</Text><TextInput value={attemptsAllowed} onChangeText={setAttemptsAllowed} keyboardType="number-pad" style={styles.input}/>
                           <Text style={styles.sectionLabel}>Navigation</Text><View style={styles.inlineActions}><PrimaryButton label="Free navigation" onPress={() => setNavigationMode("free")} variant={navigationMode === "free" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="Linear (no backtracking)" onPress={() => setNavigationMode("linear")} variant={navigationMode === "linear" ? "primary" : "secondary"} style={styles.inlineButton}/></View>
@@ -1754,9 +1923,14 @@ export default function ClassroomScreen() {
 
                       {showCustomQuestionForm ? (
                         <View style={styles.questionCard}>
+                          {assessmentFormat === "mixed" ? <><Text style={styles.sectionLabel}>Question type</Text><View style={styles.inlineActions}><PrimaryButton label="Objective" onPress={() => setCustomQuestionType("objective")} variant={customQuestionType === "objective" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="Written" onPress={() => setCustomQuestionType("written")} variant={customQuestionType === "written" ? "primary" : "secondary"} style={styles.inlineButton}/></View></> : null}
                           <Text style={styles.sectionLabel}>{t(language, "promptLabel")}</Text>
                           <TextInput value={customQuestionPrompt} onChangeText={setCustomQuestionPrompt} placeholder={t(language, "enterYourQuestion")} placeholderTextColor="#8092A7" style={[styles.input, styles.textAreaInput]} multiline />
-                          {customQuestionOptions.map((option, index) => (
+                          <Text style={styles.sectionLabel}>Marks</Text>
+                          <TextInput value={customQuestionPoints} onChangeText={setCustomQuestionPoints} keyboardType="decimal-pad" style={styles.input}/>
+                          <PrimaryButton label={customQuestionImage ? "Replace question image" : "Add labelled image"} variant="secondary" onPress={chooseCustomQuestionImage}/>
+                          {customQuestionImage ? <View style={styles.questionImagePreviewWrap}><Image source={{ uri: `data:${customQuestionImage.mimeType};base64,${customQuestionImage.dataBase64}` }} style={styles.questionImagePreview} resizeMode="contain"/><PrimaryButton label="Remove image" variant="ghost" onPress={() => setCustomQuestionImage(undefined)} compact/></View> : null}
+                          {customQuestionType === "objective" ? customQuestionOptions.map((option, index) => (
                             <View key={`custom-option-${index}`} style={styles.customOptionRow}>
                               <TextInput
                                 value={option}
@@ -1771,8 +1945,8 @@ export default function ClassroomScreen() {
                                 </Text>
                               </Pressable>
                             </View>
-                          ))}
-                          <TextInput value={customQuestionExplanation} onChangeText={setCustomQuestionExplanation} placeholder={t(language, "explanationOptional")} placeholderTextColor="#7C8EA3" style={[styles.input, styles.textAreaInput]} multiline />
+                          )) : <><Text style={styles.sectionLabel}>Marking guide</Text><TextInput value={customQuestionMarkingGuide} onChangeText={setCustomQuestionMarkingGuide} placeholder="State the points expected in a good answer" placeholderTextColor="#7C8EA3" style={[styles.input, styles.textAreaInput]} multiline/><Text style={styles.sectionLabel}>Maximum words</Text><TextInput value={customQuestionMaxWords} onChangeText={setCustomQuestionMaxWords} keyboardType="number-pad" style={styles.input}/></>}
+                          {customQuestionType === "objective" ? <TextInput value={customQuestionExplanation} onChangeText={setCustomQuestionExplanation} placeholder={t(language, "explanationOptional")} placeholderTextColor="#7C8EA3" style={[styles.input, styles.textAreaInput]} multiline /> : null}
                           <PrimaryButton label={t(language, "addCustomQuestion")} onPress={addCustomQuestion} />
                         </View>
                       ) : null}
@@ -1782,6 +1956,7 @@ export default function ClassroomScreen() {
                         currentCandidateQuestion ? (
                           <View style={styles.questionCard}>
                             <MathText value={currentCandidateQuestion.prompt} textStyle={styles.questionPrompt} />
+                            {currentCandidateQuestion.type === "written" ? <Text style={styles.helperText}>Written · {currentCandidateQuestion.points ?? 1} mark(s){currentCandidateQuestion.markingGuide ? ` · Marking guide: ${currentCandidateQuestion.markingGuide}` : ""}</Text> : null}
                             {currentCandidateQuestion.options.map((option, index) => (
                               <MathText
                                 key={`${currentCandidateQuestion.id}-option-${index}`}
@@ -1812,7 +1987,9 @@ export default function ClassroomScreen() {
                           <Text style={styles.sectionLabel}>{t(language, "reviewLabel")}</Text>
                           {reviewQuestions.map((question) => (
                             <View key={question.id} style={styles.questionCard}>
+                              {question.image ? <Image source={{ uri: `data:${question.image.mimeType};base64,${question.image.dataBase64}` }} style={styles.questionImagePreview} resizeMode="contain"/> : null}
                               <MathText value={question.prompt} textStyle={styles.questionPrompt} />
+                              <Text style={styles.helperText}>{question.type === "written" ? "Written" : "Objective"} · {question.points ?? 1} mark(s)</Text>
                               <PrimaryButton label={t(language, "remove")} variant="secondary" onPress={() => removeAcceptedQuestion(question.id)} />
                             </View>
                           ))}
@@ -2455,6 +2632,23 @@ const styles = StyleSheet.create({
   choiceChipTextActive: {
     color: palette.white,
   },
+  dropdownTrigger: {
+    minHeight: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D6E0EA",
+    backgroundColor: "#F9FBFD",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  dropdownValue: { flex: 1, color: palette.ink, fontWeight: "800" },
+  dropdownMenu: { borderWidth: 1, borderColor: "#D6E0EA", borderRadius: 16, overflow: "hidden" },
+  dropdownOption: { padding: 14, gap: 3, backgroundColor: palette.white, borderBottomWidth: 1, borderBottomColor: "#E8EEF3" },
+  dropdownOptionTitle: { color: palette.ink, fontWeight: "800" },
+  dropdownOptionHint: { color: palette.slate, fontSize: 12, lineHeight: 17 },
   dualInputRow: {
     flexDirection: "row",
     gap: 12,
@@ -2500,6 +2694,8 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
   },
+  questionImagePreviewWrap: { gap: 8 },
+  questionImagePreview: { width: "100%", height: 240, borderRadius: 14, backgroundColor: "#EEF4F7" },
   questionPrompt: {
     color: palette.ink,
     lineHeight: 22,

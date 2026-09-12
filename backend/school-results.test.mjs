@@ -27,15 +27,16 @@ let classroom, activity, report;
 test("classroom submissions populate the central register automatically and once", async () => {
   classroom = await store.createClassroom(teacher, "Year 8", "teens");
   await store.acceptClassInviteLink(student, classroom.classCode, "teens");
-  activity = await store.createClassroomActivity({ teacherProfile: teacher, classId: classroom.classId, type: "assignment", title: "Fractions", subject: { id: "math", name: "Mathematics" }, questions: [], questionCount: 10, attemptsAllowed: 2 }, "teens");
-  await store.submitActivity(student, activity.activityId, { score: 60, correctAnswers: 6, totalQuestions: 10, timeTakenSeconds: 45 }, "teens");
-  await store.submitActivity(student, activity.activityId, { score: 80, correctAnswers: 8, totalQuestions: 10, timeTakenSeconds: 30 }, "teens");
+  const questions = Array.from({ length: 5 }, (_, index) => ({ id: `q${index + 1}`, prompt: `${index + 1}+1?`, options: [String(index + 2), String(index + 3)], answer: String(index + 2) }));
+  activity = await store.createClassroomActivity({ teacherProfile: teacher, classId: classroom.classId, type: "assignment", title: "Fractions", subject: { id: "math", name: "Mathematics" }, questions, questionCount: 5, attemptsAllowed: 2 }, "teens");
+  await store.submitActivity(student, activity.activityId, { answers: questions.map((question, index) => ({ questionId: question.id, answer: index < 3 ? question.answer : "wrong" })), timeTakenSeconds: 45 }, "teens");
+  await store.submitActivity(student, activity.activityId, { answers: questions.map((question, index) => ({ questionId: question.id, answer: index < 4 ? question.answer : "wrong" })), timeTakenSeconds: 30 }, "teens");
   const latest = await request("list"); assert.equal(latest.total, 1); assert.equal(latest.rows[0].score, 80);
   assert.equal((await request("list", { filters: { attempts: "all" } })).total, 2);
   assert.equal((await request("list", { filters: { subject: "English" } })).total, 0);
   const persisted = JSON.parse(await readFile(process.env.CLASSROOM_STORE_PATH, "utf8"));
   assert.equal(Object.keys(persisted.schoolResults).length, 2);
-  assert.equal(latest.rows[0].scoreSource, "client_reported");
+  assert.equal(latest.rows[0].scoreSource, "server_calculated");
 });
 
 test("student, teacher and another school's admin cannot access the register", async () => {

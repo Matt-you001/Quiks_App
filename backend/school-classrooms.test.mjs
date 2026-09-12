@@ -44,10 +44,10 @@ for (const variant of variants) test(`${variant}: admin shared code is teacher-b
   const request = details.members.find(m => m.role === "student");
   assert.equal(request.status, "pending_teacher_approval");
   await store.respondToMembershipRequest(body.teacherProfile, c.classId, request.membershipId, "approve", variant);
-  const activity = await store.createClassroomActivity({ teacherProfile: body.teacherProfile, classId: c.classId, title: "Quiz", type: "assignment", subject: { id: "math", name: "Math" }, questionCount: 1, questions: [{ id: "q", prompt: "1+1?", options: ["2"], answer: "2" }] }, variant);
+  const activity = await store.createClassroomActivity({ teacherProfile: body.teacherProfile, classId: c.classId, title: "Quiz", type: "assignment", subject: { id: "math", name: "Math" }, questionCount: 1, questions: [{ id: "q", prompt: "1+1?", options: ["2", "3"], answer: "2" }] }, variant);
   await store.createLessonNote({ teacherProfile: body.teacherProfile, classId: c.classId, title: "Numbers", content: "Addition lesson", topic: "Addition", subject: "Math", status: "published" }, variant);
   await store.sendClassChatMessage(joining.studentProfile, c.classId, "Hello class", variant);
-  await store.submitActivity(joining.studentProfile, activity.activityId, { score: 100, totalQuestions: 1, correctAnswers: 1, timeTakenSeconds: 12 }, variant);
+  await store.submitActivity(joining.studentProfile, activity.activityId, { answers: [{ questionId: "q", answer: "2" }], timeTakenSeconds: 12 }, variant);
   details = await adminCall("details", { classId: c.classId });
   assert.equal(details.activities.length, 1); assert.equal(details.notes.length, 1); assert.equal(details.messages[0].text, "Hello class");
   assert.equal(details.submissions.length, 1); assert.equal(details.submissions[0].score, 100);

@@ -17,6 +17,16 @@ export type ClassroomResultVisibility = "public" | "private";
 export type ClassroomQuestionOrderMode = "same" | "shuffled";
 export type ClassroomAssessmentMode = "standard" | "cbt";
 export type ClassroomNavigationMode = "free" | "linear";
+export type ClassroomAssessmentFormat = "objective" | "written" | "mixed";
+export type ClassroomExitPolicy = "warn_record" | "confirm_submit" | "strict_submit";
+export type ClassroomQuestionType = "objective" | "written";
+
+export interface QuestionImage {
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  dataBase64: string;
+  altText?: string;
+}
 
 export interface AppAccount {
   uid: string;
@@ -79,6 +89,11 @@ export interface Question {
   options: string[];
   answer: string;
   explanation: string;
+  type?: ClassroomQuestionType;
+  points?: number;
+  markingGuide?: string;
+  maxWords?: number;
+  image?: QuestionImage;
 }
 
 export interface SessionResult {
@@ -607,6 +622,8 @@ export interface ClassroomQuestionCandidateRequest {
   topicLabels?: string[];
   questionCount: number;
   batchCount?: number;
+  assessmentFormat?: ClassroomAssessmentFormat;
+  candidateType?: ClassroomQuestionType;
 }
 
 export interface ClassroomQuestionCandidateResponse {
@@ -640,8 +657,10 @@ export interface ClassroomActivitySummary {
   resultVisibility: ClassroomResultVisibility;
   questionOrderMode: ClassroomQuestionOrderMode;
   assessmentMode?: ClassroomAssessmentMode;
+  assessmentFormat?: ClassroomAssessmentFormat;
   attemptsAllowed?: number;
   navigationMode?: ClassroomNavigationMode;
+  exitPolicy?: ClassroomExitPolicy;
   randomizeOptions?: boolean;
   autoSubmit?: boolean;
   passMark?: number;
@@ -682,8 +701,10 @@ export interface ClassroomActivityCreateRequest {
   resultVisibility: ClassroomResultVisibility;
   questionOrderMode: ClassroomQuestionOrderMode;
   assessmentMode?: ClassroomAssessmentMode;
+  assessmentFormat?: ClassroomAssessmentFormat;
   attemptsAllowed?: number;
   navigationMode?: ClassroomNavigationMode;
+  exitPolicy?: ClassroomExitPolicy;
   randomizeOptions?: boolean;
   autoSubmit?: boolean;
   passMark?: number;
@@ -725,6 +746,7 @@ export interface ClassroomActivityDetailsRequest {
 }
 
 export interface ClassroomSubmissionSummary {
+  submissionId?: string;
   profileId: string;
   studentName: string;
   quiksId: string;
@@ -734,6 +756,41 @@ export interface ClassroomSubmissionSummary {
   totalQuestions: number;
   timeTakenSeconds: number;
   status: "submitted" | "absent";
+  gradingStatus?: "finalized" | "awaiting_marking";
+  provisionalScore?: number;
+  totalPoints?: number;
+  pointsAwarded?: number;
+  securityEventCount?: number;
+  autoSubmitted?: boolean;
+}
+
+export interface ClassroomStudentAnswer {
+  questionId: string;
+  answer: string;
+}
+
+export interface ClassroomSecurityEvent {
+  eventId?: string;
+  eventType: "exit_attempt" | "app_background" | "tab_hidden";
+  occurredAt: number;
+}
+
+export interface ClassroomSubmissionResponseDetail {
+  questionId: string;
+  prompt: string;
+  type: ClassroomQuestionType;
+  points: number;
+  answer: string;
+  correctAnswer?: string;
+  markingGuide?: string;
+  awardedPoints?: number;
+  teacherFeedback?: string;
+}
+
+export interface ClassroomSubmissionDetail extends ClassroomSubmissionSummary {
+  responses: ClassroomSubmissionResponseDetail[];
+  teacherFeedback?: string;
+  securityEvents?: ClassroomSecurityEvent[];
 }
 
 export interface ClassroomActivityDetailsResponse {
@@ -742,20 +799,35 @@ export interface ClassroomActivityDetailsResponse {
   className: string;
   teacherName: string;
   submissions?: ClassroomSubmissionSummary[];
+  submissionDetails?: ClassroomSubmissionDetail[];
 }
 
 export interface ClassroomActivitySubmitRequest {
   profile: UserProfile;
   activityId: string;
-  score: number;
-  correctAnswers: number;
-  totalQuestions: number;
+  answers: ClassroomStudentAnswer[];
   timeTakenSeconds: number;
+  autoSubmitted?: boolean;
+  exitReason?: string;
 }
 
 export interface ClassroomActivitySubmitResponse {
   activity: ClassroomActivitySummary;
   submission: ClassroomSubmissionSummary;
+}
+
+export interface ClassroomActivitySecurityEventRequest {
+  profile: UserProfile;
+  activityId: string;
+  event: ClassroomSecurityEvent;
+}
+
+export interface ClassroomActivityGradeRequest {
+  teacherProfile: UserProfile;
+  activityId: string;
+  submissionId: string;
+  grades: Array<{ questionId: string; awardedPoints: number; feedback?: string }>;
+  teacherFeedback?: string;
 }
 
 export type LessonNoteRefinementLevel = "none" | "minimal" | "rich" | "deep";

@@ -24,6 +24,7 @@ const defaultStore = {
   memberships: {},
   activities: {},
   submissions: {},
+  activitySecurityEvents: {},
   lessonNotes: {},
   chatMessages: {},
   schoolResults: {},
@@ -373,12 +374,88 @@ function getOrderedQuestionsForStudent(activity, profileId) {
     }))
     .sort((left, right) => left.weight - right.weight)
     .map((entry) => entry.question);
-  if (!activity.randomizeOptions) return questions;
+  if (!activity.randomizeOptions) return questions.map(buildStudentQuestion);
   return questions.map((question) => {
+    if (getQuestionType(question) === "written") return buildStudentQuestion(question);
     const entries = question.options.map((option, index) => ({ option, index, weight: hashString(`${activity.id}:${profileId}:${question.id}:option:${index}`) }))
       .sort((left, right) => left.weight - right.weight);
-    return { ...question, options: entries.map((entry) => entry.option), answerIndex: entries.findIndex((entry) => entry.index === question.answerIndex) };
+    return buildStudentQuestion({ ...question, options: entries.map((entry) => entry.option) });
   });
+}
+
+function getQuestionType(question) {
+  return question?.type === "written" ? "written" : "objective";
+}
+
+function getQuestionPoints(question) {
+  const points = Number(question?.points ?? 1);
+  return Number.isFinite(points) ? Math.max(1, Math.min(100, Math.round(points * 100) / 100)) : 1;
+}
+
+function getAssessmentFormat(questions) {
+  const source = Array.isArray(questions) ? questions : [];
+  const hasWritten = source.some((question) => getQuestionType(question) === "written");
+  const hasObjective = source.some((question) => getQuestionType(question) === "objective");
+  return hasWritten && hasObjective ? "mixed" : hasWritten ? "written" : "objective";
+}
+
+function normalizeQuestionImage(image) {
+  if (!image) return undefined;
+  const mimeType = String(image.mimeType ?? "");
+  if (!["image/png", "image/jpeg", "image/webp"].includes(mimeType)) {
+    throw Object.assign(new Error("Question images must be PNG, JPEG or WebP."), { statusCode: 400 });
+  }
+  const dataBase64 = String(image.dataBase64 ?? "").replace(/\s/g, "");
+  if (!dataBase64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(dataBase64)) {
+    throw Object.assign(new Error("The question image is invalid."), { statusCode: 400 });
+  }
+  if (Buffer.byteLength(dataBase64, "base64") > 750_000) {
+    throw Object.assign(new Error("Question images must be no larger than 750 KB."), { statusCode: 400 });
+  }
+  return {
+    name: String(image.name ?? "question-image").trim().slice(0, 160) || "question-image",
+    mimeType,
+    dataBase64,
+    altText: String(image.altText ?? "").trim().slice(0, 500) || undefined,
+  };
+}
+
+function normalizeActivityQuestions(questions) {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw Object.assign(new Error("Add at least one question before publishing."), { statusCode: 400 });
+  }
+  if (questions.length > 200) throw Object.assign(new Error("An activity can contain at most 200 questions."), { statusCode: 400 });
+  const ids = new Set();
+  return questions.map((question, index) => {
+    const id = String(question?.id ?? `question-${index + 1}`).trim().slice(0, 160);
+    const prompt = String(question?.prompt ?? "").trim().slice(0, 10_000);
+    if (!id || ids.has(id) || !prompt) throw Object.assign(new Error("Every question needs a unique ID and prompt."), { statusCode: 400 });
+    ids.add(id);
+    const type = getQuestionType(question);
+    const points = getQuestionPoints(question);
+    const image = normalizeQuestionImage(question.image);
+    if (type === "written") {
+      const markingGuide = String(question.markingGuide ?? question.answer ?? "").trim().slice(0, 10_000);
+      if (!markingGuide) throw Object.assign(new Error("Every written question needs a marking guide."), { statusCode: 400 });
+      return {
+        id, prompt, type, points, image,
+        options: [], answer: "", explanation: "",
+        markingGuide,
+        maxWords: Math.max(20, Math.min(5000, Math.floor(Number(question.maxWords ?? 500)))),
+      };
+    }
+    const options = Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : [];
+    const answer = String(question.answer ?? "").trim();
+    if (options.length < 2 || options.length > 8 || !options.includes(answer)) {
+      throw Object.assign(new Error("Every objective question needs 2 to 8 options and one matching correct answer."), { statusCode: 400 });
+    }
+    return { id, prompt, type, points, image, options, answer, explanation: String(question.explanation ?? "").trim().slice(0, 10_000) };
+  });
+}
+
+function buildStudentQuestion(question) {
+  const { answer: _answer, explanation: _explanation, markingGuide: _markingGuide, ...safe } = question;
+  return { ...safe, answer: "", explanation: "" };
 }
 
 function getActivitySubmissions(store, activityId) {
@@ -387,6 +464,7 @@ function getActivitySubmissions(store, activityId) {
 
 function buildSubmissionSummary(submission) {
   return {
+    submissionId: submission.submissionId,
     profileId: submission.profileId,
     studentName: submission.studentName,
     quiksId: submission.quiksId,
@@ -396,6 +474,38 @@ function buildSubmissionSummary(submission) {
     totalQuestions: submission.totalQuestions,
     timeTakenSeconds: submission.timeTakenSeconds,
     status: "submitted",
+    gradingStatus: submission.gradingStatus ?? "finalized",
+    provisionalScore: submission.provisionalScore,
+    totalPoints: submission.totalPoints,
+    pointsAwarded: submission.pointsAwarded,
+    securityEventCount: Number(submission.securityEventCount ?? 0),
+    autoSubmitted: Boolean(submission.autoSubmitted),
+  };
+}
+
+function buildSubmissionDetail(activity, submission, securityEvents = []) {
+  const answerByQuestion = new Map((submission.answers ?? []).map((entry) => [entry.questionId, entry.answer]));
+  const gradeByQuestion = new Map((submission.writtenGrades ?? []).map((entry) => [entry.questionId, entry]));
+  return {
+    ...buildSubmissionSummary(submission),
+    teacherFeedback: submission.teacherFeedback,
+    securityEvents: cloneValue(securityEvents),
+    responses: (activity.questions ?? []).map((question) => {
+      const grade = gradeByQuestion.get(question.id);
+      return {
+        questionId: question.id,
+        prompt: question.prompt,
+        type: getQuestionType(question),
+        points: getQuestionPoints(question),
+        answer: answerByQuestion.get(question.id) ?? "",
+        correctAnswer: getQuestionType(question) === "objective" ? question.answer : undefined,
+        markingGuide: getQuestionType(question) === "written" ? question.markingGuide : undefined,
+        awardedPoints: getQuestionType(question) === "objective"
+          ? (answerByQuestion.get(question.id) === question.answer ? getQuestionPoints(question) : 0)
+          : grade?.awardedPoints,
+        teacherFeedback: grade?.feedback,
+      };
+    }),
   };
 }
 
@@ -474,8 +584,10 @@ function buildActivitySummary(store, activity, profileId) {
     resultVisibility: activity.resultVisibility,
     questionOrderMode: activity.questionOrderMode,
     assessmentMode: activity.assessmentMode ?? "standard",
+    assessmentFormat: activity.assessmentFormat ?? getAssessmentFormat(activity.questions),
     attemptsAllowed,
     navigationMode: activity.navigationMode ?? "free",
+    exitPolicy: ["warn_record", "confirm_submit", "strict_submit"].includes(activity.exitPolicy) ? activity.exitPolicy : "warn_record",
     randomizeOptions: Boolean(activity.randomizeOptions),
     autoSubmit: activity.autoSubmit !== false,
     passMark: activity.passMark ?? 50,
@@ -809,7 +921,8 @@ export async function createClassroomActivity(payload, appVariant) {
     const classroom = store.classrooms[payload.classId];
     ensureTeacherOwnsClass(classroom, payload.teacherProfile.id);
 
-    const questionCount = Math.max(1, Number(payload.questionCount ?? payload.questions.length));
+    const normalizedQuestions = normalizeActivityQuestions(payload.questions);
+    const questionCount = normalizedQuestions.length;
     const durationMinutes = Math.max(5, Number(payload.durationMinutes ?? 30));
     const now = Date.now();
     const isTest = payload.type === "test";
@@ -867,14 +980,16 @@ export async function createClassroomActivity(payload, appVariant) {
       resultVisibility: payload.resultVisibility ?? "private",
       questionOrderMode: payload.questionOrderMode ?? "same",
       assessmentMode: isTest && payload.assessmentMode === "cbt" ? "cbt" : "standard",
+      assessmentFormat: getAssessmentFormat(normalizedQuestions),
       attemptsAllowed: Math.max(1, Math.min(10, Math.floor(Number(payload.attemptsAllowed ?? 1)))),
       navigationMode: payload.navigationMode === "linear" ? "linear" : "free",
+      exitPolicy: ["warn_record", "confirm_submit", "strict_submit"].includes(payload.exitPolicy) ? payload.exitPolicy : "warn_record",
       randomizeOptions: Boolean(payload.randomizeOptions),
       autoSubmit: payload.autoSubmit !== false,
       passMark: Math.max(0, Math.min(100, Number(payload.passMark ?? 50))),
       instructions: String(payload.instructions ?? "").trim().slice(0, 2000) || undefined,
       accessCode: isTest ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined,
-      questions: payload.questions,
+      questions: normalizedQuestions,
       questionCount,
       teacherProfileId: payload.teacherProfile.id,
       teacherName: payload.teacherProfile.name,
@@ -1088,7 +1203,8 @@ export async function updateClassroomActivity(payload, appVariant) {
       throw new Error("Tests can no longer be edited within 5 minutes of the start time.");
     }
 
-    const questionCount = Math.max(1, Number(payload.questionCount ?? payload.questions.length));
+    const normalizedQuestions = normalizeActivityQuestions(payload.questions);
+    const questionCount = normalizedQuestions.length;
     const durationMinutes = Math.max(1, Number(payload.durationMinutes ?? 1));
     const explicitStartAt = Number(payload.startAt ?? 0);
     const explicitEndAt = Number(payload.endAt ?? 0);
@@ -1131,14 +1247,16 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.resultVisibility = payload.resultVisibility ?? "private";
     activity.questionOrderMode = payload.questionOrderMode ?? "same";
     activity.assessmentMode = activity.type === "test" && payload.assessmentMode === "cbt" ? "cbt" : "standard";
+    activity.assessmentFormat = getAssessmentFormat(normalizedQuestions);
     activity.attemptsAllowed = Math.max(1, Math.min(10, Math.floor(Number(payload.attemptsAllowed ?? 1))));
     activity.navigationMode = payload.navigationMode === "linear" ? "linear" : "free";
+    activity.exitPolicy = ["warn_record", "confirm_submit", "strict_submit"].includes(payload.exitPolicy) ? payload.exitPolicy : "warn_record";
     activity.randomizeOptions = Boolean(payload.randomizeOptions);
     activity.autoSubmit = payload.autoSubmit !== false;
     activity.passMark = Math.max(0, Math.min(100, Number(payload.passMark ?? 50)));
     activity.instructions = String(payload.instructions ?? "").trim().slice(0, 2000) || undefined;
     activity.accessCode = activity.type === "test" ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined;
-    activity.questions = payload.questions;
+    activity.questions = normalizedQuestions;
     activity.questionCount = questionCount;
 
     Object.keys(store.submissions).forEach((submissionId) => {
@@ -1202,6 +1320,15 @@ export async function getActivityDetails(profile, activityId, appVariant, access
         : ownAbsentSummary
           ? [...submissions.filter((submission) => submission.profileId === profile.id), ownAbsentSummary]
           : submissions.filter((submission) => submission.profileId === profile.id);
+    const submissionDetails = isTeacher
+      ? getActivitySubmissions(store, activity.id).map((submission) => buildSubmissionDetail(
+          activity,
+          submission,
+          Object.values(store.activitySecurityEvents ?? {}).filter(
+            (event) => event.activityId === activity.id && event.profileId === submission.profileId
+          )
+        ))
+      : undefined;
 
     return {
       activity: buildActivitySummary(store, activity, profile.id),
@@ -1209,17 +1336,15 @@ export async function getActivityDetails(profile, activityId, appVariant, access
       className: classroom.className,
       teacherName: classroom.teacherName,
       submissions: visibleSubmissions,
+      submissionDetails,
     };
   });
 }
 
 export async function submitActivity(profile, activityId, submissionPayload, appVariant) {
   return mutateStore(async (store) => {
-    if (typeof submissionPayload.score !== "number" || !Number.isFinite(submissionPayload.score) || submissionPayload.score < 0 || submissionPayload.score > 100
-      || !Number.isInteger(submissionPayload.totalQuestions) || submissionPayload.totalQuestions < 1
-      || !Number.isInteger(submissionPayload.correctAnswers) || submissionPayload.correctAnswers < 0 || submissionPayload.correctAnswers > submissionPayload.totalQuestions
-      || !Number.isFinite(submissionPayload.timeTakenSeconds) || submissionPayload.timeTakenSeconds < 0) {
-      throw Object.assign(new Error("The submitted result contains invalid marks, question counts or study time."), { statusCode: 400 });
+    if (!Number.isFinite(submissionPayload.timeTakenSeconds) || submissionPayload.timeTakenSeconds < 0) {
+      throw Object.assign(new Error("The submitted study time is invalid."), { statusCode: 400 });
     }
     store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
     const activity = store.activities[activityId];
@@ -1246,19 +1371,80 @@ export async function submitActivity(profile, activityId, submissionPayload, app
       throw new Error(`All ${attemptsAllowed} permitted attempt${attemptsAllowed === 1 ? "" : "s"} have been used.`);
     }
 
+    const activityQuestions = Array.isArray(activity.questions) ? activity.questions : [];
+    let answers;
+    let correctAnswers;
+    let pointsAwarded;
+    let totalPoints;
+    let gradingStatus;
+    let score;
+    if (activityQuestions.length === 0 && Number.isFinite(submissionPayload.score)) {
+      // Backward compatibility for pre-upgrade records that did not persist their questions.
+      answers = [];
+      correctAnswers = Math.max(0, Math.floor(Number(submissionPayload.correctAnswers ?? 0)));
+      totalPoints = Math.max(1, Math.floor(Number(submissionPayload.totalQuestions ?? 1)));
+      pointsAwarded = Math.max(0, Math.min(totalPoints, totalPoints * Number(submissionPayload.score) / 100));
+      score = Math.max(0, Math.min(100, Number(submissionPayload.score)));
+      gradingStatus = "finalized";
+    } else {
+      if (!Array.isArray(submissionPayload.answers)) {
+        throw Object.assign(new Error("Submit the answers for server-side marking."), { statusCode: 400 });
+      }
+      const validQuestionIds = new Set(activityQuestions.map((question) => question.id));
+      const seen = new Set();
+      answers = submissionPayload.answers.map((entry) => {
+        const questionId = String(entry?.questionId ?? "").trim();
+        if (!validQuestionIds.has(questionId) || seen.has(questionId)) {
+          throw Object.assign(new Error("The submitted answers do not match this activity."), { statusCode: 400 });
+        }
+        seen.add(questionId);
+        return { questionId, answer: String(entry?.answer ?? "").trim().slice(0, 50_000) };
+      });
+      const answerByQuestion = new Map(answers.map((entry) => [entry.questionId, entry.answer]));
+      const objectiveQuestions = activityQuestions.filter((question) => getQuestionType(question) === "objective");
+      const writtenQuestions = activityQuestions.filter((question) => getQuestionType(question) === "written");
+      correctAnswers = objectiveQuestions.filter((question) => answerByQuestion.get(question.id) === question.answer).length;
+      totalPoints = activityQuestions.reduce((sum, question) => sum + getQuestionPoints(question), 0);
+      pointsAwarded = objectiveQuestions.reduce(
+        (sum, question) => sum + (answerByQuestion.get(question.id) === question.answer ? getQuestionPoints(question) : 0),
+        0
+      );
+      gradingStatus = writtenQuestions.length > 0 ? "awaiting_marking" : "finalized";
+      score = Math.round(pointsAwarded / totalPoints * 10_000) / 100;
+    }
+
     const submissionId = randomUUID();
+    if (submissionPayload.autoSubmitted && submissionPayload.exitReason && submissionPayload.exitReason !== "time_expired") {
+      const reason = String(submissionPayload.exitReason);
+      const eventType = reason.includes("background") ? "app_background" : reason.includes("tab_hidden") ? "tab_hidden" : "exit_attempt";
+      const eventId = `auto-submit-${submissionId}`;
+      store.activitySecurityEvents[eventId] = { eventId, activityId, profileId: profile.id, eventType, occurredAt: Date.now() };
+    }
+    const relatedSecurityEvents = Object.values(store.activitySecurityEvents ?? {}).filter(
+      (event) => event.activityId === activityId && event.profileId === profile.id
+    );
     store.submissions[submissionId] = {
       submissionId,
       activityId,
       profileId: profile.id,
       studentName: profile.name,
       quiksId: profile.quiksId,
-      score: submissionPayload.score,
-      correctAnswers: submissionPayload.correctAnswers,
-      totalQuestions: submissionPayload.totalQuestions,
+      score,
+      provisionalScore: gradingStatus === "awaiting_marking" ? score : undefined,
+      gradingStatus,
+      pointsAwarded,
+      totalPoints,
+      answers,
+      writtenGrades: [],
+      correctAnswers,
+      totalQuestions: activityQuestions.length || Math.max(1, Number(submissionPayload.totalQuestions ?? 1)),
       timeTakenSeconds: submissionPayload.timeTakenSeconds,
       submittedAt: Date.now(),
       attemptNumber: attempts.length + 1,
+      autoSubmitted: Boolean(submissionPayload.autoSubmitted),
+      exitReason: String(submissionPayload.exitReason ?? "").trim().slice(0, 160) || undefined,
+      securityEventCount: relatedSecurityEvents.length,
+      scoreSource: activityQuestions.length ? "server_calculated" : "legacy_client_reported",
     };
     captureSchoolResult(store, store.submissions[submissionId]);
 
@@ -1266,6 +1452,68 @@ export async function submitActivity(profile, activityId, submissionPayload, app
       activity: buildActivitySummary(store, activity, profile.id),
       submission: buildSubmissionSummary(store.submissions[submissionId]),
     };
+  });
+}
+
+export async function recordActivitySecurityEvent(profile, activityId, event, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[profile.id] = normalizeProfileRecord(profile, appVariant);
+    const activity = store.activities[activityId];
+    if (!activity) throw Object.assign(new Error("Activity not found."), { statusCode: 404 });
+    const membership = getActiveMembership(store, activity.classId, profile.id);
+    if (!membership || membership.role !== "student") throw Object.assign(new Error("Only an active student can record this event."), { statusCode: 403 });
+    const eventId = String(event?.eventId ?? randomUUID()).trim().slice(0, 160);
+    if (!store.activitySecurityEvents[eventId]) {
+      const eventType = ["exit_attempt", "app_background", "tab_hidden"].includes(event?.eventType) ? event.eventType : "exit_attempt";
+      store.activitySecurityEvents[eventId] = {
+        eventId, activityId, profileId: profile.id, eventType,
+        occurredAt: Number.isFinite(Number(event?.occurredAt)) ? Number(event.occurredAt) : Date.now(),
+      };
+    }
+    return { event: cloneValue(store.activitySecurityEvents[eventId]) };
+  });
+}
+
+export async function gradeActivitySubmission(teacherProfile, activityId, submissionId, payload, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const activity = store.activities[activityId];
+    if (!activity) throw Object.assign(new Error("Activity not found."), { statusCode: 404 });
+    ensureTeacherOwnsClass(store.classrooms[activity.classId], teacherProfile.id);
+    const submission = store.submissions[submissionId];
+    if (!submission || submission.activityId !== activityId) throw Object.assign(new Error("Submission not found."), { statusCode: 404 });
+    const writtenQuestions = activity.questions.filter((question) => getQuestionType(question) === "written");
+    if (writtenQuestions.length === 0) throw Object.assign(new Error("This activity has no written responses to mark."), { statusCode: 400 });
+    if (!Array.isArray(payload.grades)) throw Object.assign(new Error("Written marks are required."), { statusCode: 400 });
+    const gradeByQuestion = new Map(payload.grades.map((grade) => [String(grade.questionId), grade]));
+    const writtenGrades = writtenQuestions.map((question) => {
+      const grade = gradeByQuestion.get(question.id);
+      const awardedPoints = Number(grade?.awardedPoints);
+      const maximum = getQuestionPoints(question);
+      if (!Number.isFinite(awardedPoints) || awardedPoints < 0 || awardedPoints > maximum) {
+        throw Object.assign(new Error(`Enter a mark between 0 and ${maximum} for every written question.`), { statusCode: 400 });
+      }
+      return {
+        questionId: question.id,
+        awardedPoints: Math.round(awardedPoints * 100) / 100,
+        feedback: String(grade?.feedback ?? "").trim().slice(0, 2000) || undefined,
+      };
+    });
+    const answerByQuestion = new Map((submission.answers ?? []).map((entry) => [entry.questionId, entry.answer]));
+    const objectivePoints = activity.questions
+      .filter((question) => getQuestionType(question) === "objective")
+      .reduce((sum, question) => sum + (answerByQuestion.get(question.id) === question.answer ? getQuestionPoints(question) : 0), 0);
+    submission.writtenGrades = writtenGrades;
+    submission.pointsAwarded = objectivePoints + writtenGrades.reduce((sum, grade) => sum + grade.awardedPoints, 0);
+    submission.totalPoints = activity.questions.reduce((sum, question) => sum + getQuestionPoints(question), 0);
+    submission.score = Math.round(submission.pointsAwarded / submission.totalPoints * 10_000) / 100;
+    submission.gradingStatus = "finalized";
+    submission.provisionalScore = undefined;
+    submission.teacherFeedback = String(payload.teacherFeedback ?? "").trim().slice(0, 4000) || undefined;
+    submission.markedAt = Date.now();
+    submission.markedBy = teacherProfile.id;
+    captureSchoolResult(store, submission);
+    return { submission: buildSubmissionDetail(activity, submission, Object.values(store.activitySecurityEvents ?? {}).filter((event) => event.activityId === activityId && event.profileId === submission.profileId)) };
   });
 }
 

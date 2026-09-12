@@ -17,7 +17,6 @@ function prepare(store) {
 // Immutable snapshots prevent class/activity deletion from erasing the register.
 export function captureSchoolResult(store, submission) {
   prepare(store);
-  if (store.schoolResults[submission.submissionId]) return;
   const activity = store.activities[submission.activityId];
   const classroom = store.classrooms[activity?.classId];
   const profile = store.profiles[submission.profileId];
@@ -33,7 +32,13 @@ export function captureSchoolResult(store, submission) {
     assessmentMode: activity.assessmentMode ?? "standard", appVariant: classroom.appVariant,
     teacherName: activity.teacherName, score, correctAnswers: submission.correctAnswers,
     totalQuestions: submission.totalQuestions, submittedAt: submission.submittedAt,
-    attemptNumber: submission.attemptNumber ?? 1, scoreSource: "client_reported",
+    attemptNumber: submission.attemptNumber ?? 1,
+    scoreSource: submission.scoreSource ?? "legacy_client_reported",
+    gradingStatus: submission.gradingStatus ?? "finalized",
+    provisionalScore: submission.provisionalScore,
+    pointsAwarded: submission.pointsAwarded,
+    totalPoints: submission.totalPoints,
+    autoSubmitted: Boolean(submission.autoSubmitted),
   };
 }
 
@@ -112,7 +117,14 @@ export function processSchoolResults(store, operation, scope, payload = {}) {
   if (operation === "reports") return { reports: clone(Object.values(store.schoolReports).filter((report) => report.schoolId === scope.school.id).sort((a, b) => b.updatedAt - a.updatedAt)) };
   if (operation === "create") {
     const member = currentMember(scope, payload.studentMembershipId);
-    const rows = selectedResults(store, scope.school.id, { ...payload.filters, studentMembershipId: member.membershipId, attempts: "latest" });
+    const seenActivities = new Set();
+    const rows = selectedResults(store, scope.school.id, { ...payload.filters, studentMembershipId: member.membershipId, attempts: "all" })
+      .filter((row) => row.gradingStatus !== "awaiting_marking")
+      .filter((row) => {
+        if (seenActivities.has(row.activityId)) return false;
+        seenActivities.add(row.activityId);
+        return true;
+      });
     if (!rows.length) fail("No results match this student's selected filters.");
     if (rows.length > 250) fail("Narrow the date or class filters to at most 250 activities per student report.");
     const title = text(payload.title, 160);
