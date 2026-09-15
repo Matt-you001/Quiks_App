@@ -874,7 +874,7 @@ const english: TranslationMap = {
   openChallenges: "Open challenges",
   passedLevelBadge: "Passed",
   nextLevelBadge: "Next",
-  competitionNotAvailable: "Competition is available only for Quiks Teens and Quiks Uni.",
+  competitionNotAvailable: "Competition is available only for Quiks Teens and Quiks Advance.",
   competitionSetupTitle: "{subject} competition",
   competitionSetupHint: "Choose the exact track you want to compete on. We will match you with another learner on the same subject, grade, and level.",
   joinCompetitionQueue: "Join Competition Queue",

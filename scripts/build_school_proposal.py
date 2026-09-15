@@ -253,7 +253,7 @@ set_table_geometry(logo_table, [3120, 3120, 3120])
 logos = [
     ("quiks-children-playstore-icon-512.png", "QUIKS CHILDREN", PURPLE),
     ("quiks-teens-playstore-icon-512.png", "QUIKS TEENS", TEAL),
-    ("quiks-uni-playstore-icon-512.png", "QUIKS UNI", NAVY),
+    ("quiks-uni-playstore-icon-512.png", "QUIKS ADVANCE", NAVY),
 ]
 for cell, (filename, label, color) in zip(logo_table.rows[0].cells, logos):
     p = cell.paragraphs[0]
@@ -283,7 +283,7 @@ add_callout(
 add_heading(doc, "Why Quiks", 1)
 add_text(
     doc,
-    "Quiks is a learning and practice platform built for different stages of education: Quiks Children for younger learners, Quiks Teens for secondary-school and college-age students, and Quiks Uni for tertiary learners. For a school partnership, the appropriate variant can be recommended by age group so that content, language and challenge level remain relevant.",
+    "Quiks is a learning and practice platform built for different stages of education: Quiks Children for younger learners, Quiks Teens for secondary-school and college-age students, and Quiks Advance for tertiary learners. For a school partnership, the appropriate variant can be recommended by age group so that content, language and challenge level remain relevant.",
     after=6,
 )
 add_text(

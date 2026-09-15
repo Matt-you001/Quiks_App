@@ -19,6 +19,7 @@ const members = {
 };
 await writeFile(process.env.SCHOOL_STORE_PATH, JSON.stringify({ schools: { s: { id: "s", name: "School", licence }, other: { id: "other", name: "Other", licence }, expired: { id: "expired", licence: { ...licence, endAt: Date.now() - 1 } }, disabled: { id: "disabled", licence: { ...licence, features: { classroom: false } } } }, memberships: members }));
 const { schoolClassroomsRequest } = await import("./school-classrooms-api.mjs");
+const schoolStore = await import("./school-store.mjs");
 const { authenticateClassroomRequest, schoolClassroomProfile } = await import("./classroom-auth.mjs");
 const store = await import("./classroom-store.mjs");
 const principal = m => ({ principalId: m.principalId, uid: m.membershipId, projectId: "p", emailVerified: true });
@@ -50,7 +51,10 @@ for (const variant of variants) test(`${variant}: admin shared code is teacher-b
   await store.submitActivity(joining.studentProfile, activity.activityId, { answers: [{ questionId: "q", answer: "2" }], timeTakenSeconds: 12 }, variant);
   details = await adminCall("details", { classId: c.classId });
   assert.equal(details.activities.length, 1); assert.equal(details.notes.length, 1); assert.equal(details.messages[0].text, "Hello class");
-  assert.equal(details.submissions.length, 1); assert.equal(details.submissions[0].score, 100);
+  assert.equal(details.results.length, 0);
+  await store.publishActivityResultsToSchool(body.teacherProfile, activity.activityId, variant);
+  details = await adminCall("details", { classId: c.classId });
+  assert.equal(details.results.length, 1); assert.equal(details.results[0].score, 100);
   assert.equal(details.members.filter(m => m.role === "teacher").length, 1);
   const disk = JSON.parse(await readFile(process.env.CLASSROOM_STORE_PATH, "utf8"));
   assert.ok(Object.values(disk.schoolResults).some(r => r.classId === c.classId));
@@ -95,4 +99,13 @@ test("school classes and codes survive store reload", async () => {
   const reloaded = await import(`./classroom-store.mjs?reload=${Date.now()}`);
   const after = await reloaded.schoolClassroomsOperation("list", { school: { id: "s" } }, {});
   assert.deepEqual(after.classes, before);
+});
+
+test("school activity grade terminology does not restrict classroom names", async () => {
+  await schoolStore.updateSchoolClassNaming(principal(members.admin), "s", { mode: "primary_secondary" });
+  const created = await adminCall("create", { className: "Science Champions", appVariant: "children", teacherMembershipId: "teacher", codePolicy: "shared" });
+  assert.equal(created.classroom.className, "Science Champions");
+  const teacherMembership = (await schoolStore.listPrincipalMemberships(principal(members.teacher)))[0];
+  const actor = schoolClassroomProfile(teacherMembership, "children");
+  assert.equal((await store.createClassroom(actor, "Any teacher-chosen name", "children")).className, "Any teacher-chosen name");
 });

@@ -16,7 +16,7 @@ import { appVariant } from "../lib/app-variant";
 import { createClassroomInvitationLink, createClassroomInvitationMessage } from "../lib/classroom-invite";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { canUseClassroom } from "../lib/subscription";
-import { readAppState } from "../lib/storage";
+import { readAppState, upsertProfile } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 import {
   createClassroomAssignment,
@@ -28,6 +28,7 @@ import {
   generateClassroomQuestionCandidates,
   getClassroomActivityDetails,
   getClassroomDetails,
+  getSchoolIdentity,
   inviteStudentToClassroom,
   listClassroomActivities,
   listClassroomClasses,
@@ -111,11 +112,19 @@ function addMonths(date: Date, count: number) {
 }
 
 function canEditScheduledActivity(activity: ClassroomActivitySummary) {
-  if (activity.type !== "test") {
+  if (!isTimedActivity(activity.type)) {
     return true;
   }
 
   return activity.startAt - Date.now() > 5 * 60 * 1000;
+}
+
+function isTimedActivity(type: ClassroomActivityType) {
+  return type === "test" || type === "exam";
+}
+
+function activityTypeLabel(type: ClassroomActivityType, language: UserProfile["language"]) {
+  return type === "exam" ? "Exam" : type === "test" ? t(language, "testType") : t(language, "assignmentType");
 }
 
 function confirmDestructiveAction(title: string, message: string, onConfirm: () => void) {
@@ -149,6 +158,7 @@ export default function ClassroomScreen() {
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [activityType, setActivityType] = useState<ClassroomActivityType>("assignment");
   const [grade, setGrade] = useState(appVariant.allowedGrades[0] ?? "Grade 6");
+  const [activityGradePickerOpen, setActivityGradePickerOpen] = useState(false);
   const [level, setLevel] = useState("1");
   const [difficulty, setDifficulty] = useState<Difficulty>(appVariant.defaultDifficulty);
   const [focusMode, setFocusMode] = useState<QuestionFocusMode>("general");
@@ -210,6 +220,10 @@ export default function ClassroomScreen() {
   const [classroomPage, setClassroomPage] = useState<"activities" | "notes" | "chat">("activities");
 
   const language = profile?.language ?? "en";
+  const activityGradeOptions = useMemo(
+    () => profile?.schoolId && profile.schoolClassNaming?.names.length ? profile.schoolClassNaming.names : appVariant.allowedGrades,
+    [profile?.schoolClassNaming?.names, profile?.schoolId]
+  );
   const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0")), []);
   const minuteOptions = useMemo(() => Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0")), []);
   const quarterHourOptions = useMemo(
@@ -301,7 +315,7 @@ export default function ClassroomScreen() {
     [selectedClassDetails]
   );
   const computedTestDurationMinutes = useMemo(() => {
-    if (activityType !== "test") {
+    if (!isTimedActivity(activityType)) {
       return 0;
     }
 
@@ -313,7 +327,7 @@ export default function ClassroomScreen() {
     return Math.max(1, Math.ceil(seconds / 60));
   }, [activityType, durationSeconds]);
   const computedTestEndAt = useMemo(() => {
-    if (activityType !== "test") {
+    if (!isTimedActivity(activityType)) {
       return null;
     }
 
@@ -364,6 +378,10 @@ export default function ClassroomScreen() {
   }, [activities, profile?.role, selectedClass]);
 
   useEffect(() => {
+    if (activityGradeOptions.length > 0 && !activityGradeOptions.includes(grade)) setGrade(activityGradeOptions[0]);
+  }, [activityGradeOptions, grade]);
+
+  useEffect(() => {
     if (hydratingActivityRef.current) {
       hydratingActivityRef.current = false;
       return;
@@ -378,7 +396,7 @@ export default function ClassroomScreen() {
   }, [activityType, customSubjectName, customTopicLabel, difficulty, focusMode, grade, level, questionCount, questionOrderMode, resultVisibility, subjectId, topicIds, useCustomSubject, useCustomTopic]);
 
   useEffect(() => {
-    if (activityType !== "test") {
+    if (!isTimedActivity(activityType)) {
       return;
     }
 
@@ -448,8 +466,7 @@ export default function ClassroomScreen() {
       return;
     }
 
-    const activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
-    setProfile(activeProfile);
+    let activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
 
     if (!canUseClassroom(state.subscriptionTier)) {
       setPremiumBlocked(true);
@@ -459,11 +476,21 @@ export default function ClassroomScreen() {
     setPremiumBlocked(false);
 
     if (!activeProfile) {
+      setProfile(null);
       setLoading(false);
       return;
     }
 
     try {
+      if (activeProfile.schoolMembershipId) {
+        const identity = await getSchoolIdentity();
+        const membership = identity.memberships?.find((entry) => entry.membershipId === activeProfile?.schoolMembershipId);
+        if (membership) {
+          activeProfile = { ...activeProfile, schoolName: membership.schoolName, schoolClassNaming: membership.schoolClassNaming, schoolCurriculum: membership.schoolCurriculum, preferredCurriculum: membership.schoolCurriculum || activeProfile.preferredCurriculum };
+          await upsertProfile(activeProfile);
+        }
+      }
+      setProfile(activeProfile);
       await syncClassroomProfile({ profile: activeProfile });
       const [nextClasses, nextActivities] = await Promise.all([
         listClassroomClasses({ profile: activeProfile }),
@@ -1092,31 +1119,31 @@ export default function ClassroomScreen() {
     const requestTopicIds = topicSelection.topicIds;
     const requestTopicLabels = topicSelection.topicLabels;
 
-    const parsedStartAt = activityType === "test" ? parseDateTimeInput(startDate, startTime) : null;
-    const parsedEndAt = activityType === "test" ? computedTestEndAt : null;
+    const parsedStartAt = isTimedActivity(activityType) ? parseDateTimeInput(startDate, startTime) : null;
+    const parsedEndAt = isTimedActivity(activityType) ? computedTestEndAt : null;
     const parsedDeadline = activityType === "assignment" ? parseDateTimeInput(deadlineDate, deadlineTime) : null;
 
-    if (activityType === "test" && !parsedStartAt) {
+    if (isTimedActivity(activityType) && !parsedStartAt) {
       Alert.alert(t(language, "publishTestTitle"), t(language, "enterValidTestStart"));
       return;
     }
 
-    if (activityType === "test" && parsedStartAt && parsedStartAt <= Date.now()) {
+    if (isTimedActivity(activityType) && parsedStartAt && parsedStartAt <= Date.now()) {
       Alert.alert(t(language, "publishTestTitle"), "Test start time must be in the future.");
       return;
     }
 
-    if (activityType === "test" && !parsedEndAt) {
+    if (isTimedActivity(activityType) && !parsedEndAt) {
       Alert.alert(t(language, "publishTestTitle"), t(language, "enterValidDurationSeconds"));
       return;
     }
 
-    if (activityType === "test" && parsedStartAt && parsedEndAt && parsedEndAt <= parsedStartAt) {
+    if (isTimedActivity(activityType) && parsedStartAt && parsedEndAt && parsedEndAt <= parsedStartAt) {
       Alert.alert(t(language, "publishTestTitle"), t(language, "endTimeLaterThanStart"));
       return;
     }
 
-    if (activityType === "test" && parsedStartAt && parsedEndAt) {
+    if (isTimedActivity(activityType) && parsedStartAt && parsedEndAt) {
       const startDateValue = formatLocalDateValue(new Date(parsedStartAt));
       const endDateValue = formatLocalDateValue(new Date(parsedEndAt));
       if (startDateValue !== endDateValue) {
@@ -1162,18 +1189,18 @@ export default function ClassroomScreen() {
             ? parseCustomTopicLabels(customTopicLabel)
             : undefined,
         durationMinutes:
-          activityType === "test"
+          isTimedActivity(activityType)
             ? Math.max(1, computedTestDurationMinutes)
             : Math.max(5, Math.ceil(((parsedDeadline ?? Date.now()) - Date.now()) / 60000)),
         availabilityHours: 24,
         startAt: parsedStartAt ?? undefined,
         endAt:
-          activityType === "test"
+          isTimedActivity(activityType)
             ? parsedEndAt ?? undefined
             : parsedDeadline ?? undefined,
         resultVisibility,
         questionOrderMode,
-        assessmentMode: activityType === "test" ? assessmentMode : "standard",
+        assessmentMode: isTimedActivity(activityType) ? assessmentMode : "standard",
         assessmentFormat,
         attemptsAllowed: Math.max(1, Number(attemptsAllowed) || 1),
         navigationMode,
@@ -1197,10 +1224,10 @@ export default function ClassroomScreen() {
       resetActivityBuilder();
       await refreshClassroomData();
       Alert.alert(
-        editingActivityId ? t(language, "activityUpdatedTitle") : activityType === "test" ? t(language, "testPublishedTitle") : t(language, "assignmentPublishedTitle"),
+        editingActivityId ? t(language, "activityUpdatedTitle") : activityType === "exam" ? "Exam published" : activityType === "test" ? t(language, "testPublishedTitle") : t(language, "assignmentPublishedTitle"),
         editingActivityId
           ? t(language, "activityChangesSaved")
-          : activityType === "test"
+          : isTimedActivity(activityType)
             ? t(language, "testReadyForClass")
             : t(language, "assignmentReadyForClass")
       );
@@ -1338,7 +1365,7 @@ export default function ClassroomScreen() {
         setCustomTopicLabel("");
       }
 
-      if (activity.type === "test") {
+      if (isTimedActivity(activity.type)) {
         const start = new Date(activity.startAt);
         setStartDate(formatLocalDateValue(start));
         setStartTime(`${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`);
@@ -1454,13 +1481,7 @@ export default function ClassroomScreen() {
         {profile.role === "teacher" ? (
           <View style={styles.createClassPrerequisite}>
             <View style={styles.createClassRow}>
-              <TextInput
-                value={newClassName}
-                onChangeText={setNewClassName}
-                placeholder={t(language, "className")}
-                placeholderTextColor="#8092A7"
-                style={[styles.input, styles.createClassInput]}
-              />
+              <TextInput value={newClassName} onChangeText={setNewClassName} placeholder={t(language, "className")} placeholderTextColor="#8092A7" style={[styles.input, styles.createClassInput]} />
               <PrimaryButton label={t(language, "createClassAction")} onPress={createClass} loading={saving} style={styles.createClassButton} />
             </View>
             {profile.schoolId && <View>
@@ -1609,15 +1630,16 @@ export default function ClassroomScreen() {
                   {activityExpanded ? (
                     <>
                   <Text style={styles.helperText}>
-                    Selected class: {selectedClass.className}. Create as many tests and assignments as you want inside this class.
+                    Selected class: {selectedClass.className}. Create tests, assignments and exams inside this class.
                   </Text>
                   <Text style={styles.sectionLabel}>{t(language, "activityType")}</Text>
                   <View style={styles.inlineActions}>
                     <PrimaryButton label={t(language, "assignmentType")} onPress={() => setActivityType("assignment")} variant={activityType === "assignment" ? "primary" : "secondary"} style={styles.inlineButton} />
                     <PrimaryButton label={t(language, "testType")} onPress={() => setActivityType("test")} variant={activityType === "test" ? "primary" : "secondary"} style={styles.inlineButton} />
+                    <PrimaryButton label="Exam" onPress={() => setActivityType("exam")} variant={activityType === "exam" ? "primary" : "secondary"} style={styles.inlineButton} />
                   </View>
 
-                  <TextInput value={assignmentTitle} onChangeText={setAssignmentTitle} placeholder={activityType === "test" ? t(language, "testTitle") : t(language, "assignmentTitle")} placeholderTextColor="#8092A7" style={styles.input} />
+                  <TextInput value={assignmentTitle} onChangeText={setAssignmentTitle} placeholder={activityType === "exam" ? "Exam title" : activityType === "test" ? t(language, "testTitle") : t(language, "assignmentTitle")} placeholderTextColor="#8092A7" style={styles.input} />
 
                   <Text style={styles.sectionLabel}>{t(language, "formLabel")}</Text>
                   <View style={styles.inlineActions}>
@@ -1661,14 +1683,8 @@ export default function ClassroomScreen() {
                     </ScrollView>
                   )}
 
-                  <Text style={styles.sectionLabel}>{t(language, "grade")}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                    {appVariant.allowedGrades.map((entry) => (
-                      <Pressable key={entry} onPress={() => setGrade(entry)} style={[styles.choiceChip, entry === grade ? styles.choiceChipActive : null]}>
-                        <Text style={[styles.choiceChipText, entry === grade ? styles.choiceChipTextActive : null]}>{entry}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  <Text style={styles.sectionLabel}>{profile.schoolId ? profile.schoolClassNaming?.label ?? t(language, "grade") : t(language, "grade")}</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Select activity grade" style={styles.dropdownTrigger} onPress={() => setActivityGradePickerOpen(true)}><Text style={styles.dropdownValue}>{grade}</Text><MaterialIcons name="keyboard-arrow-down" size={24} color={palette.navy}/></Pressable>
 
                   <Text style={styles.sectionLabel}>Question focus</Text>
                   <View style={styles.inlineActions}>
@@ -1774,7 +1790,7 @@ export default function ClassroomScreen() {
 
                   {activityDetailsExpanded ? (
                     <>
-                      {activityType === "test" ? (
+                      {isTimedActivity(activityType) ? (
                         <>
                           <View style={styles.dualInputRow}>
                             <View style={styles.dualInputItem}>
@@ -1888,7 +1904,7 @@ export default function ClassroomScreen() {
 
                       <Text style={styles.sectionLabel}>Import a question paper</Text>
                       <PrimaryButton label="Upload Word or TXT" variant="secondary" onPress={importQuestionDocument} loading={importingQuestionDocument}/>
-                      <Text style={styles.helperText}>Structured .docx and .txt papers are imported into the review queue. Embedded PNG, JPEG and WebP diagrams are retained from Word files. Use numbered questions, lettered options and an Answer: line; written items also need Type: Written and Marking guide:.</Text>
+                      <Text style={styles.helperText}>Embedded PNG, JPEG and WebP diagrams are retained from Word files. Use numbered questions, lettered options and an Answer.</Text>
 
                       <Text style={styles.sectionLabel}>{t(language, "questionOrderLabel")}</Text>
                       <View style={styles.inlineActions}>
@@ -1896,7 +1912,7 @@ export default function ClassroomScreen() {
                         <PrimaryButton label={t(language, "shufflePerStudent")} onPress={() => setQuestionOrderMode("shuffled")} variant={questionOrderMode === "shuffled" ? "primary" : "secondary"} style={styles.inlineButton} />
                       </View>
 
-                      {activityType === "test" ? <>
+                      {isTimedActivity(activityType) ? <>
                         <Text style={styles.sectionLabel}>Assessment delivery</Text>
                         <View style={styles.inlineActions}><PrimaryButton label="Standard test" onPress={() => setAssessmentMode("standard")} variant={assessmentMode === "standard" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="CBT mode" onPress={() => setAssessmentMode("cbt")} variant={assessmentMode === "cbt" ? "primary" : "secondary"} style={styles.inlineButton}/></View>
                         <Text style={styles.sectionLabel}>Leaving the activity</Text>
@@ -1978,7 +1994,7 @@ export default function ClassroomScreen() {
                       ) : (
                         <View style={styles.inlineActions}>
                           <PrimaryButton label={t(language, "reviewLabel")} variant="secondary" onPress={() => { setIsReviewingQuestions(true); setReviewPage(0); }} style={styles.inlineButton} />
-                          <PrimaryButton label={editingActivityId ? t(language, "saveChanges") : activityType === "test" ? t(language, "publishTest") : t(language, "publishAssignment")} onPress={publishAssignment} loading={publishingAssignment} style={styles.inlineButton} />
+                          <PrimaryButton label={editingActivityId ? t(language, "saveChanges") : activityType === "exam" ? "Publish Exam" : activityType === "test" ? t(language, "publishTest") : t(language, "publishAssignment")} onPress={publishAssignment} loading={publishingAssignment} style={styles.inlineButton} />
                         </View>
                       )}
 
@@ -2063,7 +2079,7 @@ export default function ClassroomScreen() {
               <View key={activity.activityId} style={styles.classCard}>
                 <Text style={styles.classTitle}>{activity.title}</Text>
                 <Text style={styles.classMeta}>
-                  {activity.type === "test" ? t(language, "testType") : t(language, "assignmentType")} | {getSubjectDisplayName(activity.subjectId, activity.subjectName, language)} | {activity.grade} | {t(language, "levelLabel")} {activity.level}
+                  {activityTypeLabel(activity.type, language)} | {getSubjectDisplayName(activity.subjectId, activity.subjectName, language)} | {activity.grade} | {t(language, "levelLabel")} {activity.level}
                 </Text>
                 <Text style={styles.classMeta}>
                   {activity.status === "closed"
@@ -2120,9 +2136,7 @@ export default function ClassroomScreen() {
                           ? t(language, "viewResult")
                           : activity.status === "scheduled"
                             ? t(language, "waitForStart")
-                            : activity.type === "test"
-                              ? t(language, "start", { mode: t(language, "testType").toLowerCase() })
-                              : t(language, "start", { mode: t(language, "assignmentType").toLowerCase() })
+                            : t(language, "start", { mode: activityTypeLabel(activity.type, language).toLowerCase() })
                     }
                     onPress={() =>
                       activity.submitted || activity.status === "closed"
@@ -2315,6 +2329,7 @@ export default function ClassroomScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      <Modal visible={activityGradePickerOpen} transparent animationType="fade" onRequestClose={() => setActivityGradePickerOpen(false)}><Pressable style={styles.modalBackdrop} onPress={() => setActivityGradePickerOpen(false)}><Pressable style={styles.modalCard} onPress={() => undefined}><Text style={styles.modalTitle}>Select {profile.schoolId ? profile.schoolClassNaming?.label ?? t(language, "grade") : t(language, "grade")}</Text><ScrollView style={styles.modalList} nestedScrollEnabled>{activityGradeOptions.map((value) => <Pressable key={value} style={[styles.modalListItem, grade === value && styles.modalListItemActive]} onPress={() => { setGrade(value); setActivityGradePickerOpen(false); }}><Text style={[styles.modalListItemText, grade === value && styles.modalListItemTextActive]}>{value}</Text></Pressable>)}</ScrollView><PrimaryButton label={t(language, "cancel")} variant="ghost" onPress={() => setActivityGradePickerOpen(false)}/></Pressable></Pressable></Modal>
     </AppBackground>
   );
 }

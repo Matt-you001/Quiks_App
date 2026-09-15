@@ -56,10 +56,9 @@ export function schoolClassroomOperation(store, action, scope, payload) {
   }
   if (action === "details") {
     const activities = Object.values(store.activities).filter(a => a.classId === c.id);
-    const ids = new Set(activities.map(a => a.id));
     return { classroom: summary(store, c), members: Object.values(store.memberships).filter(m => m.classId === c.id),
       activities: activities.map(({ accessCode, ...a }) => a),
-      submissions: Object.values(store.submissions).filter(s => ids.has(s.activityId)),
+      results: Object.values(store.schoolResults ?? {}).filter(r => r.classId === c.id && Number.isFinite(Number(r.teacherSubmittedAt))),
       notes: Object.values(store.lessonNotes).filter(n => n.classId === c.id).map(({ attachmentDataBase64, ...n }) => n),
       messages: Object.values(store.chatMessages).filter(m => m.classId === c.id), audit: c.schoolAudit ?? [] };
   }

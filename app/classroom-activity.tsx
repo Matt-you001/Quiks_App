@@ -9,7 +9,7 @@ import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getSubjectDisplayName } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
-import { getClassroomActivityDetails, gradeClassroomActivitySubmission } from "../services/ai";
+import { getClassroomActivityDetails, gradeClassroomActivitySubmission, publishClassroomActivityResultsToSchool } from "../services/ai";
 import type {
   ClassroomActivityDetailsResponse,
   ClassroomSubmissionDetail,
@@ -43,6 +43,10 @@ function getAverageScore(submissions: ClassroomSubmissionSummary[]) {
   );
 }
 
+function activityTypeLabel(type: string) {
+  return type === "exam" ? "Exam" : type === "test" ? "Test" : "Assignment";
+}
+
 export default function ClassroomActivityScreen() {
   const params = useLocalSearchParams<{ activityId?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -53,6 +57,7 @@ export default function ClassroomActivityScreen() {
   const [writtenMarks, setWrittenMarks] = useState<Record<string, { awardedPoints: string; feedback: string }>>({});
   const [teacherFeedback, setTeacherFeedback] = useState("");
   const [savingMarks, setSavingMarks] = useState(false);
+  const [publishingSchoolResults, setPublishingSchoolResults] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -154,11 +159,28 @@ export default function ClassroomActivityScreen() {
       });
       setMarkingSubmissionId(null);
       await loadData();
-      Alert.alert("Marking saved", "The final combined result is now available to the student and school.");
+      Alert.alert("Marking saved", "The final combined result is now available in the classroom. Submit the activity results when they are ready for the school portal.");
     } catch (error) {
       Alert.alert("Could not save marks", error instanceof Error ? error.message : "Please try again.");
     } finally {
       setSavingMarks(false);
+    }
+  };
+
+  const publishSchoolResults = async () => {
+    if (!profile || !details) return;
+    setPublishingSchoolResults(true);
+    try {
+      const result = await publishClassroomActivityResultsToSchool({
+        teacherProfile: profile,
+        activityId: details.activity.activityId,
+      });
+      await loadData();
+      Alert.alert("Results submitted", `${result.publishedCount} finalized result${result.publishedCount === 1 ? "" : "s"} ${details.activity.schoolResultsPublishedAt ? "were updated in" : "were submitted to"} the school portal.`);
+    } catch (error) {
+      Alert.alert("Results not submitted", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setPublishingSchoolResults(false);
     }
   };
 
@@ -204,7 +226,7 @@ export default function ClassroomActivityScreen() {
       <View style={styles.heroCard}>
         <Text style={styles.heroTitle}>{details.activity.title}</Text>
         <Text style={styles.heroMeta}>
-          {details.activity.type === "test" ? "Test" : "Assignment"} | {details.className}
+          {activityTypeLabel(details.activity.type)} | {details.className}
         </Text>
         <Text style={styles.heroMeta}>
           {getSubjectDisplayName(details.activity.subjectId, details.activity.subjectName, profile.language)} | {details.activity.grade} | Level {details.activity.level}
@@ -256,6 +278,26 @@ export default function ClassroomActivityScreen() {
               <View style={styles.pendingCard}>
                 <Text style={styles.pendingTitle}>Written marking required</Text>
                 <Text style={styles.bodyText}>{submittedLearners.filter((entry) => entry.gradingStatus === "awaiting_marking").length} submission(s) are awaiting final marking. Pending provisional scores are excluded from the average and highest score.</Text>
+              </View>
+            ) : null}
+            {details.activity.schoolLinked ? (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>School portal submission</Text>
+                <Text style={styles.bodyText}>These classroom results are not sent to School Administration automatically. Review the results and complete all written marking before submitting them.</Text>
+                {details.activity.schoolResultsPublishedAt ? <Text style={styles.bodyText}>Last submitted: {formatDateTime(details.activity.schoolResultsPublishedAt)} · {details.activity.schoolResultsPublishedCount ?? 0} result(s)</Text> : <Text style={styles.bodyText}>Status: Not submitted to the school portal</Text>}
+                <PrimaryButton
+                  label={details.activity.schoolResultsPublishedAt ? "Update results in school portal" : "Submit results to school portal"}
+                  onPress={() => {
+                    const message = `Submit ${submittedLearners.length} finalized classroom result${submittedLearners.length === 1 ? "" : "s"} to School Administration?`;
+                    if (globalThis.confirm && typeof document !== "undefined") {
+                      if (globalThis.confirm(message)) void publishSchoolResults();
+                    } else {
+                      Alert.alert("Submit results to school?", message, [{ text: "Cancel", style: "cancel" }, { text: "Submit", onPress: () => void publishSchoolResults() }]);
+                    }
+                  }}
+                  loading={publishingSchoolResults}
+                  disabled={!submittedLearners.length || submittedLearners.some((entry) => entry.gradingStatus === "awaiting_marking")}
+                />
               </View>
             ) : null}
           </>

@@ -19,6 +19,7 @@ const temporaryBackupStorePath = `${backupStorePath}.tmp`;
 const defaultStore = {
   schools: {},
   individualLicences: {},
+  accountRegistrations: {},
   memberships: {},
   invitations: {},
   auditEvents: {},
@@ -50,6 +51,27 @@ const defaultFeatures = {
   reports: true,
   integrations: false,
 };
+
+const CLASS_NAMING_PRESETS = Object.freeze({
+  grade: { label: "Grade", names: Array.from({ length: 12 }, (_, index) => `Grade ${index + 1}`) },
+  primary_secondary: {
+    label: "Primary / Secondary",
+    names: ["Nursery 1", "Nursery 2", ...Array.from({ length: 6 }, (_, index) => `Primary ${index + 1}`), ...Array.from({ length: 3 }, (_, index) => `JSS ${index + 1}`), ...Array.from({ length: 3 }, (_, index) => `SS ${index + 1}`)],
+  },
+  year: { label: "Year", names: Array.from({ length: 13 }, (_, index) => `Year ${index + 1}`) },
+  class: { label: "Class", names: Array.from({ length: 12 }, (_, index) => `Class ${index + 1}`) },
+});
+
+function normalizeClassNaming(value) {
+  const mode = String(value?.mode ?? "unconfigured");
+  if (CLASS_NAMING_PRESETS[mode]) return { mode, ...CLASS_NAMING_PRESETS[mode] };
+  if (mode === "custom") {
+    const names = [...new Set((Array.isArray(value?.names) ? value.names : []).map((name) => String(name).trim()).filter(Boolean))].slice(0, 100);
+    if (!names.length) throw Object.assign(new Error("Add at least one custom class name."), { statusCode: 400 });
+    return { mode: "custom", label: String(value?.label ?? "Class").trim().slice(0, 40) || "Class", names };
+  }
+  return { mode: "unconfigured", label: "Class", names: [] };
+}
 
 const SCHOOL_PRICE_CATALOGUE = Object.freeze({
   pri_01m22sf7c2yapaxmrsqvcc4q26: { packageId: "per-learner", packageName: "Per Learner Access", period: "term" },
@@ -118,6 +140,7 @@ function normalizeStore(value) {
   return {
     schools: value.schools && typeof value.schools === "object" ? value.schools : {},
     individualLicences: value.individualLicences && typeof value.individualLicences === "object" ? value.individualLicences : {},
+    accountRegistrations: value.accountRegistrations && typeof value.accountRegistrations === "object" ? value.accountRegistrations : {},
     memberships: value.memberships && typeof value.memberships === "object" ? value.memberships : {},
     invitations: value.invitations && typeof value.invitations === "object" ? value.invitations : {},
     auditEvents: value.auditEvents && typeof value.auditEvents === "object" ? value.auditEvents : {},
@@ -204,6 +227,19 @@ function isOwner(principal) {
     ownerUids.has(principal.uid.toLowerCase()) ||
     (principal.emailVerified && principal.email && ownerEmails.has(principal.email.toLowerCase()))
   );
+}
+
+export function getAppOwnerEntitlement(principal) {
+  if (!isOwner(principal)) return null;
+  return {
+    active: true,
+    expiresAt: null,
+    managementUrl: null,
+    source: "app_owner",
+    // The automatically-created App Owner profile is excluded from this
+    // allowance. Two learner profiles remain available for product testing.
+    profileLimit: 2,
+  };
 }
 
 function requireOwner(principal) {
@@ -318,10 +354,17 @@ function buildSchoolSummary(store, school) {
           membership.role === "school_admin" && membership.email === administratorSetup.email
       )
     : false;
+  const curricula = Array.from(new Set(
+    (Array.isArray(school.curricula) && school.curricula.length ? school.curricula : school.curriculum ? [school.curriculum] : [])
+      .map((curriculum) => String(curriculum ?? "").trim())
+      .filter(Boolean)
+  ));
   return {
     schoolId: school.id,
     schoolCode: school.schoolCode,
     name: school.name,
+    curriculum: curricula.join(" + "),
+    curricula,
     status: getEffectiveLicenceStatus(school.licence),
     licence: { ...school.licence, status: getEffectiveLicenceStatus(school.licence) },
     createdAt: school.createdAt,
@@ -330,6 +373,8 @@ function buildSchoolSummary(store, school) {
     adminCount,
     pendingCount: memberships.filter((membership) => membership.status === "pending").length,
     enrolmentMode: school.enrolmentMode ?? (school.enrolmentOpen ? "shared_code" : "individual_codes"),
+    classNaming: normalizeClassNaming(school.classNaming),
+    archivedAt: school.archivedAt ?? null,
     ...(administratorSetup
       ? {
           administratorSetup: {
@@ -356,10 +401,15 @@ function buildSchoolSummary(store, school) {
 }
 
 function buildMembership(store, membership) {
+  const school = store.schools[membership.schoolId];
   return {
     membershipId: membership.membershipId,
     schoolId: membership.schoolId,
-    schoolName: store.schools[membership.schoolId]?.name ?? "School",
+    schoolName: school?.name ?? "School",
+    schoolCurriculum: String(school?.curriculum ?? ""),
+    schoolLicenceStatus: school ? getEffectiveLicenceStatus(school.licence) : "expired",
+    schoolLicenceExpiresAt: school?.licence?.endAt ?? null,
+    schoolClassNaming: normalizeClassNaming(school?.classNaming),
     role: membership.role,
     status: membership.status,
     email: membership.email,
@@ -390,8 +440,23 @@ function getAdminMembership(store, schoolId, principal) {
 function requireSchoolAdmin(store, schoolId, principal) {
   if (isOwner(principal)) return;
   if (!getAdminMembership(store, schoolId, principal)) {
-    throw new Error("Only an active school administrator can perform this action.");
+    throw Object.assign(new Error("Only an active school administrator can perform this action."), { statusCode: 403 });
   }
+}
+
+function requireActiveSchoolLicence(store, schoolId) {
+  const school = store.schools[schoolId];
+  if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+  const status = getEffectiveLicenceStatus(school.licence);
+  if (status !== "active") {
+    const message = status === "expired"
+      ? `This school's Quiks licence expired on ${new Date(school.licence.endAt).toLocaleDateString("en-GB", { timeZone: "UTC" })}. Renew the licence to restore school administration access.`
+      : status === "draft"
+        ? "This school's Quiks licence has not started yet."
+        : "This school's Quiks licence is suspended.";
+    throw Object.assign(new Error(message), { statusCode: 403, code: `school_licence_${status}` });
+  }
+  return school;
 }
 
 function recordAudit(store, principal, action, schoolId, details = {}) {
@@ -548,7 +613,7 @@ export async function getSchoolPublicDetails(schoolCode) {
     status: getEffectiveLicenceStatus(school.licence),
     allowedVariants: school.licence.allowedVariants,
     profileFields: school.profileFields,
-    enrolmentOpen: school.enrolmentOpen,
+    enrolmentOpen: getEffectiveLicenceStatus(school.licence) === "active" && school.enrolmentOpen,
     enrolmentMode: school.enrolmentMode ?? (school.enrolmentOpen ? "shared_code" : "individual_codes"),
     ...(invitation ? { invitationCode: invitation.invitationCode, invitationRole: invitation.role } : {}),
   };
@@ -617,6 +682,7 @@ function createBillingSchool(store, pending, purchasedAt) {
     id: schoolId,
     schoolCode,
     name: pending.schoolName,
+    curriculum: "",
     enrolmentOpen: pending.enrolmentMode === "shared_code",
     enrolmentMode: pending.enrolmentMode,
     profileFields: cloneValue(defaultProfileFields),
@@ -829,6 +895,7 @@ export async function createSchool(principal, payload) {
       id: schoolId,
       schoolCode,
       name,
+      curriculum: "",
       enrolmentOpen: enrolmentMode === "shared_code",
       enrolmentMode,
       profileFields: cloneValue(defaultProfileFields),
@@ -920,13 +987,90 @@ export async function updateSchoolLicence(principal, schoolId, licencePatch) {
   });
 }
 
+export async function updateSchoolRecord(principal, schoolId, patch) {
+  requireOwner(principal);
+  return mutateStore(async (store) => {
+    const school = store.schools[schoolId];
+    if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+    const name = String(patch?.name ?? school.name).trim().slice(0, 120);
+    if (!name) throw Object.assign(new Error("Enter a school name."), { statusCode: 400 });
+    const nextLicence = {
+      ...school.licence,
+      startAt: patch?.licence?.startAt ?? school.licence.startAt,
+      endAt: patch?.licence?.endAt ?? school.licence.endAt,
+    };
+    nextLicence.startAt = Number(nextLicence.startAt);
+    nextLicence.endAt = Number(nextLicence.endAt);
+    if (!Number.isFinite(nextLicence.startAt) || !Number.isFinite(nextLicence.endAt) || nextLicence.endAt <= nextLicence.startAt) {
+      throw Object.assign(new Error("The school licence dates are invalid."), { statusCode: 400 });
+    }
+    school.name = name;
+    school.licence = nextLicence;
+    recordAudit(store, principal, "school.record.updated", schoolId, { name, startAt: nextLicence.startAt, endAt: nextLicence.endAt });
+    return buildSchoolSummary(store, school);
+  });
+}
+
+export async function archiveSchool(principal, schoolId, confirmationName) {
+  requireOwner(principal);
+  return mutateStore(async (store) => {
+    const school = store.schools[schoolId];
+    if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+    if (String(confirmationName ?? "").trim() !== school.name) {
+      throw Object.assign(new Error("Enter the school name exactly to confirm deletion."), { statusCode: 400 });
+    }
+    school.archivedAt = Date.now();
+    school.archivedPreviousLicenceStatus = school.licence.status;
+    school.licence.status = "suspended";
+    school.enrolmentOpen = false;
+    recordAudit(store, principal, "school.archived", schoolId, { name: school.name });
+    return { schoolId, archivedAt: school.archivedAt, recordsPreserved: true };
+  });
+}
+
+export async function restoreSchool(principal, schoolId) {
+  requireOwner(principal);
+  return mutateStore(async (store) => {
+    const school = store.schools[schoolId];
+    if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+    delete school.archivedAt;
+    school.licence.status = school.archivedPreviousLicenceStatus === "draft" ? "draft" : "active";
+    delete school.archivedPreviousLicenceStatus;
+    school.enrolmentOpen = school.enrolmentMode === "shared_code";
+    recordAudit(store, principal, "school.restored", schoolId, { name: school.name });
+    return buildSchoolSummary(store, school);
+  });
+}
+
+function listIndependentAccountRegistrations(store) {
+  const ownerIssuedEmails = new Set(Object.values(store.individualLicences).map((licence) => String(licence.email ?? "").trim().toLowerCase()));
+  const independent = new Map();
+  for (const registration of Object.values(store.accountRegistrations)) {
+    const email = String(registration.email ?? "").trim().toLowerCase();
+    if (!email || ownerIssuedEmails.has(email) || isOwner(registration)) continue;
+    if (Object.values(store.memberships).some((membership) => membershipMatchesPrincipal(membership, registration))) continue;
+    const current = independent.get(email);
+    const variants = new Set([...(current?.appVariants ?? []), ...(registration.appVariants ?? [])]);
+    independent.set(email, {
+      email,
+      appVariants: [...variants].filter((variant) => ["children", "teens", "uni"].includes(variant)).sort(),
+      registeredAt: Math.min(current?.registeredAt ?? Infinity, Number(registration.registeredAt) || Date.now()),
+      lastSeenAt: Math.max(current?.lastSeenAt ?? 0, Number(registration.lastSeenAt) || 0),
+    });
+  }
+  return [...independent.values()].sort((left, right) => left.email.localeCompare(right.email));
+}
+
 export async function getOwnerDashboard(principal) {
   requireOwner(principal);
   const store = await ensureStore();
-  const schools = Object.values(store.schools).map((school) => buildSchoolSummary(store, school));
+  const allSchools = Object.values(store.schools).map((school) => buildSchoolSummary(store, school));
+  const schools = allSchools.filter((school) => !school.archivedAt);
+  const archivedSchools = allSchools.filter((school) => Boolean(school.archivedAt));
   const now = Date.now();
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   const individualLicences = Object.values(store.individualLicences).map(buildIndividualLicence);
+  const individualSignups = listIndependentAccountRegistrations(store);
   const billingPurchases = Object.values(store.schoolBillingPurchases).sort((left, right) => right.purchasedAt - left.purchasedAt);
   return {
     totals: {
@@ -943,7 +1087,9 @@ export async function getOwnerDashboard(principal) {
       schoolBillingPurchases: billingPurchases.length,
     },
     schools: schools.sort((left, right) => left.name.localeCompare(right.name)),
+    archivedSchools: archivedSchools.sort((left, right) => left.name.localeCompare(right.name)),
     individualLicences: individualLicences.sort((left, right) => left.email.localeCompare(right.email)),
+    individualSignups,
     billingPurchases: billingPurchases.map((purchase) => ({ ...purchase })),
   };
 }
@@ -956,8 +1102,28 @@ export async function listPrincipalMemberships(principal) {
     .sort((left, right) => left.schoolName.localeCompare(right.schoolName));
 }
 
-export async function getPrincipalSchoolIdentity(principal) {
-  const store = await ensureStore();
+export async function getPrincipalSchoolIdentity(principal, appVariant) {
+  const store = await mutateStore(async (current) => {
+    const key = String(principal.principalId ?? "").trim();
+    const email = String(principal.email ?? "").trim().toLowerCase();
+    if (key && email) {
+      const existing = current.accountRegistrations[key];
+      const variants = new Set(existing?.appVariants ?? []);
+      if (["children", "teens", "uni"].includes(appVariant)) variants.add(appVariant);
+      current.accountRegistrations[key] = {
+        principalId: key,
+        uid: String(principal.uid ?? ""),
+        projectId: String(principal.projectId ?? ""),
+        email,
+        emailVerified: principal.emailVerified === true,
+        name: String(principal.name ?? "").trim(),
+        appVariants: [...variants],
+        registeredAt: existing?.registeredAt ?? Date.now(),
+        lastSeenAt: Date.now(),
+      };
+    }
+    return current;
+  });
   const administratorMemberships = Object.values(store.memberships)
     .filter(
       (membership) =>
@@ -985,6 +1151,9 @@ export async function getSchoolDetails(principal, schoolId) {
   requireSchoolAdmin(store, schoolId, principal);
   const school = store.schools[schoolId];
   if (!school) throw new Error("School not found.");
+  // The Quiks App Owner keeps read-only visibility for renewal/support. School
+  // administrators must have a currently active licence to enter the portal.
+  if (!isOwner(principal)) requireActiveSchoolLicence(store, schoolId);
   return {
     viewer: {
       displayName: principal.name || principal.email || "Quiks user",
@@ -1027,19 +1196,44 @@ export async function getSchoolClassroomContext(principal, schoolId) {
 export async function updateSchoolProfileFields(principal, schoolId, fields) {
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
-    const school = store.schools[schoolId];
-    if (!school) throw new Error("School not found.");
+    const school = requireActiveSchoolLicence(store, schoolId);
     school.profileFields = validateProfileFields(fields);
     recordAudit(store, principal, "school.profile_fields.updated", schoolId, { fieldCount: fields.length });
     return school.profileFields;
   });
 }
 
+export async function updateSchoolClassNaming(principal, schoolId, classNaming) {
+  return mutateStore(async (store) => {
+    requireSchoolAdmin(store, schoolId, principal);
+    const school = requireActiveSchoolLicence(store, schoolId);
+    school.classNaming = normalizeClassNaming(classNaming);
+    recordAudit(store, principal, "school.class_naming.updated", schoolId, school.classNaming);
+    return buildSchoolSummary(store, school);
+  });
+}
+
+export async function updateSchoolCurriculum(principal, schoolId, curriculum) {
+  return mutateStore(async (store) => {
+    requireSchoolAdmin(store, schoolId, principal);
+    const school = requireActiveSchoolLicence(store, schoolId);
+    const nextCurricula = Array.from(new Set(
+      (Array.isArray(curriculum) ? curriculum : [curriculum])
+        .map((item) => String(item ?? "").trim().slice(0, 120))
+        .filter(Boolean)
+    )).slice(0, 8);
+    if (!nextCurricula.length) throw Object.assign(new Error("Choose or enter at least one school curriculum."), { statusCode: 400 });
+    school.curricula = nextCurricula;
+    school.curriculum = nextCurricula.join(" + ");
+    recordAudit(store, principal, "school.curriculum.updated", schoolId, { curricula: nextCurricula });
+    return buildSchoolSummary(store, school);
+  });
+}
+
 export async function inviteSchoolMember(principal, schoolId, email, role) {
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
-    const school = store.schools[schoolId];
-    if (!school) throw new Error("School not found.");
+    const school = requireActiveSchoolLicence(store, schoolId);
     const normalizedEmail = String(email ?? "").trim().toLowerCase();
     if (!normalizedEmail.includes("@") || !["school_admin", "teacher", "student"].includes(role)) {
       throw new Error("A valid email and school role are required.");
@@ -1066,6 +1260,7 @@ export async function enrolInSchool(principal, payload) {
     const code = String(payload.schoolCode ?? "").trim().toUpperCase();
     const school = Object.values(store.schools).find((entry) => entry.schoolCode === code);
     if (!school) throw new Error("School code not found.");
+    requireActiveSchoolLicence(store, school.id);
     const invitationCode = String(payload.invitationCode ?? "").trim().toUpperCase();
     const invitation = invitationCode ? store.invitations[invitationCode] : null;
     const role = invitation?.role ?? (payload.role === "teacher" ? "teacher" : "student");
@@ -1124,7 +1319,7 @@ export async function enrolInSchool(principal, payload) {
 export async function updateMembershipStatus(principal, schoolId, membershipId, status) {
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
-    const school = store.schools[schoolId];
+    const school = requireActiveSchoolLicence(store, schoolId);
     const membership = store.memberships[membershipId];
     if (!school || !membership || membership.schoolId !== schoolId) throw new Error("School membership not found.");
     if (!['invited', 'pending', 'active', 'suspended'].includes(status)) throw new Error("Invalid membership status.");

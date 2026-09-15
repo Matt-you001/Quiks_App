@@ -335,7 +335,7 @@ const variantConfig: Record<AppVariant, { name: string; slug: string; scheme: st
     androidPackage: "com.quiks.teens",
   },
   uni: {
-    name: "Quiks Uni",
+    name: "Quiks Advance",
     slug: "quiks-uni",
     scheme: "quiks-uni",
     androidPackage: "com.quiks.uni",

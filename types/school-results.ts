@@ -6,6 +6,7 @@ export interface SchoolResultRow {
   resultId: string; schoolId: string; studentMembershipId: string; studentName: string;
   classId: string; className: string; activityId: string; title: string; subject: string;
   type: string; appVariant: string; assessmentMode: string; score: number; submittedAt: number;
+  teacherSubmittedAt: number; teacherSubmittedBy?: string;
   attemptNumber: number; scoreSource: string; adjustedScore?: number; adjustmentReason?: string;
   gradingStatus?: "awaiting_marking" | "finalized"; provisionalScore?: number;
   pointsAwarded?: number; totalPoints?: number; autoSubmitted?: boolean;

@@ -17,7 +17,7 @@ const variantMobileLinks = {
     scheme: "quiks-uni",
     packageName: "com.quiks.uni",
     playStoreUrl: "https://play.google.com/store/apps/details?id=com.quiks.uni",
-    launcherUrl: "https://uni.quiks.site/classroom-invite.html",
+    launcherUrl: "https://advance.quiks.site/classroom-invite.html",
   },
 } as const;
 

@@ -92,7 +92,7 @@ function resolveFirebaseValue(
 
   // A single exported web bundle is shared by all hosted variants. Its generic
   // Expo extras belong to whichever variant Metro compiled last, so accepting
-  // those values on another hostname can connect Children or Teens to Uni's
+  // those values on another hostname can connect Children or Teens to Advance's
   // Firebase project. The checked-in fallback is variant-specific and is the
   // safe source for hostname-selected web builds.
   if (Platform.OS === "web") {

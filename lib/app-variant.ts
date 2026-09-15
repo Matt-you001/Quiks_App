@@ -175,12 +175,12 @@ export const variantConfigs: Record<AppVariant, VariantConfig> = {
   },
   uni: {
     id: "uni",
-    appName: "Quiks Uni",
+    appName: "Quiks Advance",
     slug: "quiks-uni",
     scheme: "quiks-uni",
     androidPackage: "com.quiks.uni",
     audienceLabel: "Tertiary and University",
-    heroTitle: "Quiks Uni",
+    heroTitle: "Quiks Advance",
     heroSubtitle: "Advanced study support for tertiary students with focused practice, AI-backed question generation, and stronger academic workflows.",
     profileNoun: "student",
     profileEditorSubtitle: "Create a university learner profile for deeper independent study, course-focused practice, and stronger academic planning.",
@@ -231,6 +231,9 @@ function readVariantFromWebLocation(): AppVariant | undefined {
 
   const hostname = location.hostname.toLowerCase();
   const hostFirstSegment = hostname.split(".")[0];
+  if (hostFirstSegment === "advance") {
+    return "uni";
+  }
   if (hostFirstSegment === "children" || hostFirstSegment === "teens" || hostFirstSegment === "uni") {
     return hostFirstSegment;
   }

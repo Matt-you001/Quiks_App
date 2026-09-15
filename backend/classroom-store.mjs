@@ -541,6 +541,9 @@ function buildAbsentSummaryForProfile(store, activity, profileId) {
 
 function buildActivitySummary(store, activity, profileId) {
   const submissions = getActivitySubmissions(store, activity.id);
+  const schoolResultsPublishedCount = Object.values(store.schoolResults ?? {}).filter(
+    (result) => result.activityId === activity.id
+  ).length;
   const ownSubmissions = submissions.filter((submission) => submission.profileId === profileId);
   const ownSubmission = [...ownSubmissions].sort((left, right) => right.submittedAt - left.submittedAt)[0];
   const attemptsAllowed = Math.max(1, Number(activity.attemptsAllowed ?? 1));
@@ -597,6 +600,9 @@ function buildActivitySummary(store, activity, profileId) {
     teacherProfileId: activity.teacherProfileId,
     teacherName: activity.teacherName,
     submissionCount: submissions.length,
+    schoolLinked: Boolean(store.classrooms[activity.classId]?.schoolId),
+    schoolResultsPublishedAt: activity.schoolResultsPublishedAt,
+    schoolResultsPublishedCount,
     createdAt: activity.createdAt,
     submitted: ownSubmissions.length >= attemptsAllowed,
     score: ownSubmission?.score,
@@ -615,6 +621,8 @@ export async function createClassroom(teacherProfile, className, appVariant) {
     if (normalizeRole(teacherProfile.role) !== "teacher") {
       throw new Error("Only teachers can create classes.");
     }
+    const cleanClassName = String(className ?? "").trim();
+    if (!cleanClassName || cleanClassName.length > 100) throw new Error("Enter a class name of 1–100 characters.");
 
     store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
 
@@ -625,7 +633,7 @@ export async function createClassroom(teacherProfile, className, appVariant) {
     store.classrooms[classroomId] = {
       id: classroomId,
       classCode,
-      className: className.trim(),
+      className: cleanClassName,
       teacherProfileId: teacherProfile.id,
       teacherName: teacherProfile.name,
       schoolId: teacherProfile.schoolId ?? null,
@@ -925,7 +933,7 @@ export async function createClassroomActivity(payload, appVariant) {
     const questionCount = normalizedQuestions.length;
     const durationMinutes = Math.max(5, Number(payload.durationMinutes ?? 30));
     const now = Date.now();
-    const isTest = payload.type === "test";
+    const isTest = payload.type === "test" || payload.type === "exam";
     const explicitStartAt = Number(payload.startAt ?? 0);
     const explicitEndAt = Number(payload.endAt ?? 0);
     const startAt = Number.isFinite(explicitStartAt) && explicitStartAt > now
@@ -954,7 +962,7 @@ export async function createClassroomActivity(payload, appVariant) {
     store.activities[activityId] = {
       id: activityId,
       classId: payload.classId,
-      type: isTest ? "test" : "assignment",
+      type: payload.type === "exam" ? "exam" : isTest ? "test" : "assignment",
       title: payload.title.trim(),
       subjectId: payload.subject.id,
       subjectName: payload.subject.name,
@@ -1169,9 +1177,9 @@ export async function duplicateActivity(teacherProfile, activityId, appVariant) 
 
     const nextActivityId = randomUUID();
     const now = Date.now();
-    const startAt = sourceActivity.type === "test" ? now + 5 * 60 * 1000 : now;
+    const startAt = sourceActivity.type === "test" || sourceActivity.type === "exam" ? now + 5 * 60 * 1000 : now;
     const endAt =
-      sourceActivity.type === "test"
+      sourceActivity.type === "test" || sourceActivity.type === "exam"
         ? startAt + sourceActivity.durationMinutes * 60 * 1000
         : startAt + 24 * 60 * 60 * 1000;
 
@@ -1199,7 +1207,7 @@ export async function updateClassroomActivity(payload, appVariant) {
       throw new Error("Activity not found.");
     }
 
-    if (activity.type === "test" && activity.startAt - Date.now() <= 5 * 60 * 1000) {
+    if ((activity.type === "test" || activity.type === "exam") && activity.startAt - Date.now() <= 5 * 60 * 1000) {
       throw new Error("Tests can no longer be edited within 5 minutes of the start time.");
     }
 
@@ -1211,7 +1219,7 @@ export async function updateClassroomActivity(payload, appVariant) {
     const startAt = Number.isFinite(explicitStartAt) && explicitStartAt > 0 ? explicitStartAt : activity.startAt;
     const endAt = Number.isFinite(explicitEndAt) && explicitEndAt > startAt ? explicitEndAt : activity.endAt;
 
-    activity.type = payload.type === "test" ? "test" : "assignment";
+    activity.type = payload.type === "exam" ? "exam" : payload.type === "test" ? "test" : "assignment";
     activity.title = payload.title.trim();
     activity.subjectId = payload.subject.id;
     activity.subjectName = payload.subject.name;
@@ -1246,7 +1254,7 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.endAt = endAt;
     activity.resultVisibility = payload.resultVisibility ?? "private";
     activity.questionOrderMode = payload.questionOrderMode ?? "same";
-    activity.assessmentMode = activity.type === "test" && payload.assessmentMode === "cbt" ? "cbt" : "standard";
+    activity.assessmentMode = activity.type !== "assignment" && payload.assessmentMode === "cbt" ? "cbt" : "standard";
     activity.assessmentFormat = getAssessmentFormat(normalizedQuestions);
     activity.attemptsAllowed = Math.max(1, Math.min(10, Math.floor(Number(payload.attemptsAllowed ?? 1))));
     activity.navigationMode = payload.navigationMode === "linear" ? "linear" : "free";
@@ -1255,7 +1263,7 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.autoSubmit = payload.autoSubmit !== false;
     activity.passMark = Math.max(0, Math.min(100, Number(payload.passMark ?? 50)));
     activity.instructions = String(payload.instructions ?? "").trim().slice(0, 2000) || undefined;
-    activity.accessCode = activity.type === "test" ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined;
+    activity.accessCode = activity.type !== "assignment" ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined;
     activity.questions = normalizedQuestions;
     activity.questionCount = questionCount;
 
@@ -1446,8 +1454,6 @@ export async function submitActivity(profile, activityId, submissionPayload, app
       securityEventCount: relatedSecurityEvents.length,
       scoreSource: activityQuestions.length ? "server_calculated" : "legacy_client_reported",
     };
-    captureSchoolResult(store, store.submissions[submissionId]);
-
     return {
       activity: buildActivitySummary(store, activity, profile.id),
       submission: buildSubmissionSummary(store.submissions[submissionId]),
@@ -1512,8 +1518,43 @@ export async function gradeActivitySubmission(teacherProfile, activityId, submis
     submission.teacherFeedback = String(payload.teacherFeedback ?? "").trim().slice(0, 4000) || undefined;
     submission.markedAt = Date.now();
     submission.markedBy = teacherProfile.id;
-    captureSchoolResult(store, submission);
+    // A changed mark must be deliberately re-submitted by the teacher before
+    // it replaces the snapshot already visible to School Administration.
+    delete submission.schoolPublishedAt;
+    delete submission.schoolPublishedBy;
     return { submission: buildSubmissionDetail(activity, submission, Object.values(store.activitySecurityEvents ?? {}).filter((event) => event.activityId === activityId && event.profileId === submission.profileId)) };
+  });
+}
+
+export async function publishActivityResultsToSchool(teacherProfile, activityId, appVariant) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const activity = store.activities[activityId];
+    if (!activity) throw Object.assign(new Error("Activity not found."), { statusCode: 404 });
+    const classroom = store.classrooms[activity.classId];
+    ensureTeacherOwnsClass(classroom, teacherProfile.id);
+    if (!classroom?.schoolId || !teacherProfile.schoolId || classroom.schoolId !== teacherProfile.schoolId) {
+      throw Object.assign(new Error("Link this classroom to your school before submitting its results."), { statusCode: 400 });
+    }
+    const submissions = getActivitySubmissions(store, activityId);
+    if (!submissions.length) throw Object.assign(new Error("No student results are available to submit."), { statusCode: 400 });
+    const awaitingMarking = submissions.filter((submission) => submission.gradingStatus === "awaiting_marking");
+    if (awaitingMarking.length) {
+      throw Object.assign(new Error(`Mark all written answers first. ${awaitingMarking.length} submission${awaitingMarking.length === 1 ? " is" : "s are"} still awaiting marking.`), { statusCode: 409 });
+    }
+    const publishedAt = Date.now();
+    activity.schoolResultsPublishedAt = publishedAt;
+    activity.schoolResultsPublishedBy = teacherProfile.id;
+    submissions.forEach((submission) => {
+      submission.schoolPublishedAt = publishedAt;
+      submission.schoolPublishedBy = teacherProfile.id;
+      captureSchoolResult(store, submission);
+    });
+    return {
+      activity: buildActivitySummary(store, activity, teacherProfile.id),
+      publishedCount: submissions.length,
+      publishedAt,
+    };
   });
 }
 

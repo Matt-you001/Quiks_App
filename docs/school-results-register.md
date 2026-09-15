@@ -4,13 +4,13 @@
 
 The school administration page now has a collapsible menu: Overview, Members & invitations, Enrolment form, and Results & reports. The same screen is used on web and mobile, with a stacked menu on smaller screens.
 
-This change has not been deployed remotely. Fresh Children, Teens and Uni web-hosting exports were generated on 2 September 2026, including the classroom/portal integration. See `hosting-test-guide.md` for testing instructions; the updated backend must also be deployed.
+This change has not been deployed remotely. Fresh Quiks Children, Quiks Teens and Quiks Advance web-hosting exports were generated on 2 September 2026, including the classroom/portal integration. See `hosting-test-guide.md` for testing instructions; the updated backend must also be deployed.
 
 ## Data flow and storage
 
-- A successful classroom test/assignment submission made with an approved school-linked profile is copied into a school-scoped result register **within the same file transaction** as the classroom submission. Tests marked CBT follow the same path. Class teachers retain their existing activity result view.
+- Student submissions remain in Classroom until the class teacher reviews the activity and explicitly selects **Submit results to school portal**. The teacher publication transaction copies only finalized results into the school-scoped register. Activities with written responses cannot be published while any submission still awaits teacher marking.
 - The register lives in `schoolResults` in the existing persistent `CLASSROOM_STORE_PATH` database file, alongside `schoolReports`. This is a central server-side JSON store, not a newly provisioned managed SQL database. It inherits the existing single-server/persistent-disk capacity and backup limitations.
-- Each result is keyed by submission ID and includes school, school membership, class, subject, activity, variant, attempt, time and original mark. Existing linked submissions can be backfilled when the register is opened, provided their classroom/activity/profile records still exist.
+- Each result is keyed by submission ID and includes school, school membership, class, subject, activity type, variant, attempt, learner submission time, teacher publication time and original mark. Re-publishing an activity updates its existing result snapshots and adds newly completed attempts without creating duplicate rows.
 - A student's personal-profile practice sessions or non-school classroom activity are not silently included. Select the school's labelled profile and use a school-linked class.
 - Deleting an activity or class does not erase its captured school-result snapshots or saved reports. School record retention/deletion must be handled explicitly; deleting the source activity is not a data-erasure mechanism.
 - Draft/approved reports contain frozen result snapshots, comments, optional reasoned adjustments, revision numbers, action history and email state. Adjustments change the report only, not the original classroom mark. Concurrent stale edits are rejected.

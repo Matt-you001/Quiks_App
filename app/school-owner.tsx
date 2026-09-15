@@ -1,12 +1,15 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as Clipboard from "expo-clipboard";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { CalendarDateField, getTodayDateValue } from "../components/CalendarDateField";
 import { palette, shadows } from "../lib/theme";
-import { createOwnerIssuedIndividualLicence, createSchool, getSchoolOwnerDashboard } from "../services/ai";
-import type { SchoolEnrolmentMode, SchoolOwnerDashboardResponse } from "../types/app";
+import { archiveSchool, createOwnerIssuedIndividualLicence, createSchool, getSchoolOwnerDashboard, restoreSchool, updateSchoolRecord } from "../services/ai";
+import type { SchoolEnrolmentMode, SchoolOwnerDashboardResponse, SchoolSummary } from "../types/app";
+
+function dateValue(timestamp: number) { return new Date(timestamp).toISOString().slice(0, 10); }
 
 export default function SchoolOwnerScreen() {
   const [data, setData] = useState<SchoolOwnerDashboardResponse | null>(null);
@@ -32,6 +35,42 @@ export default function SchoolOwnerScreen() {
   } | null>(null);
   const [individualCreationNotice, setIndividualCreationNotice] = useState<{ email: string; endAt: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<SchoolSummary | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
+  const [deletingSchool, setDeletingSchool] = useState<SchoolSummary | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [individualSignupsOpen, setIndividualSignupsOpen] = useState(false);
+  const [individualLicencesOpen, setIndividualLicencesOpen] = useState(false);
+
+  async function copyCode(code: string, label: string) {
+    await Clipboard.setStringAsync(code);
+    Alert.alert("Copied", `${label} copied to the clipboard.`);
+  }
+
+  function openEditor(school: SchoolSummary) {
+    setEditingSchool(school); setEditName(school.name); setEditStartDate(dateValue(school.licence.startAt)); setEditEndDate(dateValue(school.licence.endAt)); setError("");
+  }
+
+  async function saveSchoolEdit() {
+    if (!editingSchool || busy) return;
+    const nextStartAt = new Date(`${editStartDate}T00:00:00`).getTime();
+    const nextEndAt = new Date(`${editEndDate}T23:59:59`).getTime();
+    if (!editName.trim() || !Number.isFinite(nextStartAt) || !Number.isFinite(nextEndAt) || nextEndAt <= nextStartAt) { setError("Enter a school name and valid licence dates."); return; }
+    setBusy(true);
+    try { await updateSchoolRecord({ schoolId: editingSchool.schoolId, patch: { name: editName.trim(), licence: { startAt: nextStartAt, endAt: nextEndAt } } }); setEditingSchool(null); await load(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to update the school."); }
+    finally { setBusy(false); }
+  }
+
+  async function confirmArchive() {
+    if (!deletingSchool || busy) return;
+    setBusy(true);
+    try { await archiveSchool({ schoolId: deletingSchool.schoolId, confirmationName: deleteConfirmation }); setDeletingSchool(null); setDeleteConfirmation(""); setSelectedSchoolId(null); await load(); Alert.alert("School deleted from active use", "Access is revoked and the school is hidden. Its records were preserved and can be restored by the App Owner."); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to delete the school."); }
+    finally { setBusy(false); }
+  }
 
   async function load() {
     setLoading(true);
@@ -217,9 +256,9 @@ export default function SchoolOwnerScreen() {
           {creationNotice ? (
             <View style={styles.creationNotice}>
               <Text style={styles.creationNoticeTitle}>{creationNotice.schoolName} was created successfully.</Text>
-              <Text style={styles.creationNoticeText}>School code: {creationNotice.schoolCode}</Text>
+              <View style={styles.codeRow}><Text selectable style={styles.creationNoticeText}>School code: {creationNotice.schoolCode}</Text><Pressable style={styles.copyIcon} onPress={() => void copyCode(creationNotice.schoolCode, "School code")}><MaterialIcons name="content-copy" size={19} color={palette.navy}/></Pressable></View>
               <Text style={styles.creationNoticeText}>Administrator: {creationNotice.administratorEmail}</Text>
-              <Text style={styles.creationNoticeText}>Administrator invitation code: {creationNotice.administratorInvitationCode}</Text>
+              <View style={styles.codeRow}><Text selectable style={styles.creationNoticeText}>Administrator invitation code: {creationNotice.administratorInvitationCode}</Text><Pressable style={styles.copyIcon} onPress={() => void copyCode(creationNotice.administratorInvitationCode, "Administrator invitation code")}><MaterialIcons name="content-copy" size={19} color={palette.navy}/></Pressable></View>
               <Text style={styles.creationNoticeText}>{creationNotice.emailStatus === "sent" ? "The invitation code was sent to the administrator by email." : creationNotice.emailStatus === "failed" ? "Email delivery failed. Copy and send the administrator code manually." : "Automatic email is not configured. Copy and send the administrator code manually."}</Text>
             </View>
           ) : null}
@@ -234,7 +273,7 @@ export default function SchoolOwnerScreen() {
                 <Text style={styles.schoolName}>{school.name}</Text><MaterialIcons name={selectedSchoolId === school.schoolId ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={24} color={palette.navy}/>
               </Pressable>
               {selectedSchoolId === school.schoolId ? <View style={styles.schoolDetails}>
-              <Text style={styles.meta}>School code {school.schoolCode} · {school.status}</Text>
+              <View style={styles.codeRow}><Text selectable style={styles.meta}>School code {school.schoolCode} · {school.status}</Text><Pressable accessibilityLabel="Copy school code" style={styles.copyIcon} onPress={() => void copyCode(school.schoolCode, "School code")}><MaterialIcons name="content-copy" size={19} color={palette.navy}/></Pressable></View>
               {school.licence.packageName ? <Text style={styles.meta}>{school.licence.packageName} · {school.licence.plan === "session" ? "Session / year" : "Term"}</Text> : null}
               <Text style={styles.meta}>Enrolment: {school.enrolmentMode === "individual_codes" ? "unique individual codes" : "one shared school code"}</Text>
               <Text style={styles.meta}>{school.studentCount}/{school.licence.studentSeatLimit} students · {school.teacherCount}/{school.licence.teacherSeatLimit} teachers · {school.pendingCount} pending</Text>
@@ -242,20 +281,35 @@ export default function SchoolOwnerScreen() {
               {school.administratorSetup ? (
                 <View style={styles.adminSetup}>
                   <Text style={styles.adminText}>Administrator: {school.administratorSetup.email} · {school.administratorSetup.status}</Text>
-                  {school.administratorSetup.invitationCode ? <Text style={styles.invitationCode}>Invitation code: {school.administratorSetup.invitationCode}</Text> : null}
+                  {school.administratorSetup.invitationCode ? <View style={styles.codeRow}><Text selectable style={styles.invitationCode}>Invitation code: {school.administratorSetup.invitationCode}</Text><Pressable accessibilityLabel="Copy administrator invitation code" style={styles.copyIcon} onPress={() => void copyCode(school.administratorSetup!.invitationCode!, "Administrator invitation code")}><MaterialIcons name="content-copy" size={19} color={palette.navy}/></Pressable></View> : null}
                 </View>
               ) : null}
               <Pressable style={styles.secondaryButton} onPress={() => router.push({ pathname: "/school-admin", params: { schoolId: school.schoolId } } as never)}>
                 <Text style={styles.secondaryButtonText}>View enrolment records</Text>
               </Pressable>
+              <View style={styles.row}><Pressable style={[styles.secondaryButton, styles.flex]} onPress={() => openEditor(school)}><Text style={styles.secondaryButtonText}>Edit / renew</Text></Pressable><Pressable style={[styles.deleteButton, styles.flex]} onPress={() => { setDeletingSchool(school); setDeleteConfirmation(""); setError(""); }}><Text style={styles.deleteButtonText}>Delete school</Text></Pressable></View>
               </View> : null}
             </View>
           ))}
         </View>
         <View style={styles.card}>
-          <Text style={styles.heading}>Individual licences</Text>
-          {data.individualLicences.length === 0 ? <Text style={styles.copy}>No individual licences issued yet.</Text> : data.individualLicences.map((licence) => <View key={licence.licenceId} style={styles.school}><Text style={styles.schoolName}>{licence.email}</Text><Text style={styles.meta}>{licence.status} · {new Date(licence.startAt).toLocaleDateString()} to {new Date(licence.endAt).toLocaleDateString()}</Text><Text style={styles.meta}>Profile allowance: 1</Text></View>)}
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: individualSignupsOpen }} onPress={() => setIndividualSignupsOpen((current) => !current)} style={styles.signupSummary}>
+            <Text style={styles.collapsibleHeading}>Individual sign-ups</Text>
+            <MaterialIcons name={individualSignupsOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={28} color={palette.navy}/>
+          </Pressable>
+          {individualSignupsOpen ? <View>
+            <Text style={styles.signupTotal}>Total: {(data.individualSignups ?? []).length}</Text>
+            {(data.individualSignups ?? []).length === 0 ? <Text style={styles.copy}>No independent individual sign-ups have been captured yet.</Text> : (data.individualSignups ?? []).map((account) => <View key={account.email} style={styles.school}><Text selectable style={styles.schoolName}>{account.email}</Text></View>)}
+          </View> : null}
         </View>
+        <View style={styles.card}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: individualLicencesOpen }} onPress={() => setIndividualLicencesOpen((current) => !current)} style={styles.signupSummary}>
+            <Text style={styles.collapsibleHeading}>Individual licences</Text>
+            <MaterialIcons name={individualLicencesOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={28} color={palette.navy}/>
+          </Pressable>
+          {individualLicencesOpen ? <View>{data.individualLicences.length === 0 ? <Text style={styles.copy}>No individual licences issued yet.</Text> : data.individualLicences.map((licence) => <View key={licence.licenceId} style={styles.school}><Text style={styles.schoolName}>{licence.email}</Text><Text style={styles.meta}>{licence.status} · {new Date(licence.startAt).toLocaleDateString()} to {new Date(licence.endAt).toLocaleDateString()}</Text><Text style={styles.meta}>Activated by signed-in email · Profile allowance: 1</Text></View>)}</View> : null}
+        </View>
+        {(data.archivedSchools?.length ?? 0) > 0 ? <View style={styles.card}><Text style={styles.heading}>Deleted schools</Text><Text style={styles.copy}>Access is revoked, but records remain preserved for recovery and audit.</Text>{data.archivedSchools?.map(school => <View key={school.schoolId} style={styles.school}><Text style={styles.schoolName}>{school.name}</Text><Text style={styles.meta}>Deleted {school.archivedAt ? new Date(school.archivedAt).toLocaleString() : ""}</Text><Pressable style={styles.secondaryButton} onPress={() => void (async () => { setBusy(true); try { await restoreSchool({ schoolId: school.schoolId }); await load(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to restore school."); } finally { setBusy(false); } })()}><Text style={styles.secondaryButtonText}>Restore school</Text></Pressable></View>)}</View> : null}
         <View style={styles.card}>
           <Text style={styles.heading}>Online school licence payments</Text>
           <Text style={styles.copy}>Verified Paddle purchases and the fixed licence periods granted by Quiks.</Text>
@@ -270,6 +324,8 @@ export default function SchoolOwnerScreen() {
           })}
         </View>
       </View> : null}
+      <Modal visible={Boolean(editingSchool)} transparent animationType="fade" onRequestClose={() => setEditingSchool(null)}><View style={styles.modalOverlay}><ScrollView contentContainerStyle={styles.modalScroll}><View style={styles.modalCard}><Text style={styles.heading}>Edit or renew school</Text><Text style={styles.copy}>Changing the expiry date is the manual renewal workflow. Online Paddle renewals continue to update from verified payments.</Text><TextInput value={editName} onChangeText={setEditName} placeholder="School name" style={styles.input}/><CalendarDateField label="Licence starts" value={editStartDate} onChange={setEditStartDate}/><CalendarDateField label="Licence expires" value={editEndDate} onChange={setEditEndDate} minimumDate={editStartDate}/>{error ? <Text style={styles.formError}>{error}</Text> : null}<Pressable disabled={busy} style={styles.button} onPress={() => void saveSchoolEdit()}><Text style={styles.buttonText}>Save changes</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => { setEditingSchool(null); setError(""); }}><Text style={styles.secondaryButtonText}>Cancel</Text></Pressable></View></ScrollView></View></Modal>
+      <Modal visible={Boolean(deletingSchool)} transparent animationType="fade" onRequestClose={() => setDeletingSchool(null)}><View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.heading}>Delete school from active use?</Text><Text style={styles.copy}>This immediately revokes school access and hides the school. Records are preserved for recovery and audit. Type <Text style={styles.schoolName}>{deletingSchool?.name}</Text> exactly to confirm.</Text><TextInput value={deleteConfirmation} onChangeText={setDeleteConfirmation} placeholder="School name" style={styles.input}/>{error ? <Text style={styles.formError}>{error}</Text> : null}<Pressable disabled={busy || deleteConfirmation !== deletingSchool?.name} style={[styles.deleteButton, (busy || deleteConfirmation !== deletingSchool?.name) && styles.disabled]} onPress={() => void confirmArchive()}><Text style={styles.deleteButtonText}>Confirm delete</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => { setDeletingSchool(null); setDeleteConfirmation(""); setError(""); }}><Text style={styles.secondaryButtonText}>Cancel</Text></Pressable></View></View></Modal>
     </AppBackground>
   );
 }
@@ -287,6 +343,9 @@ const styles = StyleSheet.create({
   metricLabel: { color: "#587180", textTransform: "capitalize" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   card: { backgroundColor: "white", borderRadius: 24, padding: 20, flexGrow: 1, flexBasis: 440, ...shadows.card },
+  signupSummary: { minHeight: 72, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  collapsibleHeading: { color: palette.navy, fontSize: 22, fontWeight: "900" },
+  signupTotal: { color: palette.navy, fontSize: 18, fontWeight: "900", marginBottom: 6 },
   heading: { color: palette.navy, fontSize: 22, fontWeight: "900", marginBottom: 10 },
   copy: { color: "#587180", lineHeight: 21, marginBottom: 8 },
   input: { backgroundColor: "#F6F9FB", borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, padding: 13, marginVertical: 6 },
@@ -312,6 +371,8 @@ const styles = StyleSheet.create({
   creationNotice: { backgroundColor: "#E9F8F2", borderWidth: 1, borderColor: "#81C9AF", borderRadius: 14, padding: 13, marginTop: 10 },
   creationNoticeTitle: { color: "#125C45", fontWeight: "900", marginBottom: 6 },
   creationNoticeText: { color: "#125C45", fontWeight: "700", marginTop: 3 },
+  codeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  copyIcon: { minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#E8F4F5" },
   school: { paddingVertical: 15, borderTopColor: "#E4ECF1", borderTopWidth: 1 },
   schoolName: { color: palette.navy, fontSize: 17, fontWeight: "900" },
   schoolNameButton: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -322,5 +383,10 @@ const styles = StyleSheet.create({
   invitationCode: { color: palette.navy, fontWeight: "900", marginTop: 5 },
   secondaryButton: { borderWidth: 1, borderColor: palette.navy, borderRadius: 12, padding: 12, alignItems: "center", marginTop: 10 },
   secondaryButtonText: { color: palette.navy, fontWeight: "900" },
+  deleteButton: { backgroundColor: "#FFF0EE", borderWidth: 1, borderColor: "#E6584E", borderRadius: 12, padding: 12, alignItems: "center", marginTop: 10 },
+  deleteButtonText: { color: "#B42318", fontWeight: "900" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 },
+  modalScroll: { flexGrow: 1, justifyContent: "center" },
+  modalCard: { width: "100%", maxWidth: 560, alignSelf: "center", backgroundColor: "white", borderRadius: 22, padding: 20 },
   error: { color: "#B42318", backgroundColor: "#FFF0EE", padding: 12, borderRadius: 12, marginBottom: 12 },
 });

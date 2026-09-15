@@ -24,18 +24,24 @@ const { captureSchoolResult } = await import("./school-results.mjs");
 const request = (action, payload = {}, dependencies) => schoolResultsRequest(admin, action, { schoolId: "s1", ...payload }, dependencies);
 let classroom, activity, report;
 
-test("classroom submissions populate the central register automatically and once", async () => {
+test("classroom submissions populate the central register only after teacher publication", async () => {
   classroom = await store.createClassroom(teacher, "Year 8", "teens");
   await store.acceptClassInviteLink(student, classroom.classCode, "teens");
   const questions = Array.from({ length: 5 }, (_, index) => ({ id: `q${index + 1}`, prompt: `${index + 1}+1?`, options: [String(index + 2), String(index + 3)], answer: String(index + 2) }));
-  activity = await store.createClassroomActivity({ teacherProfile: teacher, classId: classroom.classId, type: "assignment", title: "Fractions", subject: { id: "math", name: "Mathematics" }, questions, questionCount: 5, attemptsAllowed: 2 }, "teens");
+  activity = await store.createClassroomActivity({ teacherProfile: teacher, classId: classroom.classId, type: "assignment", title: "Fractions", subject: { id: "math", name: "Mathematics" }, questions, questionCount: 5, attemptsAllowed: 3 }, "teens");
   await store.submitActivity(student, activity.activityId, { answers: questions.map((question, index) => ({ questionId: question.id, answer: index < 3 ? question.answer : "wrong" })), timeTakenSeconds: 45 }, "teens");
   await store.submitActivity(student, activity.activityId, { answers: questions.map((question, index) => ({ questionId: question.id, answer: index < 4 ? question.answer : "wrong" })), timeTakenSeconds: 30 }, "teens");
+  assert.equal((await request("list")).total, 0);
+  await store.publishActivityResultsToSchool(teacher, activity.activityId, "teens");
   const latest = await request("list"); assert.equal(latest.total, 1); assert.equal(latest.rows[0].score, 80);
   assert.equal((await request("list", { filters: { attempts: "all" } })).total, 2);
   assert.equal((await request("list", { filters: { subject: "English" } })).total, 0);
+  await store.submitActivity(student, activity.activityId, { answers: questions.map((question, index) => ({ questionId: question.id, answer: index < 4 ? question.answer : "wrong" })), timeTakenSeconds: 25 }, "teens");
+  assert.equal((await request("list", { filters: { attempts: "all" } })).total, 2);
+  await store.publishActivityResultsToSchool(teacher, activity.activityId, "teens");
+  assert.equal((await request("list", { filters: { attempts: "all" } })).total, 3);
   const persisted = JSON.parse(await readFile(process.env.CLASSROOM_STORE_PATH, "utf8"));
-  assert.equal(Object.keys(persisted.schoolResults).length, 2);
+  assert.equal(Object.keys(persisted.schoolResults).length, 3);
   assert.equal(latest.rows[0].scoreSource, "server_calculated");
 });
 
@@ -61,7 +67,7 @@ test("report snapshot has latest attempts, immutable source marks, audited corre
 test("results survive deleting the source activity and its classroom", async () => {
   await store.deleteClassroomActivity(teacher, activity.activityId, "teens");
   await store.deleteClassroom(teacher, classroom.classId, "teens");
-  assert.equal((await request("list", { filters: { attempts: "all" } })).total, 2);
+  assert.equal((await request("list", { filters: { attempts: "all" } })).total, 3);
   assert.equal((await request("reports")).reports[0].rows.length, 1);
 });
 
@@ -92,6 +98,30 @@ test("uncertain email result remains locked and persists without blind retry", a
   await assert.rejects(request("send", { reportId: draft.reportId, revision: draft.revision, confirm: true }), /Approve/);
   const disk = JSON.parse(await readFile(process.env.CLASSROOM_STORE_PATH, "utf8"));
   assert.equal(disk.schoolReports[draft.reportId].status, "delivery_unknown");
+});
+
+test("written results cannot be published until the teacher finalizes marking", async () => {
+  const writtenClass = await store.createClassroom(teacher, "Written assessment class", "teens");
+  await store.acceptClassInviteLink(student, writtenClass.classCode, "teens");
+  const writtenActivity = await store.createClassroomActivity({
+    teacherProfile: teacher,
+    classId: writtenClass.classId,
+    type: "exam",
+    title: "First Term Biology Examination",
+    subject: { id: "biology", name: "Biology" },
+    questions: [{ id: "written", type: "written", prompt: "Explain respiration.", markingGuide: "Mentions gas exchange.", points: 5 }],
+    questionCount: 1,
+  }, "teens");
+  assert.equal(writtenActivity.type, "exam");
+  const submitted = await store.submitActivity(student, writtenActivity.activityId, { answers: [{ questionId: "written", answer: "Respiration releases energy." }], timeTakenSeconds: 60 }, "teens");
+  await assert.rejects(store.publishActivityResultsToSchool(teacher, writtenActivity.activityId, "teens"), /Mark all written answers/);
+  assert.equal((await request("list", { filters: { classId: writtenClass.classId } })).total, 0);
+  await store.gradeActivitySubmission(teacher, writtenActivity.activityId, submitted.submission.submissionId, { grades: [{ questionId: "written", awardedPoints: 4 }] }, "teens");
+  const published = await store.publishActivityResultsToSchool(teacher, writtenActivity.activityId, "teens");
+  assert.equal(published.publishedCount, 1);
+  const rows = (await request("list", { filters: { classId: writtenClass.classId } })).rows;
+  assert.equal(rows[0].title, "First Term Biology Examination");
+  assert.equal(rows[0].score, 80);
 });
 
 test("unlinked personal and cross-school profile data are not imported", () => {

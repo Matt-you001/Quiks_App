@@ -135,7 +135,7 @@ export default function ClassroomResultScreen() {
       <View style={styles.heroCard}>
         <Text style={styles.heroTitle}>{details.activity.title}</Text>
         <Text style={styles.heroMeta}>
-          {details.activity.type === "test" ? "Test" : "Assignment"} | {details.className}
+          {details.activity.type === "exam" ? "Exam" : details.activity.type === "test" ? "Test" : "Assignment"} | {details.className}
         </Text>
         <Text style={styles.heroMeta}>Teacher: {details.teacherName}</Text>
       </View>

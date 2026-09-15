@@ -18,7 +18,7 @@ const variantWebAssets = {
     faviconPng: "quiks-teens-playstore-icon-512.png",
   },
   uni: {
-    title: "Quiks Uni",
+    title: "Quiks Advance",
     svgLogo: "quiks-uni-logo.svg",
     faviconPng: "quiks-uni-playstore-icon-512.png",
   },
@@ -27,7 +27,7 @@ const variantWebAssets = {
 const variantRouteTitles = {
   children: "Quiks Children",
   teens: "Quiks Teens",
-  uni: "Quiks Uni",
+  uni: "Quiks Advance",
 };
 
 const hostedRouteWrappers = {
@@ -171,7 +171,7 @@ function stripHostedHeaderShell(html) {
 }
 
 function injectLocalFileGuard(html, variant) {
-  const liveUrl = `https://${variant}.quiks.site`;
+  const liveUrl = `https://${variant === "uni" ? "advance" : variant}.quiks.site`;
   const guardScript = `
     <script>
       (function () {

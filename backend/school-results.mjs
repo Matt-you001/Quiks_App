@@ -13,13 +13,17 @@ function prepare(store) {
   store.schoolReports ??= {};
 }
 
-// Called in the same persisted transaction as the classroom submission.
-// Immutable snapshots prevent class/activity deletion from erasing the register.
+// Called only from the teacher-controlled school publication transaction.
+// Immutable snapshots prevent later class/activity deletion from erasing the register.
 export function captureSchoolResult(store, submission) {
   prepare(store);
   const activity = store.activities[submission.activityId];
   const classroom = store.classrooms[activity?.classId];
   const profile = store.profiles[submission.profileId];
+  const teacherSubmittedAt = Number(submission.schoolPublishedAt);
+  // Classroom results remain private to the teacher until the teacher
+  // explicitly submits this activity's finalized marks to the school.
+  if (!Number.isFinite(teacherSubmittedAt) || teacherSubmittedAt <= 0) return;
   if (!classroom?.schoolId || !profile?.schoolMembershipId || profile.schoolId !== classroom.schoolId) return;
   const score = Number(submission.score);
   if (!Number.isFinite(score) || score < 0 || score > 100) return;
@@ -32,6 +36,7 @@ export function captureSchoolResult(store, submission) {
     assessmentMode: activity.assessmentMode ?? "standard", appVariant: classroom.appVariant,
     teacherName: activity.teacherName, score, correctAnswers: submission.correctAnswers,
     totalQuestions: submission.totalQuestions, submittedAt: submission.submittedAt,
+    teacherSubmittedAt, teacherSubmittedBy: submission.schoolPublishedBy,
     attemptNumber: submission.attemptNumber ?? 1,
     scoreSource: submission.scoreSource ?? "legacy_client_reported",
     gradingStatus: submission.gradingStatus ?? "finalized",
@@ -49,7 +54,7 @@ export function backfillSchoolResults(store) {
 
 function selectedResults(store, schoolId, filters = {}) {
   if (!filters || typeof filters !== "object" || Array.isArray(filters)) fail("Invalid result filters.");
-  let rows = Object.values(store.schoolResults).filter((row) => row.schoolId === schoolId);
+  let rows = Object.values(store.schoolResults).filter((row) => row.schoolId === schoolId && Number.isFinite(Number(row.teacherSubmittedAt)));
   for (const key of ["classId", "studentMembershipId", "subject", "type", "appVariant"]) {
     if (filters[key]) rows = rows.filter((row) => row[key] === filters[key]);
   }

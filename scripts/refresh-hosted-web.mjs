@@ -77,7 +77,7 @@ const routesByVariant = {
 const titles = {
   children: "Quiks Children",
   teens: "Quiks Teens",
-  uni: "Quiks Uni",
+  uni: "Quiks Advance",
 };
 
 function getEntryScriptName(variant) {

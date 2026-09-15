@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Platform, View } from "react-native";
 import { appVariant } from "../lib/app-variant";
 import { preloadAppOpenAd, showAppOpenAd } from "../lib/ads";
-import { waitForFirebaseAuthAccount } from "../lib/firebase";
+import { getAuthenticatedAccount, waitForFirebaseAuthAccount } from "../lib/firebase";
 import { syncRevenueCatIdentityForAuthentication } from "../lib/revenuecat";
 import { syncAdministrativeProfileForAccount } from "../lib/school-identity";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
@@ -58,7 +58,14 @@ export default function RootLayout() {
     }
 
     let cancelled = false;
-    setWebAuthReady(false);
+    // Do not blank the whole application after a successful sign-in. Firebase
+    // has already placed that account in memory, so the protected route may
+    // remain visible while its account cache and administrative role refresh.
+    // A cold start or genuinely signed-out navigation still stays behind the
+    // loading gate until Firebase persistence has been resolved.
+    if (!getAuthenticatedAccount()) {
+      setWebAuthReady(false);
+    }
 
     const protectVariantRoute = async () => {
       const account = await waitForFirebaseAuthAccount();

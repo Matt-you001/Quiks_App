@@ -10,7 +10,7 @@ export type SubscriptionTier = "free" | "pro";
 
 export type UserRole = "student" | "teacher";
 
-export type ClassroomActivityType = "assignment" | "test";
+export type ClassroomActivityType = "assignment" | "test" | "exam";
 
 export type ClassroomResultVisibility = "public" | "private";
 
@@ -81,6 +81,8 @@ export interface UserProfile {
   administrativeSchoolId?: string;
   schoolId?: string;
   schoolMembershipId?: string;
+  schoolClassNaming?: SchoolClassNaming;
+  schoolCurriculum?: string;
 }
 
 export interface Question {
@@ -358,7 +360,7 @@ export interface AccountSubscriptionStatusResponse {
   active: boolean;
   expiresAt: string | null;
   managementUrl: string | null;
-  source?: "individual" | "owner_issued" | "school" | "individual_and_school" | "individual_and_owner_issued" | "owner_issued_and_school" | "individual_owner_issued_and_school" | "none";
+  source?: "app_owner" | "individual" | "owner_issued" | "school" | "individual_and_school" | "individual_and_owner_issued" | "owner_issued_and_school" | "individual_owner_issued_and_school" | "none";
   profileLimit: number;
   school?: SchoolEntitlementSummary | null;
 }
@@ -406,6 +408,8 @@ export interface SchoolSummary {
   schoolId: string;
   schoolCode: string;
   name: string;
+  curriculum: string;
+  curricula: string[];
   status: SchoolLicenceStatus;
   licence: SchoolLicence;
   createdAt: number;
@@ -415,6 +419,8 @@ export interface SchoolSummary {
   pendingCount: number;
   seatUsagePercent: number;
   enrolmentMode: SchoolEnrolmentMode;
+  classNaming: SchoolClassNaming;
+  archivedAt?: number | null;
   administratorSetup?: {
     email: string;
     status: "invited" | "active" | "expired";
@@ -440,6 +446,10 @@ export interface SchoolMembership {
   membershipId: string;
   schoolId: string;
   schoolName: string;
+  schoolCurriculum?: string;
+  schoolLicenceStatus?: SchoolLicenceStatus;
+  schoolLicenceExpiresAt?: number | null;
+  schoolClassNaming?: SchoolClassNaming;
   role: SchoolMemberRole;
   status: SchoolMembershipStatus;
   email: string;
@@ -473,7 +483,14 @@ export interface SchoolOwnerDashboardResponse {
     schoolBillingPurchases?: number;
   };
   schools: SchoolSummary[];
+  archivedSchools?: SchoolSummary[];
   individualLicences: OwnerIssuedIndividualLicence[];
+  individualSignups: Array<{
+    email: string;
+    appVariants: Array<"children" | "teens" | "uni">;
+    registeredAt: number;
+    lastSeenAt: number;
+  }>;
   billingPurchases?: SchoolBillingPurchase[];
 }
 
@@ -544,6 +561,19 @@ export interface SchoolEmailDelivery {
 export interface SchoolOwnerLicenceUpdateRequest {
   schoolId: string;
   licence: Partial<SchoolLicence>;
+}
+
+export type SchoolClassNamingMode = "unconfigured" | "grade" | "primary_secondary" | "year" | "class" | "custom";
+
+export interface SchoolClassNaming {
+  mode: SchoolClassNamingMode;
+  label: string;
+  names: string[];
+}
+
+export interface SchoolOwnerRecordUpdateRequest {
+  schoolId: string;
+  patch: { name: string; licence: Pick<SchoolLicence, "startAt" | "endAt"> };
 }
 
 export interface SchoolMembershipListResponse {
@@ -670,6 +700,9 @@ export interface ClassroomActivitySummary {
   teacherProfileId: string;
   teacherName: string;
   submissionCount: number;
+  schoolLinked?: boolean;
+  schoolResultsPublishedAt?: number;
+  schoolResultsPublishedCount?: number;
   createdAt: number;
   submitted?: boolean;
   score?: number;
@@ -828,6 +861,17 @@ export interface ClassroomActivityGradeRequest {
   submissionId: string;
   grades: Array<{ questionId: string; awardedPoints: number; feedback?: string }>;
   teacherFeedback?: string;
+}
+
+export interface ClassroomActivityPublishSchoolResultsRequest {
+  teacherProfile: UserProfile;
+  activityId: string;
+}
+
+export interface ClassroomActivityPublishSchoolResultsResponse {
+  activity: ClassroomActivitySummary;
+  publishedCount: number;
+  publishedAt: number;
 }
 
 export type LessonNoteRefinementLevel = "none" | "minimal" | "rich" | "deep";

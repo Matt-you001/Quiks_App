@@ -2,7 +2,7 @@
 
 The upload folders are `web-hosting/children`, `web-hosting/teens`, and `web-hosting/uni`. The `web-hosting/parent` website and neutral enrolment portal are separate and unchanged.
 
-Exports generated 2 September 2026. Static checks passed for 33 key pages across the three variants, including compiled variant identity, bundle references, referenced HTML assets, backend address and classroom/results feature markers. Logged-out browser smoke tests reached the correct variant's account screen from Children home, Teens school administration and Uni classroom. Authenticated school operations were not exercised against the live backend.
+Exports generated 2 September 2026. Static checks passed for 33 key pages across the three variants, including compiled variant identity, bundle references, referenced HTML assets, backend address and classroom/results feature markers. Logged-out browser smoke tests reached the correct variant's account screen from Quiks Children home, Quiks Teens school administration and Quiks Advance classroom. Authenticated school operations were not exercised against the live backend.
 
 ## Backend first
 

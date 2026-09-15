@@ -14,6 +14,9 @@ export function schoolClassroomProfile(membership, variant) {
     role: membership.role === "student" ? "student" : "teacher",
     schoolId: membership.schoolId,
     schoolMembershipId: membership.membershipId,
+    schoolClassNaming: membership.schoolClassNaming,
+    preferredCurriculum: membership.schoolCurriculum,
+    schoolCurriculum: membership.schoolCurriculum,
   };
 }
 

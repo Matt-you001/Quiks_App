@@ -31,7 +31,10 @@ export async function syncAdministrativeProfileForAccount(account: AppAccount) {
       role: membership.role === "student" ? "student" : "teacher",
       quiksId: `QX-S-${appVariant.id.toUpperCase()}-${membership.membershipId.toUpperCase()}`,
       schoolName: membership.schoolName, schoolId: membership.schoolId,
+      preferredCurriculum: membership.schoolCurriculum || existingSchoolProfile?.preferredCurriculum || "",
+      schoolCurriculum: membership.schoolCurriculum || "",
       schoolMembershipId: membership.membershipId,
+      schoolClassNaming: membership.schoolClassNaming,
       ...(membership.role === "school_admin" ? { administrativeRole: "school_admin" as const, administrativeAccountUid: account.uid, administrativeSchoolId: membership.schoolId } : {}),
     });
   }

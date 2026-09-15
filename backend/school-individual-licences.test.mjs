@@ -12,6 +12,17 @@ const learner = { principalId: "test:learner", uid: "learner", name: "Learner", 
 const stranger = { ...learner, principalId: "test:stranger", uid: "stranger", email: "stranger@example.com" };
 const store = await import("./school-store.mjs");
 
+test("configured App Owner receives permanent premium access without payment", () => {
+  assert.deepEqual(store.getAppOwnerEntitlement(owner), {
+    active: true,
+    expiresAt: null,
+    managementUrl: null,
+    source: "app_owner",
+    profileLimit: 2,
+  });
+  assert.equal(store.getAppOwnerEntitlement(learner), null);
+});
+
 test("owner issues a persistent email-bound individual licence", async () => {
   const startAt = Date.now() - 60_000;
   const endAt = Date.now() + 86_400_000;

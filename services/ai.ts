@@ -202,7 +202,7 @@ function describeAcademicStage(request: QuestionRequest) {
 
   return [
     "This learner is in the University band and should receive true tertiary-level course content.",
-    `For Quiks Uni, treat ${request.subject.name} as a university course, not a school subject.`,
+    `For Quiks Advance, treat ${request.subject.name} as a university course, not a school subject.`,
     `Level ${request.level} means course progression depth: Level 1 should feel like first-year university foundations, while higher levels should show more abstraction, formalism, application, and analytical reasoning.`,
     "Use correct academic terminology, concept-based reasoning, and realistic undergraduate question styles.",
     "Do not downgrade Mathematics, Law, Engineering, Medicine, Management Studies, or any other course to primary- or secondary-school material.",
@@ -296,7 +296,7 @@ export async function getSchoolMemberships(): Promise<SchoolMembershipListRespon
 }
 
 export async function getSchoolIdentity(): Promise<SchoolIdentityResponse> {
-  return postJson("/school/identity", {});
+  return postJson("/school/identity", { appVariant: appVariant.id });
 }
 
 export async function enrolInSchool(request: SchoolEnrolRequest): Promise<SchoolEnrolResponse> {
@@ -355,6 +355,33 @@ export async function createOwnerIssuedIndividualLicence(request: OwnerIssuedInd
 
 export async function updateSchoolLicence(request: SchoolOwnerLicenceUpdateRequest): Promise<SchoolDetailsResponse["school"]> {
   return postJson("/school/owner/licence", request);
+}
+
+export async function updateSchoolRecord(request: import("../types/app").SchoolOwnerRecordUpdateRequest): Promise<SchoolDetailsResponse["school"]> {
+  // Keep owner edits on the long-standing licence endpoint so a newly built
+  // client can still renew a school while the backend deployment is rolling
+  // out. Updated backends also apply the optional name on this endpoint.
+  return postJson("/school/owner/licence", {
+    schoolId: request.schoolId,
+    licence: request.patch.licence,
+    name: request.patch.name,
+  });
+}
+
+export async function archiveSchool(request: { schoolId: string; confirmationName: string }): Promise<{ schoolId: string; archivedAt: number; recordsPreserved: boolean }> {
+  return postJson("/school/owner/archive", request);
+}
+
+export async function restoreSchool(request: { schoolId: string }): Promise<SchoolDetailsResponse["school"]> {
+  return postJson("/school/owner/restore", request);
+}
+
+export async function updateSchoolClassNaming(request: { schoolId: string; classNaming: import("../types/app").SchoolClassNaming }): Promise<SchoolDetailsResponse["school"]> {
+  return postJson("/school/admin/class-naming", request);
+}
+
+export async function updateSchoolCurriculum(request: { schoolId: string; curriculum: string | string[] }): Promise<SchoolDetailsResponse["school"]> {
+  return postJson("/school/admin/curriculum", request);
 }
 
 function withVariantMeta<T extends object>(body: T) {
@@ -1246,4 +1273,10 @@ export async function gradeClassroomActivitySubmission(
   request: ClassroomActivityGradeRequest
 ): Promise<{ submission: ClassroomSubmissionDetail }> {
   return postJson("/classroom/assignments/grade", withVariantMeta(request));
+}
+
+export async function publishClassroomActivityResultsToSchool(
+  request: import("../types/app").ClassroomActivityPublishSchoolResultsRequest
+): Promise<import("../types/app").ClassroomActivityPublishSchoolResultsResponse> {
+  return postJson("/classroom/assignments/publish-school-results", withVariantMeta(request));
 }

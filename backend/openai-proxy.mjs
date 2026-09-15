@@ -27,6 +27,7 @@ import {
   respondToMembershipRequest,
   recordActivitySecurityEvent,
   gradeActivitySubmission,
+  publishActivityResultsToSchool,
   submitActivity,
   sendClassChatMessage,
   updateClassroomActivity,
@@ -46,6 +47,7 @@ import {
   activateSchoolPurchase,
   enrolInSchool,
   getInstitutionalEntitlement,
+  getAppOwnerEntitlement,
   getOwnerIssuedIndividualEntitlement,
   getOwnerDashboard,
   getPrincipalSchoolIdentity,
@@ -58,7 +60,12 @@ import {
   recordIgnoredSchoolBillingWebhook,
   refundSchoolPurchase,
   updateMembershipStatus,
+  archiveSchool,
+  restoreSchool,
+  updateSchoolClassNaming,
+  updateSchoolCurriculum,
   updateSchoolLicence,
+  updateSchoolRecord,
   updateSchoolProfileFields,
 } from "./school-store.mjs";
 
@@ -182,6 +189,11 @@ async function handleSubscriptionStatus(request, body, response) {
     return;
   }
   const appVariant = body.appVariant ?? "children";
+  const appOwner = getAppOwnerEntitlement(principal);
+  if (appOwner) {
+    sendJson(response, 200, { ...appOwner, school: null });
+    return;
+  }
   const school = await getInstitutionalEntitlement(principal, appVariant);
   const ownerIssued = await getOwnerIssuedIndividualEntitlement(principal);
   let individual = { active: false, expiresAt: null, managementUrl: null };
@@ -467,7 +479,7 @@ function describeAcademicStage(body) {
 
   return [
     "Treat this learner as a university student receiving true tertiary-level course content.",
-    `For Quiks Uni, treat ${body.subject?.name ?? "the subject"} as a university course, not a school subject.`,
+    `For Quiks Advance, treat ${body.subject?.name ?? "the subject"} as a university course, not a school subject.`,
     `Level ${body.level ?? 1} means course progression depth: Level 1 should feel like first-year undergraduate foundations, while higher levels should show more abstraction, formalism, application, and analysis.`,
     "Use correct academic terminology, concept-based reasoning, and realistic undergraduate question styles.",
     "Do not downgrade Mathematics, Law, Engineering, Medicine, Management Studies, or any other course to school-level filler.",
@@ -3468,6 +3480,18 @@ async function handleAssignmentGrade(body, response) {
   ));
 }
 
+async function handleAssignmentPublishSchoolResults(body, response) {
+  if (!body.teacherProfile?.id || !body.activityId) {
+    sendJson(response, 400, { error: "Teacher and activity are required." });
+    return;
+  }
+  sendJson(response, 200, await publishActivityResultsToSchool(
+    body.teacherProfile,
+    body.activityId,
+    body.appVariant ?? "children"
+  ));
+}
+
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
@@ -3684,7 +3708,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/school/identity") {
-      sendJson(response, 200, await getPrincipalSchoolIdentity(await requireFirebasePrincipal(request)));
+      sendJson(response, 200, await getPrincipalSchoolIdentity(await requireFirebasePrincipal(request), body.appVariant));
       return;
     }
 
@@ -3714,6 +3738,16 @@ const server = http.createServer(async (request, response) => {
       const principal = await requireFirebasePrincipal(request);
       await updateSchoolProfileFields(principal, body.schoolId, body.fields);
       sendJson(response, 200, await getSchoolDetails(principal, body.schoolId));
+      return;
+    }
+
+    if (url.pathname === "/school/admin/class-naming") {
+      sendJson(response, 200, await updateSchoolClassNaming(await requireFirebasePrincipal(request), body.schoolId, body.classNaming));
+      return;
+    }
+
+    if (url.pathname === "/school/admin/curriculum") {
+      sendJson(response, 200, await updateSchoolCurriculum(await requireFirebasePrincipal(request), body.schoolId, body.curriculum));
       return;
     }
 
@@ -3768,7 +3802,26 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/school/owner/licence") {
-      sendJson(response, 200, await updateSchoolLicence(await requireFirebasePrincipal(request), body.schoolId, body.licence));
+      const principal = await requireFirebasePrincipal(request);
+      sendJson(response, 200, body.name === undefined
+        ? await updateSchoolLicence(principal, body.schoolId, body.licence)
+        : await updateSchoolRecord(principal, body.schoolId, { name: body.name, licence: body.licence }));
+      return;
+    }
+
+
+    if (url.pathname === "/school/owner/update") {
+      sendJson(response, 200, await updateSchoolRecord(await requireFirebasePrincipal(request), body.schoolId, body.patch));
+      return;
+    }
+
+    if (url.pathname === "/school/owner/archive") {
+      sendJson(response, 200, await archiveSchool(await requireFirebasePrincipal(request), body.schoolId, body.confirmationName));
+      return;
+    }
+
+    if (url.pathname === "/school/owner/restore") {
+      sendJson(response, 200, await restoreSchool(await requireFirebasePrincipal(request), body.schoolId));
       return;
     }
 
@@ -3915,6 +3968,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/assignments/grade") {
       await handleAssignmentGrade(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/publish-school-results") {
+      await handleAssignmentPublishSchoolResults(body, response);
       return;
     }
 

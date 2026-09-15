@@ -111,13 +111,24 @@ export default function ProfileEditorScreen() {
       age: isTeacher ? (Number.isFinite(age) && age >= 18 ? age : editingProfile?.age ?? 18) : age,
       targetExam: isTeacher ? t(form.language, "teacherAccount") : form.targetExam.trim() || "General school prep",
       preferredCurriculum:
-        !isTeacher && appVariant.id !== "uni" ? form.preferredCurriculum.trim() : "",
+        editingProfile?.schoolId
+          ? editingProfile.schoolCurriculum || editingProfile.preferredCurriculum || ""
+          : !isTeacher && appVariant.id !== "uni" ? form.preferredCurriculum.trim() : "",
       dailyGoalMinutes: isTeacher ? 0 : goal,
-      schoolName: form.schoolName.trim(),
+      schoolName: editingProfile?.schoolId ? editingProfile.schoolName : form.schoolName.trim(),
       teachingFocus: isTeacher ? form.teachingFocus.trim() : "",
       language: form.language,
       role: form.role,
       quiksId: editingProfile?.quiksId ?? createQuiksId(form.name.trim(), form.role),
+      ...(editingProfile?.schoolId ? {
+        schoolId: editingProfile.schoolId,
+        schoolMembershipId: editingProfile.schoolMembershipId,
+        schoolClassNaming: editingProfile.schoolClassNaming,
+        schoolCurriculum: editingProfile.schoolCurriculum,
+        administrativeRole: editingProfile.administrativeRole,
+        administrativeAccountUid: editingProfile.administrativeAccountUid,
+        administrativeSchoolId: editingProfile.administrativeSchoolId,
+      } : {}),
     };
 
     try {
@@ -243,9 +254,11 @@ export default function ProfileEditorScreen() {
                   value={form.preferredCurriculum}
                   onChangeText={(value) => setForm((current) => ({ ...current, preferredCurriculum: value }))}
                   style={styles.input}
+                  editable={!editingProfile?.schoolId}
                   placeholder={t(form.language, "preferredCurriculumPlaceholder")}
                   placeholderTextColor="#7C8EA3"
                 />
+                {editingProfile?.schoolId ? <Text style={styles.managedHint}>Managed by {editingProfile.schoolName || "your school"}. The school curriculum applies automatically.</Text> : null}
               </>
             ) : null}
 
@@ -342,6 +355,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     color: palette.ink,
   },
+  managedHint: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 5 },
   languageWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
