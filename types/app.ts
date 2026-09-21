@@ -193,6 +193,52 @@ export interface LearningHubQuestionRequest {
   question: string;
 }
 
+export interface PastQuestionAttachmentInput {
+  name: string;
+  mimeType: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
+  size: number;
+  dataBase64: string;
+}
+
+export interface PastQuestionSolvedItem {
+  id: string;
+  number: string;
+  prompt: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+}
+
+export interface PastQuestionSet {
+  id: string;
+  examTitle: string;
+  year: string;
+  subject?: string;
+  appVariant: "children" | "teens" | "uni";
+  questionCount: number;
+  questions: PastQuestionSolvedItem[];
+  createdAt: number;
+}
+
+export interface PastQuestionSubmitRequest {
+  examTitle: string;
+  subject?: string;
+  year: string;
+  questionText?: string;
+  attachment?: PastQuestionAttachmentInput;
+  shareConfirmed: boolean;
+  profile?: UserProfile | null;
+}
+
+export interface PastQuestionSubmitResponse {
+  item: PastQuestionSet;
+  duplicate: boolean;
+}
+
+export interface PastQuestionSearchResponse {
+  items: PastQuestionSet[];
+}
+
 export interface StoredAppState {
   account: AppAccount | null;
   isAuthenticated: boolean;
@@ -594,12 +640,74 @@ export interface SchoolDetailsResponse {
   viewer: {
     displayName: string;
     email: string;
-    role: "app_owner" | "school_admin";
+    role: "app_owner" | "school_owner" | "school_admin";
   };
   school: SchoolSummary;
   profileFields: SchoolProfileFieldDefinition[];
   memberships: SchoolMembership[];
   billingHistory?: SchoolBillingPurchase[];
+}
+
+export type SchoolAdministrationModuleCode =
+  | "operations.foundation"
+  | "operations.attendance"
+  | "operations.planning"
+  | "operations.staff"
+  | "operations.transport";
+
+export interface SchoolAdministrationGrant {
+  featureCode: SchoolAdministrationModuleCode;
+  status: "pending" | "active" | "expired" | "revoked";
+  startsAt: string;
+  endsAt: string | null;
+}
+
+export interface SchoolAdministrationSettings {
+  collectionSettings: {
+    studentPhotograph: boolean;
+    staffPhotograph: boolean;
+    birthCertificate: boolean;
+    identityDocument: boolean;
+    medicalDocument: boolean;
+  };
+  transportPricingMode: "uniform" | "varying";
+  uniformRoutePriceMinor: number | null;
+  currency: string;
+}
+
+export interface SchoolAdministrationSummary {
+  modules: Array<{ code: SchoolAdministrationModuleCode; name: string }>;
+  grants: SchoolAdministrationGrant[];
+  activeModules: SchoolAdministrationModuleCode[];
+  settings: SchoolAdministrationSettings;
+  people: Array<{
+    id: string;
+    personType: "student" | "staff" | "guardian";
+    givenName: string;
+    familyName: string;
+    email?: string | null;
+    phone?: string | null;
+    status: "pending" | "active" | "inactive" | "archived";
+    customFields: Record<string, unknown>;
+    createdAt: string;
+  }>;
+  routes: Array<{
+    id: string;
+    name: string;
+    priceMinor: number | null;
+    currency: string;
+    status: string;
+    createdAt: string;
+  }>;
+  vehicles: Array<{ id: string; registrationNumber: string; capacity: number | null; status: string }>;
+  transportAssignments: Array<{ id: string; routeId: string; vehicleId: string | null; personId: string; startsOn: string; endsOn: string | null; status: string; routeName: string; registrationNumber: string | null }>;
+  attendanceSessions: Array<{ id: string; attendanceDate: string; sessionLabel: string; createdAt: string; recordCount: number }>;
+  lessonPlans: Array<{ id: string; subject: string; title: string; status: string; createdAt: string; updatedAt: string }>;
+  timetables: Array<{ id: string; timetableType: "lesson" | "exam"; name: string; status: string; createdAt: string }>;
+  timetableEntries: Array<{ id: string; timetableId: string; subject: string | null; title: string; startsAt: string; endsAt: string; location: string | null }>;
+  staffReports: Array<{ id: string; staffPersonId: string; reportType: string; status: string; createdAt: string; updatedAt: string }>;
+  recentAudit: Array<{ id: number; action: string; entityType: string; entityId: string | null; occurredAt: string }>;
+  viewer: { role: "app_owner" | "school_owner" | "school_admin"; displayName: string };
 }
 
 export interface SchoolProfileFieldsUpdateRequest {

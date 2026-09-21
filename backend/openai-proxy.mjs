@@ -45,7 +45,8 @@ import {
 import { authenticateClassroomRequest } from "./classroom-auth.mjs";
 import { schoolResultsRequest } from "./school-results-api.mjs";
 import { schoolClassroomsRequest } from "./school-classrooms-api.mjs";
-import { getSchoolEmailDiagnostics, sendSchoolInvitationEmail } from "./school-email.mjs";
+import { schoolAdministrationRequest } from "./school-administration-api.mjs";
+import { getSchoolEmailDiagnostics, sendOperationalAlert, sendSchoolInvitationEmail } from "./school-email.mjs";
 import { getPostgresDiagnostics, initializePostgres } from "./postgres.mjs";
 import {
   createIndividualLicence,
@@ -67,6 +68,7 @@ import {
   recordIgnoredSchoolBillingWebhook,
   refundSchoolPurchase,
   updateMembershipStatus,
+  updateMembershipRole,
   archiveSchool,
   restoreSchool,
   updateSchoolClassNaming,
@@ -3894,8 +3896,28 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/school/admin/membership/role") {
+      sendJson(response, 200, await updateMembershipRole(await requireFirebasePrincipal(request), body.schoolId, body.membershipId, body.role));
+      return;
+    }
+
     if (url.pathname === "/school/owner/dashboard") {
       sendJson(response, 200, await getOwnerDashboard(await requireFirebasePrincipal(request)));
+      return;
+    }
+
+    if (url.pathname === "/school/owner/administration/modules") {
+      sendJson(response, 200, await schoolAdministrationRequest(
+        await requireFirebasePrincipal(request),
+        body.update ? "owner-modules-update" : "owner-modules-list",
+        body
+      ));
+      return;
+    }
+
+    if (url.pathname.startsWith("/school/admin/operations/")) {
+      const action = url.pathname.slice("/school/admin/operations/".length);
+      sendJson(response, 200, await schoolAdministrationRequest(await requireFirebasePrincipal(request), action, body));
       return;
     }
 
@@ -4110,12 +4132,29 @@ const classroomInitialization = await initializeClassroomStore();
 if (classroomInitialization.status !== "not_requested") {
   console.log(`Classroom identity migration: ${classroomInitialization.status}; backup created: ${Boolean(classroomInitialization.backupCreated)}`);
 }
-const postgresInitialization = await initializePostgres();
+let postgresInitialization;
+try {
+  postgresInitialization = await initializePostgres();
+} catch (error) {
+  await sendOperationalAlert({
+    subject: "Required PostgreSQL startup failed",
+    message: `quiks-app could not start because its required PostgreSQL connection or migration failed. Error: ${error instanceof Error ? error.message : "Unknown database error"}`,
+    idempotencyKey: `quiks-postgres-required-${new Date().toISOString().slice(0, 13)}`,
+  });
+  throw error;
+}
 if (postgresInitialization.configured) {
   console.log(
     `PostgreSQL: ${postgresInitialization.connected ? "connected" : "degraded"}; ` +
     `mode: ${postgresInitialization.mode}; schema: ${postgresInitialization.schemaVersion}/${postgresInitialization.targetSchemaVersion}`
   );
+  if (!postgresInitialization.connected) {
+    await sendOperationalAlert({
+      subject: "PostgreSQL connection failed",
+      message: `quiks-app started without a working PostgreSQL connection. Mode: ${postgresInitialization.mode}. Error: ${postgresInitialization.lastError || "No error detail was returned."}`,
+      idempotencyKey: `quiks-postgres-startup-${new Date().toISOString().slice(0, 13)}`,
+    });
+  }
 }
 server.listen(port, () => {
   console.log(`OpenAI proxy listening on http://localhost:${port}`);

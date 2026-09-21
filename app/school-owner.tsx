@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { CalendarDateField, getTodayDateValue } from "../components/CalendarDateField";
+import { SchoolAdministrationLicenceEditor } from "../components/SchoolAdministrationLicenceEditor";
 import { palette, shadows } from "../lib/theme";
 import { archiveSchool, createOwnerIssuedIndividualLicence, createSchool, getSchoolOwnerDashboard, restoreSchool, updateSchoolRecord } from "../services/ai";
 import type { SchoolEnrolmentMode, SchoolOwnerDashboardResponse, SchoolSummary } from "../types/app";
@@ -287,6 +288,7 @@ export default function SchoolOwnerScreen() {
               <Pressable style={styles.secondaryButton} onPress={() => router.push({ pathname: "/school-admin", params: { schoolId: school.schoolId } } as never)}>
                 <Text style={styles.secondaryButtonText}>View enrolment records</Text>
               </Pressable>
+              <SchoolAdministrationLicenceEditor schoolId={school.schoolId}/>
               <View style={styles.row}><Pressable style={[styles.secondaryButton, styles.flex]} onPress={() => openEditor(school)}><Text style={styles.secondaryButtonText}>Edit / renew</Text></Pressable><Pressable style={[styles.deleteButton, styles.flex]} onPress={() => { setDeletingSchool(school); setDeleteConfirmation(""); setError(""); }}><Text style={styles.deleteButtonText}>Delete school</Text></Pressable></View>
               </View> : null}
             </View>

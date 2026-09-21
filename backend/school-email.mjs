@@ -1,13 +1,57 @@
 const resendApiKey = String(process.env.RESEND_API_KEY ?? "").trim();
 const invitationFrom = String(process.env.QUIKS_SCHOOL_EMAIL_FROM ?? "").trim();
 const enrolmentUrl = String(process.env.QUIKS_SCHOOL_ENROLMENT_URL ?? "https://quiks.site/school-enrol.html").trim();
+const operationsAlertEmail = String(process.env.QUIKS_OPERATIONS_ALERT_EMAIL ?? "").trim().toLowerCase();
 
 export function getSchoolEmailDiagnostics() {
   return {
     provider: "resend",
     configured: Boolean(resendApiKey && invitationFrom),
     fromConfigured: Boolean(invitationFrom),
+    operationalAlertsConfigured: Boolean(resendApiKey && invitationFrom && operationsAlertEmail),
   };
+}
+
+export async function sendOperationalAlert({ subject, message, idempotencyKey }, fetcher = fetch) {
+  if (!resendApiKey || !invitationFrom || !operationsAlertEmail) {
+    return { status: "not_configured" };
+  }
+  const safeSubject = `Quiks operational alert: ${String(subject || "Attention required")}`
+    .replace(/[\r\n]/g, " ")
+    .slice(0, 180);
+  try {
+    const response = await fetcher("https://api.resend.com/emails", {
+      method: "POST",
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": String(idempotencyKey || `quiks-operations-${Date.now()}`).slice(0, 256),
+        "User-Agent": "Quiks-School/1.0",
+      },
+      body: JSON.stringify({
+        from: invitationFrom,
+        to: [operationsAlertEmail],
+        subject: safeSubject,
+        text: [
+          String(message || "An operational condition requires attention."),
+          "",
+          `Environment: ${String(process.env.QUIKS_SCHOOL_BILLING_ENVIRONMENT || process.env.NODE_ENV || "unknown")}`,
+          `Recorded at: ${new Date().toISOString()}`,
+        ].join("\n"),
+      }),
+    });
+    if (!response.ok) {
+      const providerMessage = (await response.text()).slice(0, 500);
+      console.error(`Operational alert email failed (${response.status}): ${providerMessage}`);
+      return { status: response.status >= 500 ? "unknown" : "failed" };
+    }
+    const payload = await response.json().catch(() => ({}));
+    return typeof payload.id === "string" ? { status: "sent", messageId: payload.id } : { status: "unknown" };
+  } catch (error) {
+    console.error("Operational alert email failed:", error instanceof Error ? error.message : "Unknown error");
+    return { status: "unknown" };
+  }
 }
 
 export async function sendSchoolResultEmail(report, fetcher = fetch) {

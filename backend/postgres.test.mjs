@@ -24,6 +24,9 @@ test("administration schema is versioned and tenant scoped", () => {
   assert.match(sql, /FORCE ROW LEVEL SECURITY/);
   assert.match(sql, /quiks\.owner_context/);
   assert.match(sql, /quiks_legacy_imports/);
+  assert.match(sql, /quiks_school_admin_settings/);
+  assert.match(sql, /transport_pricing_mode/);
+  assert.match(sql, /uniform_route_price_minor/);
 });
 
 test("audit records are protected from updates and deletions", () => {

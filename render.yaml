@@ -47,6 +47,8 @@ services:
         sync: false
       - key: QUIKS_SCHOOL_ENROLMENT_URL
         value: https://quiks.site/school-enrol.html
+      - key: QUIKS_OPERATIONS_ALERT_EMAIL
+        value: support@quiks.site
       - key: PADDLE_API_KEY
         sync: false
       - key: PADDLE_SANDBOX_API_KEY

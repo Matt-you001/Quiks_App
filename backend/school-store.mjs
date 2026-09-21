@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hasActiveAdministrationGrant } from "./school-admin-grants.mjs";
+import { sendOperationalAlert } from "./school-email.mjs";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const configuredStorePath = String(process.env.SCHOOL_STORE_PATH ?? "").trim();
@@ -193,7 +195,16 @@ async function ensureStore() {
 
 async function persistStore(store) {
   writeQueue = writeQueue.catch(() => undefined).then(async () => {
-    await writeStoreSnapshot(store);
+    try {
+      await writeStoreSnapshot(store);
+    } catch (error) {
+      await sendOperationalAlert({
+        subject: "School store backup write failed",
+        message: `The school store or its local recovery copy could not be written. Error: ${error instanceof Error ? error.message : "Unknown filesystem error"}`,
+        idempotencyKey: `quiks-school-store-write-${new Date().toISOString().slice(0, 13)}`,
+      });
+      throw error;
+    }
   });
   await writeQueue;
 }
@@ -435,6 +446,25 @@ function getAdminMembership(store, schoolId, principal) {
       membership.role === "school_admin" &&
       membership.status === "active"
   );
+}
+
+function getInstitutionalOwnerMembership(store, schoolId) {
+  const ownerEmail = String(store.schools[schoolId]?.administratorSetup?.email ?? "").trim().toLowerCase();
+  if (!ownerEmail) return null;
+  return Object.values(store.memberships).find(
+    (membership) => membership.schoolId === schoolId && membership.status === "active" && membership.email === ownerEmail
+  ) ?? null;
+}
+
+function principalIsInstitutionalOwner(store, schoolId, principal) {
+  const membership = getInstitutionalOwnerMembership(store, schoolId);
+  return Boolean(membership && membershipMatchesPrincipal(membership, principal));
+}
+
+function requireInstitutionalOwner(store, schoolId, principal) {
+  if (!principalIsInstitutionalOwner(store, schoolId, principal)) {
+    throw Object.assign(new Error("Only the School Owner can perform this action."), { statusCode: 403 });
+  }
 }
 
 function requireSchoolAdmin(store, schoolId, principal) {
@@ -1153,12 +1183,15 @@ export async function getSchoolDetails(principal, schoolId) {
   if (!school) throw new Error("School not found.");
   // The Quiks App Owner keeps read-only visibility for renewal/support. School
   // administrators must have a currently active licence to enter the portal.
-  if (!isOwner(principal)) requireActiveSchoolLicence(store, schoolId);
+  if (!isOwner(principal) && getEffectiveLicenceStatus(school.licence) !== "active") {
+    const administrationActive = await hasActiveAdministrationGrant(schoolId);
+    if (!administrationActive) requireActiveSchoolLicence(store, schoolId);
+  }
   return {
     viewer: {
       displayName: principal.name || principal.email || "Quiks user",
       email: principal.email,
-      role: isOwner(principal) ? "app_owner" : "school_admin",
+      role: isOwner(principal) ? "app_owner" : principalIsInstitutionalOwner(store, schoolId, principal) ? "school_owner" : "school_admin",
     },
     school: buildSchoolSummary(store, school),
     profileFields: cloneValue(school.profileFields),
@@ -1169,6 +1202,20 @@ export async function getSchoolDetails(principal, schoolId) {
       .filter((purchase) => purchase.schoolId === schoolId)
       .sort((left, right) => right.purchasedAt - left.purchasedAt)
       .map((purchase) => ({ ...purchase })),
+  };
+}
+
+export async function getSchoolAdministrationContext(principal, schoolId) {
+  const store = await ensureStore();
+  requireSchoolAdmin(store, schoolId, principal);
+  const school = store.schools[schoolId];
+  if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+  return {
+    principal,
+    isAppOwner: isOwner(principal),
+    isSchoolOwner: principalIsInstitutionalOwner(store, schoolId, principal),
+    school: buildSchoolSummary(store, school),
+    memberships: membershipsForSchool(store, schoolId).map((membership) => buildMembership(store, membership)),
   };
 }
 
@@ -1233,6 +1280,7 @@ export async function updateSchoolCurriculum(principal, schoolId, curriculum) {
 export async function inviteSchoolMember(principal, schoolId, email, role) {
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
+    if (role === "school_admin") requireInstitutionalOwner(store, schoolId, principal);
     const school = requireActiveSchoolLicence(store, schoolId);
     const normalizedEmail = String(email ?? "").trim().toLowerCase();
     if (!normalizedEmail.includes("@") || !["school_admin", "teacher", "student"].includes(role)) {
@@ -1323,10 +1371,31 @@ export async function updateMembershipStatus(principal, schoolId, membershipId, 
     const membership = store.memberships[membershipId];
     if (!school || !membership || membership.schoolId !== schoolId) throw new Error("School membership not found.");
     if (!['invited', 'pending', 'active', 'suspended'].includes(status)) throw new Error("Invalid membership status.");
+    const institutionalOwner = getInstitutionalOwnerMembership(store, schoolId);
+    if (institutionalOwner?.membershipId === membershipId && status !== "active") {
+      throw Object.assign(new Error("The School Owner account cannot be suspended."), { statusCode: 409 });
+    }
     if (status === "active") ensureSeatAvailable(store, school, membership.role, membershipId);
     membership.status = status;
     if (status === "active" && !membership.joinedAt) membership.joinedAt = Date.now();
     recordAudit(store, principal, "school.membership.updated", schoolId, { membershipId, status });
+    return buildMembership(store, membership);
+  });
+}
+
+export async function updateMembershipRole(principal, schoolId, membershipId, role) {
+  return mutateStore(async (store) => {
+    requireSchoolAdmin(store, schoolId, principal);
+    const school = requireActiveSchoolLicence(store, schoolId);
+    const membership = store.memberships[membershipId];
+    if (!membership || membership.schoolId !== schoolId) throw Object.assign(new Error("School membership not found."), { statusCode: 404 });
+    if (!["school_admin", "teacher", "student"].includes(role)) throw Object.assign(new Error("Choose a valid school role."), { statusCode: 400 });
+    const institutionalOwner = getInstitutionalOwnerMembership(store, schoolId);
+    if (institutionalOwner?.membershipId === membershipId) throw Object.assign(new Error("The School Owner's primary role cannot be changed."), { statusCode: 409 });
+    ensureSeatAvailable(store, school, role, membershipId);
+    const previousRole = membership.role;
+    membership.role = role;
+    recordAudit(store, principal, "school.membership.role.updated", schoolId, { membershipId, previousRole, role });
     return buildMembership(store, membership);
   });
 }

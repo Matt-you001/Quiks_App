@@ -373,4 +373,57 @@ export const POSTGRES_MIGRATIONS = [
       $$;
     `,
   },
+  {
+    version: 2,
+    name: "administration_configuration_and_transport_pricing",
+    sql: String.raw`
+      CREATE TABLE IF NOT EXISTS quiks_school_admin_settings (
+        school_id text PRIMARY KEY REFERENCES quiks_schools(id) ON DELETE RESTRICT,
+        collection_settings jsonb NOT NULL DEFAULT '{
+          "studentPhotograph": false,
+          "staffPhotograph": false,
+          "birthCertificate": false,
+          "identityDocument": false,
+          "medicalDocument": false
+        }'::jsonb,
+        transport_pricing_mode text NOT NULL DEFAULT 'uniform'
+          CHECK (transport_pricing_mode IN ('uniform', 'varying')),
+        uniform_route_price_minor bigint,
+        currency char(3) NOT NULL DEFAULT 'NGN',
+        updated_by_principal_id text,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CHECK (uniform_route_price_minor IS NULL OR uniform_route_price_minor >= 0)
+      );
+
+      ALTER TABLE quiks_transport_routes
+        ADD COLUMN IF NOT EXISTS price_minor bigint,
+        ADD COLUMN IF NOT EXISTS currency char(3) NOT NULL DEFAULT 'NGN';
+      ALTER TABLE quiks_transport_routes
+        DROP CONSTRAINT IF EXISTS quiks_transport_routes_price_nonnegative;
+      ALTER TABLE quiks_transport_routes
+        ADD CONSTRAINT quiks_transport_routes_price_nonnegative
+        CHECK (price_minor IS NULL OR price_minor >= 0);
+
+      INSERT INTO quiks_permissions (code, description) VALUES
+        ('administrators.manage', 'Create administrators and manage administrative roles'),
+        ('attendance.amend', 'Amend submitted attendance with an audit reason'),
+        ('sensitive_records.view', 'View disciplinary and appraisal records'),
+        ('school.export_all', 'Export the complete school data set'),
+        ('people.archive', 'Archive student and staff records')
+      ON CONFLICT (code) DO UPDATE SET description = EXCLUDED.description;
+
+      ALTER TABLE quiks_school_admin_settings ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE quiks_school_admin_settings FORCE ROW LEVEL SECURITY;
+      DROP POLICY IF EXISTS quiks_school_scope ON quiks_school_admin_settings;
+      CREATE POLICY quiks_school_scope ON quiks_school_admin_settings
+        USING (
+          current_setting('quiks.owner_context', true) = 'true'
+          OR school_id = nullif(current_setting('quiks.school_id', true), '')
+        )
+        WITH CHECK (
+          current_setting('quiks.owner_context', true) = 'true'
+          OR school_id = nullif(current_setting('quiks.school_id', true), '')
+        );
+    `,
+  },
 ];

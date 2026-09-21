@@ -109,10 +109,16 @@ import type {
   SchoolOwnerLicenceUpdateRequest,
   SchoolProfileFieldsUpdateRequest,
   SchoolPublicDetails,
+  SchoolAdministrationSummary,
+  SchoolAdministrationSettings,
+  SchoolAdministrationModuleCode,
   FeedbackRequest,
   LearningLesson,
   LearningLessonRequest,
   LearningHubQuestionRequest,
+  PastQuestionSearchResponse,
+  PastQuestionSubmitRequest,
+  PastQuestionSubmitResponse,
   Question,
   QuestionRequest,
   QuestionResponse,
@@ -341,6 +347,10 @@ export async function updateSchoolMembershipStatus(request: SchoolMembershipStat
   return postJson("/school/admin/membership/status", request);
 }
 
+export async function updateSchoolMembershipRole(request: { schoolId: string; membershipId: string; role: import("../types/app").SchoolMemberRole }): Promise<SchoolDetailsResponse["memberships"][number]> {
+  return postJson("/school/admin/membership/role", request);
+}
+
 export async function getSchoolOwnerDashboard(): Promise<SchoolOwnerDashboardResponse> {
   return postJson("/school/owner/dashboard", {});
 }
@@ -382,6 +392,124 @@ export async function updateSchoolClassNaming(request: { schoolId: string; class
 
 export async function updateSchoolCurriculum(request: { schoolId: string; curriculum: string | string[] }): Promise<SchoolDetailsResponse["school"]> {
   return postJson("/school/admin/curriculum", request);
+}
+
+export async function getSchoolAdministrationSummary(schoolId: string): Promise<SchoolAdministrationSummary> {
+  return postJson("/school/admin/operations/summary", { schoolId });
+}
+
+export async function updateSchoolAdministrationSettings(request: {
+  schoolId: string;
+  collectionSettings: SchoolAdministrationSettings["collectionSettings"];
+  transportPricingMode: SchoolAdministrationSettings["transportPricingMode"];
+  uniformRoutePriceMinor: number | null;
+  currency: string;
+  routePrices?: Record<string, number>;
+}): Promise<{ settings: SchoolAdministrationSettings }> {
+  return postJson("/school/admin/operations/settings-update", request);
+}
+
+export async function createSchoolAdministrationPerson(request: {
+  schoolId: string;
+  personType: "student" | "staff" | "guardian";
+  givenName: string;
+  familyName: string;
+  email?: string;
+  phone?: string;
+  identifier?: string;
+  customFields?: Record<string, unknown>;
+}): Promise<{ id: string }> {
+  return postJson("/school/admin/operations/person-create", request);
+}
+
+export async function archiveSchoolAdministrationPerson(request: { schoolId: string; personId: string }): Promise<{ personId: string; archived: boolean }> {
+  return postJson("/school/admin/operations/person-archive", request);
+}
+
+export async function createSchoolTransportRoute(request: { schoolId: string; name: string; priceMinor?: number }): Promise<SchoolAdministrationSummary["routes"][number]> {
+  return postJson("/school/admin/operations/route-create", request);
+}
+
+export async function submitSchoolAttendance(request: {
+  schoolId: string;
+  date: string;
+  sessionLabel?: string;
+  records: Array<{ personId: string; status: "present" | "absent" | "late" | "excused"; note?: string }>;
+}): Promise<{ sessionId: string; recordCount: number }> {
+  return postJson("/school/admin/operations/attendance-submit", request);
+}
+
+export async function getSchoolAttendanceDetails(request: { schoolId: string; sessionId: string }): Promise<{
+  session: { id: string; attendanceDate: string; sessionLabel: string; createdAt: string };
+  records: Array<{ personId: string; givenName: string; familyName: string; status: "present" | "absent" | "late" | "excused"; note: string | null }>;
+}> {
+  return postJson("/school/admin/operations/attendance-details", request);
+}
+
+export async function amendSchoolAttendance(request: {
+  schoolId: string;
+  sessionId: string;
+  personId: string;
+  status: "present" | "absent" | "late" | "excused";
+  reason: string;
+}): Promise<{ sessionId: string; personId: string; status: string }> {
+  return postJson("/school/admin/operations/attendance-amend", request);
+}
+
+export async function createSchoolLessonPlan(request: {
+  schoolId: string;
+  teacherMembershipId: string;
+  subject: string;
+  title: string;
+  notes?: string;
+}): Promise<{ id: string }> {
+  return postJson("/school/admin/operations/lesson-plan-create", request);
+}
+
+export async function createSchoolStaffReport(request: {
+  schoolId: string;
+  staffPersonId: string;
+  authorMembershipId: string;
+  reportType: string;
+  notes?: string;
+}): Promise<{ id: string }> {
+  return postJson("/school/admin/operations/staff-report-create", request);
+}
+
+export async function createSchoolVehicle(request: { schoolId: string; registrationNumber: string; capacity: number }): Promise<{ id: string }> {
+  return postJson("/school/admin/operations/vehicle-create", request);
+}
+
+export async function createSchoolTransportAssignment(request: { schoolId: string; routeId: string; vehicleId?: string; personId: string; startsOn: string }): Promise<{ id: string }> {
+  return postJson("/school/admin/operations/transport-assignment-create", request);
+}
+
+export async function createSchoolTimetable(request: { schoolId: string; name: string; timetableType: "lesson" | "exam" }): Promise<{ id: string }> {
+  return postJson("/school/admin/operations/timetable-create", request);
+}
+
+export async function createSchoolTimetableEntry(request: { schoolId: string; timetableId: string; subject?: string; title: string; startsAt: string; endsAt: string; location?: string }): Promise<{ id: string }> {
+  return postJson("/school/admin/operations/timetable-entry-create", request);
+}
+
+export async function exportSchoolAdministrationData(schoolId: string): Promise<{ filename: string; content: string }> {
+  return postJson("/school/admin/operations/export", { schoolId });
+}
+
+export async function getSchoolAdministrationModules(schoolId: string): Promise<{
+  modules: Array<{ code: SchoolAdministrationModuleCode; name: string }>;
+  grants: import("../types/app").SchoolAdministrationGrant[];
+}> {
+  return postJson("/school/owner/administration/modules", { schoolId });
+}
+
+export async function updateSchoolAdministrationModules(request: {
+  schoolId: string;
+  modules: SchoolAdministrationModuleCode[];
+  startsAt: string;
+  endsAt: string;
+}): ReturnType<typeof getSchoolAdministrationModules> {
+  return postJson("/school/owner/administration/modules", { ...request, update: true });
 }
 
 function withVariantMeta<T extends object>(body: T) {
@@ -945,6 +1073,16 @@ export async function askLearningHubQuestion(request: LearningHubQuestionRequest
     request as unknown as Record<string, unknown>
   );
   return response.answer;
+}
+
+export async function submitPastQuestions(request: PastQuestionSubmitRequest): Promise<PastQuestionSubmitResponse> {
+  if (!apiUrl || aiMode === "demo") throw new Error("Live Past Q&A is unavailable.");
+  return postJson("/learning-hub/past-questions/submit", withVariantMeta(request));
+}
+
+export async function searchPastQuestions(query: string): Promise<PastQuestionSearchResponse> {
+  if (!apiUrl || aiMode === "demo") throw new Error("The Past Q&A library is unavailable.");
+  return postJson("/learning-hub/past-questions/search", withVariantMeta({ query }));
 }
 
 export async function joinCompetition(request: CompetitionJoinRequest): Promise<CompetitionJoinResponse> {
