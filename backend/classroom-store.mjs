@@ -188,6 +188,28 @@ export async function authorizeClassroomRequest(path, body, actor, actorKey) {
   });
 }
 
+// A successful classroom profile sync binds a personal profile to a verified
+// Firebase principal in the server-side store. Use that binding as an
+// authoritative fallback when the account's Firestore profile write is still
+// propagating or Firestore is temporarily unavailable. School profiles never
+// use this path; their identity continues to come from school membership.
+export async function resolveBoundClassroomProfile(profileId, principalId, appVariant) {
+  const store = await ensureStore();
+  const identity = store.profileIdentities[profileId];
+  const profile = store.profiles[profileId];
+  if (
+    !identity ||
+    !profile ||
+    identity.owner !== principalId ||
+    identity.appVariant !== appVariant ||
+    profile.appVariant !== appVariant ||
+    profile.schoolMembershipId
+  ) {
+    return null;
+  }
+  return cloneValue(profile);
+}
+
 function normalizeRole(role) {
   return role === "teacher" ? "teacher" : "student";
 }

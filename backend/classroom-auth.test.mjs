@@ -92,6 +92,33 @@ test("personal profile ownership persists, cannot be stolen by a second account"
   await assert.rejects(call("profile/upsert", { profile: impersonator }, { ...deps, loadProfiles: async () => [impersonator] }), /Quiks ID is already associated/);
 });
 
+test("new personal and automatic administrative profiles bootstrap securely before Firestore propagation", async () => {
+  const automatic = { id: "admin-uid-1", name: "Quiks Owner", quiksId: "QX-A-UID10000", role: "teacher" };
+  const noCloudProfile = dependencies(teacherMembership, { loadProfiles: async () => [] });
+  const synced = await call("profile/upsert", { profile: automatic }, noCloudProfile);
+  assert.equal(synced.profile.id, automatic.id);
+  assert.equal(synced.profile.schoolId, undefined);
+  await store.upsertClassroomProfile(synced.profile, "teens");
+
+  const listed = await call("classes/list", { profile: automatic }, noCloudProfile);
+  assert.equal(listed.profile.id, automatic.id);
+  await assert.rejects(
+    call("classes/list", { profile: automatic }, {
+      ...noCloudProfile,
+      verify: async () => ({ ...principal, principalId: "project-1:different-user" }),
+    }),
+    /not saved/
+  );
+});
+
+test("a bound personal profile remains available during a Firestore lookup outage", async () => {
+  const automatic = { id: "admin-uid-1", name: "Quiks Owner", quiksId: "QX-A-UID10000", role: "teacher" };
+  const authenticated = await call("classes/list", { profile: automatic }, dependencies(teacherMembership, {
+    loadProfiles: async () => { throw auth.accessError("Unable to verify your saved classroom profile.", 503); },
+  }));
+  assert.equal(authenticated.profile.id, automatic.id);
+});
+
 test("unbound legacy profile cannot be claimed; approved mapping keeps ID and records", async () => {
   const legacy = { id: "legacy-1", name: "Legacy", role: "teacher", quiksId: "QX-L1" };
   await store.upsertClassroomProfile(legacy, "teens");
@@ -113,10 +140,11 @@ test("Firestore lookup uses verified project/UID and caller token, fails on outa
   await assert.rejects(auth.loadVerifiedAccountProfiles(req, principal, async () => ({ ok: false, status: 503 })), /Unable to verify/);
 });
 
-test("every HTTP classroom route rejects anonymous requests before its handler", async () => {
+test("every protected classroom and Past Q&A route rejects anonymous requests before its handler", async () => {
   const source = await readFile(new URL("./openai-proxy.mjs", import.meta.url), "utf8");
   const routes = [...new Set([...source.matchAll(/url\.pathname === "(\/classroom\/[^\"]+)"/g)].map((match) => match[1]))];
   routes.push("/classroom/classes/claim", "/classroom/classes/student-code", ...["list", "create", "link", "details"].map(action => `/school/admin/classes/${action}`));
+  routes.push("/learning-hub/past-questions/submit", "/learning-hub/past-questions/search");
   assert.ok(routes.length >= 29);
   const probe = createServer();
   probe.listen(0, "127.0.0.1");

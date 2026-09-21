@@ -31,6 +31,14 @@ services:
         value: /var/data/classroom-store.json
       - key: SCHOOL_STORE_PATH
         value: /var/data/school-store.json
+      - key: DATABASE_URL
+        sync: false
+      - key: QUIKS_POSTGRES_MODE
+        value: shadow
+      - key: QUIKS_POSTGRES_REQUIRED
+        value: false
+      - key: QUIKS_POSTGRES_IMPORT_JSON
+        value: ""
       - key: QUIKS_OWNER_EMAILS
         sync: false
       - key: RESEND_API_KEY

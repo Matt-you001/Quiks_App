@@ -1,6 +1,6 @@
 import { verifyFirebaseRequest } from "./firebase-auth.mjs";
 import { listPrincipalMemberships, assertInstitutionalFeature } from "./school-store.mjs";
-import { authorizeClassroomRequest } from "./classroom-store.mjs";
+import { authorizeClassroomRequest, resolveBoundClassroomProfile } from "./classroom-store.mjs";
 
 export function accessError(message, statusCode = 403) {
   return Object.assign(new Error(message), { statusCode });
@@ -51,6 +51,7 @@ export async function authenticateClassroomRequest(request, path, body, dependen
   const membershipsFor = dependencies.membershipsFor ?? listPrincipalMemberships;
   const loadProfiles = dependencies.loadProfiles ?? loadVerifiedAccountProfiles;
   const authorize = dependencies.authorize ?? authorizeClassroomRequest;
+  const resolveBoundProfile = dependencies.resolveBoundProfile ?? resolveBoundClassroomProfile;
   const principal = await verify(request);
   const variant = body.appVariant ?? "children";
   if (!["children", "teens", "uni"].includes(variant)) throw accessError("Invalid app variant.", 400);
@@ -66,7 +67,20 @@ export async function authenticateClassroomRequest(request, path, body, dependen
     if (!membership || membership.status !== "active") throw accessError("An active school membership is required for this profile.");
     actor = schoolClassroomProfile(membership, variant);
   } else {
-    const saved = (await loadProfiles(request, principal)).find((profile) => profile.id === id);
+    let saved;
+    let profileLookupError;
+    try {
+      saved = (await loadProfiles(request, principal)).find((profile) => profile.id === id);
+    } catch (error) {
+      profileLookupError = error;
+    }
+    saved ??= await resolveBoundProfile(id, principal.principalId, variant);
+    // The sync endpoint is the secure bootstrap point for a new personal or
+    // automatically-created administrative profile. The verified Firebase
+    // principal is bound by authorizeClassroomRequest immediately below; an
+    // existing ID or Quiks ID owned elsewhere is still rejected by the store.
+    if (!saved && path === "/classroom/profile/upsert") saved = body[key];
+    if (!saved && profileLookupError) throw profileLookupError;
     if (!saved) throw accessError("This classroom profile is not saved under the signed-in account. Sync the profile and retry.");
     // Only approved school profiles may carry institutional scope. User-editable
     // Firestore fields cannot grant school/admin roles or link a school.
