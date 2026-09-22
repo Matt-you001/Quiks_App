@@ -32,6 +32,8 @@ Set this on the Render `quiks-app` service:
 QUIKS_OPERATIONS_ALERT_EMAIL=support@quiks.site
 ```
 
+`support@quiks.site` is also the backend default because it is a public operational mailbox, not a secret. The environment variable is optional unless the recipient needs to be changed.
+
 With the existing Resend variables configured, `/health.schoolEmail.operationalAlertsConfigured` should be `true`. The backend sends a best-effort alert when PostgreSQL is unavailable during startup or when the local school-store recovery copy cannot be written.
 
 Also configure Render service, deploy and managed-database notifications to send to `support@quiks.site`. Application email cannot report a complete service outage or a managed PostgreSQL backup failure when the application itself is offline.
@@ -43,4 +45,3 @@ The school can enable or disable collection categories for student photographs, 
 ## Backup limits
 
 The existing `.backup` file is a local recovery copy on the same Render disk; it is not an off-site backup. PostgreSQL recovery should use Render's database backups/PITR when available, plus a separately controlled encrypted export to off-site object storage. Test restoration before commercial onboarding.
-

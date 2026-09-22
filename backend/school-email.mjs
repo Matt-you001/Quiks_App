@@ -1,7 +1,7 @@
 const resendApiKey = String(process.env.RESEND_API_KEY ?? "").trim();
 const invitationFrom = String(process.env.QUIKS_SCHOOL_EMAIL_FROM ?? "").trim();
 const enrolmentUrl = String(process.env.QUIKS_SCHOOL_ENROLMENT_URL ?? "https://quiks.site/school-enrol.html").trim();
-const operationsAlertEmail = String(process.env.QUIKS_OPERATIONS_ALERT_EMAIL ?? "").trim().toLowerCase();
+const operationsAlertEmail = String(process.env.QUIKS_OPERATIONS_ALERT_EMAIL || "support@quiks.site").trim().toLowerCase();
 
 export function getSchoolEmailDiagnostics() {
   return {
