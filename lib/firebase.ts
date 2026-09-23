@@ -7,12 +7,15 @@ import {
   getAuth,
   GoogleAuthProvider,
   initializeAuth,
+  reload,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
   updateProfile,
+  verifyBeforeUpdateEmail,
   type Auth,
   type User,
 } from "firebase/auth";
@@ -163,7 +166,33 @@ function toAccount(user: User, provider?: "email" | "google"): AppAccount {
     name: user.displayName?.trim() || user.email?.split("@")[0] || "Learner",
     email: user.email?.trim().toLowerCase() || "",
     provider: guessedProvider,
+    emailVerified: user.emailVerified,
   };
+}
+
+export function isAccountEmailVerified(account: AppAccount | null | undefined) {
+  return account?.emailVerified === true;
+}
+
+function requireCurrentUser() {
+  const user = firebaseAuth?.currentUser;
+  if (!user) {
+    throw new Error("Sign in is required.");
+  }
+  return user;
+}
+
+function requireVerifiedCurrentUser(expectedUid?: string) {
+  const user = requireCurrentUser();
+  if (expectedUid && user.uid !== expectedUid) {
+    throw new Error("The signed-in Firebase account does not match this request.");
+  }
+  if (!user.emailVerified) {
+    throw Object.assign(new Error("Verify your email address before continuing."), {
+      code: "auth/email-not-verified",
+    });
+  }
+  return user;
 }
 
 export function isFirebaseConfigured() {
@@ -205,7 +234,10 @@ export async function getFirebaseIdToken(forceRefresh = false) {
     await waitForFirebaseAuthAccount();
   }
 
-  return firebaseAuth.currentUser?.getIdToken(forceRefresh) ?? null;
+  if (!firebaseAuth.currentUser) {
+    return null;
+  }
+  return requireVerifiedCurrentUser().getIdToken(forceRefresh);
 }
 
 export function formatFirebaseError(error: unknown) {
@@ -259,6 +291,14 @@ export function formatFirebaseError(error: unknown) {
     return "Too many sign-in attempts were made. Wait a little and try again.";
   }
 
+  if (message.includes("auth/email-not-verified")) {
+    return "Verify your email address before continuing.";
+  }
+
+  if (message.includes("auth/requires-recent-login")) {
+    return "For security, sign in again before changing your email address.";
+  }
+
   if (message.includes("auth/requests-from-referer") || message.includes("API_KEY_HTTP_REFERRER_BLOCKED")) {
     return "This website address is not permitted by the Firebase API key settings.";
   }
@@ -306,6 +346,7 @@ export async function signUpWithEmailAccount(name: string, email: string, passwo
       displayName: name.trim(),
     });
   }
+  await sendEmailVerification(credential.user);
   return toAccount(credential.user, "email");
 }
 
@@ -326,6 +367,33 @@ export async function signInWithGoogleAccount(idToken: string, accessToken?: str
   const googleCredential = GoogleAuthProvider.credential(idToken, accessToken);
   const credential = await signInWithCredential(firebaseAuth, googleCredential);
   return toAccount(credential.user, "google");
+}
+
+export async function resendEmailVerification() {
+  const user = requireCurrentUser();
+  if (!user.emailVerified) {
+    await sendEmailVerification(user);
+  }
+  return toAccount(user);
+}
+
+export async function refreshEmailVerification() {
+  const user = requireCurrentUser();
+  await reload(user);
+  if (user.emailVerified) {
+    await user.getIdToken(true);
+  }
+  return toAccount(user);
+}
+
+export async function changeEmailWithVerification(nextEmail: string) {
+  const user = requireCurrentUser();
+  const normalizedEmail = nextEmail.trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw new Error("Enter a valid email address.");
+  }
+  await verifyBeforeUpdateEmail(user, normalizedEmail);
+  return normalizedEmail;
 }
 
 export async function sendResetPasswordEmail(email: string) {
@@ -349,6 +417,7 @@ export async function loadCloudState(userId: string) {
   if (!firebaseDb) {
     return null;
   }
+  requireVerifiedCurrentUser(userId);
 
   const snapshot = await getDoc(doc(firebaseDb, "users", userId));
   if (!snapshot.exists()) {
@@ -403,6 +472,7 @@ export async function saveCloudState(userId: string, state: StoredAppState) {
   if (!firebaseDb) {
     return;
   }
+  requireVerifiedCurrentUser(userId);
 
   const userRef = doc(firebaseDb, "users", userId);
   await runTransaction(firebaseDb, async (transaction) => {
@@ -437,6 +507,7 @@ export async function deleteCloudProfile(userId: string, profileId: string) {
   if (!firebaseDb) {
     return;
   }
+  requireVerifiedCurrentUser(userId);
 
   const userRef = doc(firebaseDb, "users", userId);
   await runTransaction(firebaseDb, async (transaction) => {

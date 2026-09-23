@@ -22,6 +22,7 @@ import {
   formatFirebaseError,
   getAuthenticatedAccount,
   getFirebaseConfigErrorMessage,
+  isAccountEmailVerified,
   isFirebaseConfigured,
   sendResetPasswordEmail,
   signInWithEmailAccount,
@@ -29,11 +30,14 @@ import {
   waitForFirebaseAuthAccount,
 } from "../lib/firebase";
 import { t } from "../lib/i18n";
-import { syncRevenueCatIdentityForAuthentication } from "../lib/revenuecat";
-import { syncAdministrativeProfileForAccount } from "../lib/school-identity";
-import { readAppState, setAuthenticatedAccount } from "../lib/storage";
+import {
+  completeVerifiedAuthentication,
+  getContinuationRoute,
+  getVerifyEmailRoute,
+} from "../lib/auth-flow";
+import { readAppState } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
-import { getPostAuthRoute } from "../lib/web-checkout";
+
 import type { AppLanguage } from "../types/app";
 
 function GoogleLoginButton({
@@ -146,9 +150,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const hasGoogleConfig = hasGoogleSignInConfig();
-  const nextRoute = () => schoolCode.trim()
-    ? ({ pathname: "/school-enrol", params: { code: schoolCode.trim().toUpperCase() } } as const)
-    : getPostAuthRoute(params.redirect, params.plan, params.joinCode, params.className, params.returnTo);
+  const nextRoute = () => getContinuationRoute({ ...params, schoolCode: schoolCode.trim() });
 
   const reportAuthError = useCallback((message: string) => {
     setAuthFeedback({ message, tone: "error" });
@@ -167,13 +169,12 @@ export default function LoginScreen() {
         setLanguage(preferredLanguage);
 
         const firebaseAccount = Platform.OS === "web" ? await waitForFirebaseAuthAccount() : getAuthenticatedAccount();
+        if (firebaseAccount && !isAccountEmailVerified(firebaseAccount)) {
+          router.replace(getVerifyEmailRoute(params, schoolCode) as never);
+          return;
+        }
         if (firebaseAccount) {
-          // Firebase browser persistence has already restored this account.
-          // readAppState above opens its account-scoped cache and starts the
-          // cloud refresh, so do not block the returning user on network I/O.
-          await setAuthenticatedAccount(firebaseAccount, true);
-          void syncAdministrativeProfileForAccount(firebaseAccount).catch(() => undefined);
-          void syncRevenueCatIdentityForAuthentication(firebaseAccount);
+          await completeVerifiedAuthentication(firebaseAccount);
         }
         if (firebaseAccount || (Platform.OS !== "web" && state.isAuthenticated)) {
           router.replace(nextRoute() as never);
@@ -194,12 +195,11 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const account = await signInWithEmailAccount(email, password);
-      // Hydrate the complete account state before the plan sync writes its
-      // updated tier. Running these together can let a one-profile browser
-      // cache overwrite the fully hydrated Firestore document.
-      await setAuthenticatedAccount(account, true);
-      await syncAdministrativeProfileForAccount(account).catch(() => undefined);
-      await syncRevenueCatIdentityForAuthentication(account);
+      if (!isAccountEmailVerified(account)) {
+        router.replace(getVerifyEmailRoute(params, schoolCode) as never);
+        return;
+      }
+      await completeVerifiedAuthentication(account);
       router.replace(nextRoute() as never);
     } catch (error) {
       reportAuthError(formatFirebaseError(error));
@@ -277,9 +277,11 @@ export default function LoginScreen() {
                   onSuccess={async (idToken, accessToken) => {
                     try {
                       const account = await signInWithGoogleAccount(idToken, accessToken);
-                      await setAuthenticatedAccount(account, true);
-                      await syncAdministrativeProfileForAccount(account).catch(() => undefined);
-                      await syncRevenueCatIdentityForAuthentication(account);
+                      if (!isAccountEmailVerified(account)) {
+                        router.replace(getVerifyEmailRoute(params, schoolCode) as never);
+                        return;
+                      }
+                      await completeVerifiedAuthentication(account);
                       router.replace(nextRoute() as never);
                     } catch (error) {
                       reportAuthError(formatFirebaseError(error));

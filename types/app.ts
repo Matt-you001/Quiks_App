@@ -33,6 +33,7 @@ export interface AppAccount {
   name: string;
   email: string;
   provider: "email" | "google";
+  emailVerified: boolean;
 }
 
 export interface SubjectTopic {

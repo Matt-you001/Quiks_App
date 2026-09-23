@@ -58,12 +58,14 @@ These regenerate each existing `web-builds` variant and then replace the generat
 $env:EXPO_PUBLIC_AI_API_URL = "https://quiks-app.onrender.com"
 foreach ($quiksVariant in @("children", "teens", "uni")) {
     $env:APP_VARIANT = $quiksVariant
-    node node_modules/expo/bin/cli export --platform web --output-dir "web-builds/$quiksVariant"
+    $env:EXPO_PUBLIC_APP_VARIANT = $quiksVariant
+    node node_modules/expo/bin/cli export --clear --platform web --output-dir "web-builds/$quiksVariant"
     if ($LASTEXITCODE -ne 0) { throw "Export failed for $quiksVariant" }
 }
 node scripts/prepare-hostable-web-builds.mjs
 if ($LASTEXITCODE -ne 0) { throw "Hosting preparation failed" }
 Remove-Item Env:APP_VARIANT
+Remove-Item Env:EXPO_PUBLIC_APP_VARIANT
 Remove-Item Env:EXPO_PUBLIC_AI_API_URL
 ```
 

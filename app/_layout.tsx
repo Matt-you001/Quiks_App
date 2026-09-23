@@ -6,9 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Platform, View } from "react-native";
 import { appVariant } from "../lib/app-variant";
 import { preloadAppOpenAd, showAppOpenAd } from "../lib/ads";
-import { getAuthenticatedAccount, waitForFirebaseAuthAccount } from "../lib/firebase";
-import { syncRevenueCatIdentityForAuthentication } from "../lib/revenuecat";
-import { syncAdministrativeProfileForAccount } from "../lib/school-identity";
+import {
+  getAuthenticatedAccount,
+  isAccountEmailVerified,
+  waitForFirebaseAuthAccount,
+} from "../lib/firebase";
+import { completeVerifiedAuthentication, getVerifyEmailRoute } from "../lib/auth-flow";
 import { readAppState, setAuthenticatedAccount } from "../lib/storage";
 import {
   useNotificationNavigation,
@@ -31,38 +34,16 @@ export default function RootLayout() {
   const hydratedAccountUidRef = useRef<string | null>(null);
   const segments = useSegments();
   const rootSegment = segments[0];
-  const [webAuthReady, setWebAuthReady] = useState(Platform.OS !== "web");
+  const [webAuthReady, setWebAuthReady] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
-    // Firebase restores native sessions independently of the local app cache.
-    // Reconcile both and refresh administrative roles on every cold start so a
-    // newly approved school administrator does not have to sign out first.
-    void waitForFirebaseAuthAccount().then(async (account) => {
-      if (!account) return;
-      await setAuthenticatedAccount(account, true);
-      await syncAdministrativeProfileForAccount(account).catch(() => undefined);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== "web") {
-      setWebAuthReady(true);
-      return;
-    }
-
-    const route = rootSegment;
-    if (route === "login" || route === "signup") {
+    const route = String(rootSegment ?? "");
+    if (route === "login" || route === "signup" || route === "verify-email") {
       setWebAuthReady(true);
       return;
     }
 
     let cancelled = false;
-    // Do not blank the whole application after a successful sign-in. Firebase
-    // has already placed that account in memory, so the protected route may
-    // remain visible while its account cache and administrative role refresh.
-    // A cold start or genuinely signed-out navigation still stays behind the
-    // loading gate until Firebase persistence has been resolved.
     if (!getAuthenticatedAccount()) {
       setWebAuthReady(false);
     }
@@ -73,27 +54,27 @@ export default function RootLayout() {
         return;
       }
 
+      const returnTo =
+        Platform.OS === "web" && typeof window !== "undefined"
+          ? window.location.pathname + window.location.search
+          : "/";
+
       if (!account) {
         hydratedAccountUidRef.current = null;
         await setAuthenticatedAccount(null, false);
-        const returnTo =
-          typeof window !== "undefined"
-            ? `${window.location.pathname}${window.location.search}`
-            : "/";
         router.replace({ pathname: "/signup", params: { returnTo } } as never);
         return;
       }
 
+      if (!isAccountEmailVerified(account)) {
+        hydratedAccountUidRef.current = null;
+        await setAuthenticatedAccount(account, false);
+        router.replace(getVerifyEmailRoute({ returnTo }) as never);
+        return;
+      }
+
       if (hydratedAccountUidRef.current !== account.uid) {
-        // A returning web user already has an account-scoped local cache.
-        // Restore the route immediately, then refresh cloud state and plan in
-        // the background. Explicit sign-in still performs the awaited first
-        // cloud merge before it navigates here.
-        await setAuthenticatedAccount(account, true);
-        // Resolve app-owner/school-admin identity before showing a protected
-        // route so a browser refresh cannot briefly downgrade the account.
-        await syncAdministrativeProfileForAccount(account).catch(() => undefined);
-        void syncRevenueCatIdentityForAuthentication(account);
+        await completeVerifiedAuthentication(account);
         hydratedAccountUidRef.current = account.uid;
       }
 

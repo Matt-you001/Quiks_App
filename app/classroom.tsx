@@ -200,6 +200,7 @@ export default function ClassroomScreen() {
   const [customQuestionExplanation, setCustomQuestionExplanation] = useState("");
   const [customQuestionType, setCustomQuestionType] = useState<"objective" | "written">("objective");
   const [customQuestionPoints, setCustomQuestionPoints] = useState("1");
+  const [questionPointsDrafts, setQuestionPointsDrafts] = useState<Record<string, string>>({});
   const [customQuestionMarkingGuide, setCustomQuestionMarkingGuide] = useState("");
   const [customQuestionMaxWords, setCustomQuestionMaxWords] = useState("500");
   const [customQuestionImage, setCustomQuestionImage] = useState<Question["image"]>();
@@ -389,6 +390,7 @@ export default function ClassroomScreen() {
 
     setCandidateQuestions([]);
     setAcceptedQuestions([]);
+    setQuestionPointsDrafts({});
     setCandidateLoadError(null);
     setIsReviewingQuestions(false);
     setReviewPage(0);
@@ -561,6 +563,7 @@ export default function ClassroomScreen() {
     setAssignmentTitle("");
     setAcceptedQuestions([]);
     setCandidateQuestions([]);
+    setQuestionPointsDrafts({});
     setIsReviewingQuestions(false);
     setReviewPage(0);
     setDeadlineDate("");
@@ -944,23 +947,43 @@ export default function ClassroomScreen() {
   };
 
   const acceptCandidate = (question: Question) => {
+    const rawPoints = questionPointsDrafts[question.id] ?? String(question.points ?? 1);
+    const points = Number(rawPoints);
+    if (!rawPoints.trim() || !Number.isFinite(points) || points < 1 || points > 100) {
+      Alert.alert("Question marks", "Enter a mark between 1 and 100 before accepting this question.");
+      return;
+    }
+    const acceptedQuestion = { ...question, points: Math.round(points * 100) / 100 };
     setAcceptedQuestions((current) => {
       if (current.some((entry) => entry.id === question.id) || current.length >= desiredQuestionCount) {
         return current;
       }
 
-      return [...current, question];
+      return [...current, acceptedQuestion];
     });
+    setQuestionPointsDrafts((current) => ({ ...current, [question.id]: String(acceptedQuestion.points) }));
     setCandidateQuestions((current) => current.filter((entry) => entry.id !== question.id));
     setIsReviewingQuestions(false);
   };
 
   const skipCandidate = () => {
+    if (currentCandidateQuestion) {
+      setQuestionPointsDrafts((current) => {
+        const next = { ...current };
+        delete next[currentCandidateQuestion.id];
+        return next;
+      });
+    }
     setCandidateQuestions((current) => current.slice(1));
   };
 
   const removeAcceptedQuestion = (questionId: string) => {
     setAcceptedQuestions((current) => current.filter((entry) => entry.id !== questionId));
+    setQuestionPointsDrafts((current) => {
+      const next = { ...current };
+      delete next[questionId];
+      return next;
+    });
     setIsReviewingQuestions(false);
     setReviewPage(0);
   };
@@ -1066,11 +1089,17 @@ export default function ClassroomScreen() {
       return;
     }
 
+    const customPoints = Number(customQuestionPoints);
+    if (!customQuestionPoints.trim() || !Number.isFinite(customPoints) || customPoints < 1 || customPoints > 100) {
+      Alert.alert("Question marks", "Enter a mark between 1 and 100 for this question.");
+      return;
+    }
+
     const customQuestion: Question = {
       id: `custom-${Date.now()}-${acceptedQuestions.length + 1}`,
       prompt: customQuestionPrompt.trim(),
       type: customQuestionType,
-      points: Math.max(1, Math.min(100, Number(customQuestionPoints) || 1)),
+      points: Math.round(customPoints * 100) / 100,
       image: customQuestionImage,
       options: customQuestionType === "objective" ? customQuestionOptions.map((option) => option.trim()) : [],
       answer: customQuestionType === "objective" ? answer : "",
@@ -1100,6 +1129,21 @@ export default function ClassroomScreen() {
       Alert.alert(t(language, "publishAssignmentTitle"), t(language, "acceptQuestionsBeforePublishing", { count: desiredQuestionCount }));
       return;
     }
+
+
+    const invalidMarksQuestion = acceptedQuestions.find((question) => {
+      const rawValue = questionPointsDrafts[question.id] ?? String(question.points ?? 1);
+      const value = Number(rawValue);
+      return !rawValue.trim() || !Number.isFinite(value) || value < 1 || value > 100;
+    });
+    if (invalidMarksQuestion) {
+      Alert.alert("Question marks", "Every question must have a mark between 1 and 100 before publishing.");
+      return;
+    }
+    const questionsForPublishing = acceptedQuestions.map((question) => ({
+      ...question,
+      points: Math.round(Number(questionPointsDrafts[question.id] ?? question.points ?? 1) * 100) / 100,
+    }));
 
     const hasWrittenQuestions = acceptedQuestions.some((question) => question.type === "written");
     const hasObjectiveQuestions = acceptedQuestions.some((question) => question.type !== "written");
@@ -1210,7 +1254,7 @@ export default function ClassroomScreen() {
         passMark: Math.max(0, Math.min(100, Number(passMark) || 0)),
         instructions: cbtInstructions.trim() || undefined,
         accessCode: cbtAccessCode.trim() || undefined,
-        questions: acceptedQuestions.slice(0, desiredQuestionCount),
+        questions: questionsForPublishing.slice(0, desiredQuestionCount),
       };
 
       if (editingActivityId) {
@@ -1317,6 +1361,7 @@ export default function ClassroomScreen() {
       setCbtInstructions(activity.instructions ?? "");
       setCbtAccessCode("");
       setAcceptedQuestions(details.questions);
+      setQuestionPointsDrafts(Object.fromEntries(details.questions.map((question) => [question.id, String(question.points ?? 1)])));
       setCandidateQuestions([]);
       setIsReviewingQuestions(false);
       setReviewPage(0);
@@ -1522,6 +1567,7 @@ export default function ClassroomScreen() {
                     classroomLoadError ? (
                       <View style={styles.loadErrorCard}>
                         <Text style={styles.helperText}>{t(language, "classroomLoadFailed")}</Text>
+                        <Text style={styles.classroomErrorText}>{classroomLoadError}</Text>
                         <PrimaryButton label={t(language, "retryLoading")} onPress={loadData} compact />
                       </View>
                     ) : (
@@ -1942,7 +1988,7 @@ export default function ClassroomScreen() {
                           {assessmentFormat === "mixed" ? <><Text style={styles.sectionLabel}>Question type</Text><View style={styles.inlineActions}><PrimaryButton label="Objective" onPress={() => setCustomQuestionType("objective")} variant={customQuestionType === "objective" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="Written" onPress={() => setCustomQuestionType("written")} variant={customQuestionType === "written" ? "primary" : "secondary"} style={styles.inlineButton}/></View></> : null}
                           <Text style={styles.sectionLabel}>{t(language, "promptLabel")}</Text>
                           <TextInput value={customQuestionPrompt} onChangeText={setCustomQuestionPrompt} placeholder={t(language, "enterYourQuestion")} placeholderTextColor="#8092A7" style={[styles.input, styles.textAreaInput]} multiline />
-                          <Text style={styles.sectionLabel}>Marks</Text>
+                          <Text style={styles.sectionLabel}>Marks for this question (1–100)</Text>
                           <TextInput value={customQuestionPoints} onChangeText={setCustomQuestionPoints} keyboardType="decimal-pad" style={styles.input}/>
                           <PrimaryButton label={customQuestionImage ? "Replace question image" : "Add labelled image"} variant="secondary" onPress={chooseCustomQuestionImage}/>
                           {customQuestionImage ? <View style={styles.questionImagePreviewWrap}><Image source={{ uri: `data:${customQuestionImage.mimeType};base64,${customQuestionImage.dataBase64}` }} style={styles.questionImagePreview} resizeMode="contain"/><PrimaryButton label="Remove image" variant="ghost" onPress={() => setCustomQuestionImage(undefined)} compact/></View> : null}
@@ -1972,7 +2018,7 @@ export default function ClassroomScreen() {
                         currentCandidateQuestion ? (
                           <View style={styles.questionCard}>
                             <MathText value={currentCandidateQuestion.prompt} textStyle={styles.questionPrompt} />
-                            {currentCandidateQuestion.type === "written" ? <Text style={styles.helperText}>Written · {currentCandidateQuestion.points ?? 1} mark(s){currentCandidateQuestion.markingGuide ? ` · Marking guide: ${currentCandidateQuestion.markingGuide}` : ""}</Text> : null}
+                            <Text style={styles.helperText}>{currentCandidateQuestion.type === "written" ? "Written" : "Objective"}{currentCandidateQuestion.type === "written" && currentCandidateQuestion.markingGuide ? ` · Marking guide: ${currentCandidateQuestion.markingGuide}` : ""}</Text>
                             {currentCandidateQuestion.options.map((option, index) => (
                               <MathText
                                 key={`${currentCandidateQuestion.id}-option-${index}`}
@@ -1980,6 +2026,13 @@ export default function ClassroomScreen() {
                                 textStyle={styles.optionPreview}
                               />
                             ))}
+                            <Text style={styles.sectionLabel}>Marks for this question (1–100)</Text>
+                            <TextInput
+                              value={questionPointsDrafts[currentCandidateQuestion.id] ?? String(currentCandidateQuestion.points ?? 1)}
+                              onChangeText={(value) => setQuestionPointsDrafts((current) => ({ ...current, [currentCandidateQuestion.id]: value }))}
+                              keyboardType="decimal-pad"
+                              style={styles.input}
+                            />
                             <View style={styles.inlineActions}>
                               <PrimaryButton label={t(language, "accept")} onPress={() => acceptCandidate(currentCandidateQuestion)} style={styles.inlineButton} />
                               <PrimaryButton label={t(language, "skip")} variant="secondary" onPress={skipCandidate} style={styles.inlineButton} />
@@ -2005,7 +2058,14 @@ export default function ClassroomScreen() {
                             <View key={question.id} style={styles.questionCard}>
                               {question.image ? <Image source={{ uri: `data:${question.image.mimeType};base64,${question.image.dataBase64}` }} style={styles.questionImagePreview} resizeMode="contain"/> : null}
                               <MathText value={question.prompt} textStyle={styles.questionPrompt} />
-                              <Text style={styles.helperText}>{question.type === "written" ? "Written" : "Objective"} · {question.points ?? 1} mark(s)</Text>
+                              <Text style={styles.helperText}>{question.type === "written" ? "Written" : "Objective"}</Text>
+                              <Text style={styles.sectionLabel}>Marks for this question (1–100)</Text>
+                              <TextInput
+                                value={questionPointsDrafts[question.id] ?? String(question.points ?? 1)}
+                                onChangeText={(value) => setQuestionPointsDrafts((current) => ({ ...current, [question.id]: value }))}
+                                keyboardType="decimal-pad"
+                                style={styles.input}
+                              />
                               <PrimaryButton label={t(language, "remove")} variant="secondary" onPress={() => removeAcceptedQuestion(question.id)} />
                             </View>
                           ))}
@@ -2479,6 +2539,11 @@ const styles = StyleSheet.create({
   loadErrorCard: {
     gap: 10,
     alignItems: "flex-start",
+  },
+  classroomErrorText: {
+    color: palette.danger,
+    fontSize: 14,
+    lineHeight: 20,
   },
   pickerTrigger: {
     minHeight: 50,

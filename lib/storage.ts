@@ -1,5 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { deleteCloudProfile, getAuthenticatedAccount, isFirebaseConfigured, loadCloudState, saveCloudState } from "./firebase";
+import {
+  deleteCloudProfile,
+  getAuthenticatedAccount,
+  isAccountEmailVerified,
+  isFirebaseConfigured,
+  loadCloudState,
+  saveCloudState,
+} from "./firebase";
 import { DEFAULT_LANGUAGE, normalizeLanguage } from "./i18n";
 import { getSubjectDisplayName } from "./subjects";
 import type { AppAccount, SessionResult, StoredAppState, SubscriptionTier, UserProfile, UserRole } from "../types/app";
@@ -63,6 +70,12 @@ function normalizeQuiksId(quiksId: string | undefined, seed: string) {
 }
 
 function normalizeState(state: Partial<StoredAppState>): StoredAppState {
+  const account = state.account
+    ? {
+        ...state.account,
+        emailVerified: state.account.emailVerified === true,
+      }
+    : null;
   const profiles = (state.profiles ?? []).map(normalizeProfile);
   const preferredProfileId = state.currentProfileId ?? profiles[0]?.id ?? null;
   const results = Object.fromEntries(
@@ -107,8 +120,8 @@ function normalizeState(state: Partial<StoredAppState>): StoredAppState {
   // completes, and destructive normalization would otherwise overwrite the
   // complete cloud record with a one-profile snapshot.
   return {
-    account: state.account ?? null,
-    isAuthenticated: Boolean(state.isAuthenticated && state.account),
+    account,
+    isAuthenticated: Boolean(state.isAuthenticated && isAccountEmailVerified(account)),
     profiles,
     currentProfileId: profiles.some((profile) => profile.id === preferredProfileId)
       ? preferredProfileId
@@ -394,6 +407,16 @@ export async function readAppState(options?: { awaitCloudRefresh?: boolean }): P
       return localState;
     }
 
+    if (!isAccountEmailVerified(remoteAccount)) {
+      const verificationPendingState = normalizeState({
+        ...localState,
+        account: remoteAccount,
+        isAuthenticated: false,
+      });
+      await persistLocalAppState(verificationPendingState);
+      return verificationPendingState;
+    }
+
     const accountLocalState =
       localState.account?.uid === remoteAccount.uid || (!localState.account && localState.profiles.length > 0)
         ? localState
@@ -437,6 +460,9 @@ export async function writeAppState(nextState: StoredAppState, options?: { await
 }
 
 export async function upsertProfile(profile: UserProfile) {
+  if (!isAccountEmailVerified(getAuthenticatedAccount())) {
+    throw new Error("Verify your email address before creating or updating a profile.");
+  }
   const state = await readMutableAppState();
   const normalizedProfile = normalizeProfile(profile);
   const index = state.profiles.findIndex((item) => item.id === normalizedProfile.id);
@@ -579,7 +605,7 @@ export async function recordReviewCompleted(dateIso = new Date().toISOString()) 
 
 export async function setAuthenticatedAccount(account: AppAccount | null, isAuthenticated: boolean) {
   const localState = await readLocalAppState(account?.uid);
-  if (!account || !isAuthenticated) {
+  if (!account || !isAuthenticated || !isAccountEmailVerified(account)) {
     const signedOutState = normalizeState({
       ...localState,
       account,

@@ -73,6 +73,18 @@ export default function BreatherScreen() {
   const sudokuBoardWidth = Math.min(width - 72, 430);
 
   useEffect(() => {
+    setActivityMessage("");
+    setCompleted(false);
+    setSelectedCell(null);
+    setSudokuValues(activity.kind === "sudoku" ? [...activity.puzzle] : []);
+    setOpenCards([]);
+    setMatchedSymbols([]);
+    setWordAnswer("");
+    setBreathingStarted(false);
+    setBreathingRemaining(activity.kind === "breathe" ? activity.durationSeconds : 0);
+  }, [activity]);
+
+  useEffect(() => {
     readAppState().then((state) => {
       const activeProfile = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
       setLanguage(activeProfile?.language ?? "en");
@@ -294,30 +306,33 @@ export default function BreatherScreen() {
         <View style={styles.card}>
           <Text style={styles.bodyText}>{t(language, "sudokuHint")}</Text>
           <View style={[styles.sudokuBoard, { width: sudokuBoardWidth }]}>
-            {sudokuValues.map((value, index) => {
-              const row = Math.floor(index / activity.size);
-              const column = index % activity.size;
-              const blockWidth = activity.size === 6 ? 3 : activity.size === 4 ? 2 : 3;
-              const blockHeight = activity.size === 6 ? 2 : activity.size === 4 ? 2 : 3;
-              const fixed = activity.puzzle[index] !== 0;
-              return (
-                <Pressable
-                  key={index}
-                  disabled={fixed || completed}
-                  onPress={() => setSelectedCell(index)}
-                  style={[
-                    styles.sudokuCell,
-                    { width: sudokuBoardWidth / activity.size, height: sudokuBoardWidth / activity.size },
-                    column % blockWidth === 0 && styles.sudokuBlockLeft,
-                    row % blockHeight === 0 && styles.sudokuBlockTop,
-                    selectedCell === index && styles.sudokuCellSelected,
-                    fixed && styles.sudokuCellFixed,
-                  ]}
-                >
-                  <Text style={[styles.sudokuValue, activity.size === 9 && styles.sudokuValueSmall, fixed && styles.sudokuValueFixed]}>{value || ""}</Text>
-                </Pressable>
-              );
-            })}
+            {Array.from({ length: activity.size }, (_, row) => (
+              <View key={`row-${row}`} style={styles.sudokuRow}>
+                {sudokuValues.slice(row * activity.size, (row + 1) * activity.size).map((value, column) => {
+                  const index = row * activity.size + column;
+                  const blockWidth = activity.size === 6 ? 3 : activity.size === 4 ? 2 : 3;
+                  const blockHeight = activity.size === 6 ? 2 : activity.size === 4 ? 2 : 3;
+                  const fixed = activity.puzzle[index] !== 0;
+                  return (
+                    <Pressable
+                      key={index}
+                      disabled={fixed || completed}
+                      onPress={() => setSelectedCell(index)}
+                      style={[
+                        styles.sudokuCell,
+                        { height: sudokuBoardWidth / activity.size },
+                        column % blockWidth === 0 && styles.sudokuBlockLeft,
+                        row % blockHeight === 0 && styles.sudokuBlockTop,
+                        selectedCell === index && styles.sudokuCellSelected,
+                        fixed && styles.sudokuCellFixed,
+                      ]}
+                    >
+                      <Text style={[styles.sudokuValue, activity.size === 9 && styles.sudokuValueSmall, fixed && styles.sudokuValueFixed]}>{value || ""}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
           <View style={styles.numberRow}>
             {Array.from({ length: activity.size }, (_, index) => index + 1).map((value) => (
@@ -405,8 +420,9 @@ const styles = StyleSheet.create({
   sectionTitle: { color: palette.ink, fontSize: 20, fontWeight: "800", marginBottom: 10 },
   bodyText: { color: palette.slate, lineHeight: 24, fontSize: 16 },
   factLine: { color: palette.slate, lineHeight: 24, marginBottom: 8 },
-  sudokuBoard: { alignSelf: "center", marginTop: 18, flexDirection: "row", flexWrap: "wrap", borderRightWidth: 2, borderBottomWidth: 2, borderColor: palette.navy },
-  sudokuCell: { alignItems: "center", justifyContent: "center", borderTopWidth: 1, borderLeftWidth: 1, borderColor: "#AAB8C5", backgroundColor: palette.white },
+  sudokuBoard: { alignSelf: "center", marginTop: 18, borderRightWidth: 2, borderBottomWidth: 2, borderColor: palette.navy, overflow: "hidden" },
+  sudokuRow: { flexDirection: "row" },
+  sudokuCell: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", borderTopWidth: 1, borderLeftWidth: 1, borderColor: "#AAB8C5", backgroundColor: palette.white },
   sudokuBlockLeft: { borderLeftWidth: 2, borderLeftColor: palette.navy },
   sudokuBlockTop: { borderTopWidth: 2, borderTopColor: palette.navy },
   sudokuCellSelected: { backgroundColor: "#DDF5FB" },

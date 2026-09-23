@@ -105,6 +105,16 @@ export async function parseDocxQuestions(dataBase64: string) {
   return parseQuestionParagraphs(paragraphs);
 }
 
+export async function extractDocxText(dataBase64: string) {
+  const zip = await JSZip.loadAsync(dataBase64, { base64: true });
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+  if (!documentXml) throw new Error("This Word file does not contain a readable document.");
+  return [...documentXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)]
+    .map((match) => cleanParagraphText(match[0]))
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function parsePlainTextQuestions(text: string) {
   return parseQuestionParagraphs(text.split(/\r?\n/).map((line) => ({ text: line })));
 }

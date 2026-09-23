@@ -712,7 +712,7 @@ const english: TranslationMap = {
   nextQuestion: "Next question",
   learnMore: "Learn More",
   learningHub: "Learning Hub",
-  learningHubHint: "Choose a subject, topic, and grade to generate a focused lesson.",
+  learningHubHint: "Generate a focused lesson, get answers to past questions and ask any question.",
   generateLesson: "Generate Lesson",
   lessonOverview: "Overview",
   lessonExamples: "Examples",

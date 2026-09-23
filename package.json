@@ -14,7 +14,8 @@
     "proxy": "node backend/openai-proxy.mjs",
     "proxy:local": "node --env-file=.env backend/openai-proxy.mjs",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:email-verification": "node --test backend/firebase-auth.test.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

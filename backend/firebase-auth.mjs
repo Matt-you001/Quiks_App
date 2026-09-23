@@ -47,6 +47,13 @@ function getTokenFromRequest(request) {
   return Array.isArray(token) ? token[0] : token;
 }
 
+export function assertFirebaseEmailVerified(principal) {
+  if (principal?.emailVerified !== true) {
+    throw Object.assign(new Error("Verify your email address before continuing."), { statusCode: 403 });
+  }
+  return principal;
+}
+
 export async function verifyFirebaseRequest(request) {
   const token = String(getTokenFromRequest(request) ?? "").trim();
   if (!token) {
@@ -99,14 +106,14 @@ export async function verifyFirebaseRequest(request) {
     throw new Error("The Firebase identity token signature is invalid.");
   }
 
-  return {
+  return assertFirebaseEmailVerified({
     uid: payload.sub,
     projectId,
     principalId: `${projectId}:${payload.sub}`,
     email: String(payload.email ?? "").trim().toLowerCase(),
     emailVerified: payload.email_verified === true,
     name: String(payload.name ?? payload.email ?? "Quiks user").trim(),
-  };
+  });
 }
 
 export function getFirebaseAuthDiagnostics() {
