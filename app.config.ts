@@ -427,6 +427,7 @@ const config: ExpoConfig = {
     "expo-audio",
     "expo-web-browser",
     "expo-notifications",
+    "expo-secure-store",
   ],
   experiments: {
     typedRoutes: true,
@@ -436,6 +437,7 @@ const config: ExpoConfig = {
     EXPO_PUBLIC_APP_VARIANT: variant,
     EXPO_PUBLIC_AI_API_URL: readEnvValue("EXPO_PUBLIC_AI_API_URL"),
     EXPO_PUBLIC_AI_MODE: readEnvValue("EXPO_PUBLIC_AI_MODE"),
+    EXPO_PUBLIC_QUIKS_EXAM_SIGNING_PUBLIC_KEY: process.env.EXPO_PUBLIC_QUIKS_EXAM_SIGNING_PUBLIC_KEY ?? "",
     EXPO_PUBLIC_GEMINI_MODEL: readEnvValue("EXPO_PUBLIC_GEMINI_MODEL"),
     EXPO_PUBLIC_GEMINI_VERIFIER_MODEL: readEnvValue("EXPO_PUBLIC_GEMINI_VERIFIER_MODEL"),
     EXPO_PUBLIC_ADMOB_ANDROID_APP_ID: readVariantAdMobAppId("androidAppId"),

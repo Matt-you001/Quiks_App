@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { CLASSROOM_RESET_VERSION, migrateClassroomTestData } from "./classroom-migration.mjs";
 import { captureSchoolResult, backfillSchoolResults, processSchoolResults } from "./school-results.mjs";
 import { schoolClassroomOperation, teacherSchoolClassOperation, newClassCode } from "./school-classrooms.mjs";
+import { createOfflineExamPackages } from "./offline-exam-packages.mjs";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const configuredStorePath = String(process.env.CLASSROOM_STORE_PATH ?? "").trim();
@@ -617,6 +618,9 @@ function buildActivitySummary(store, activity, profileId) {
     autoSubmit: activity.autoSubmit !== false,
     passMark: activity.passMark ?? 50,
     instructions: activity.instructions,
+    deliveryMode: activity.deliveryMode ?? "online",
+    offlineConfiguration: activity.offlineConfiguration,
+    offlinePackageVersion: activity.offlinePackageVersion ?? 1,
     accessCodeRequired: Boolean(activity.accessCode),
     status: getClassStatus(activity),
     teacherProfileId: activity.teacherProfileId,
@@ -628,6 +632,36 @@ function buildActivitySummary(store, activity, profileId) {
     createdAt: activity.createdAt,
     submitted: ownSubmissions.length >= attemptsAllowed,
     score: ownSubmission?.score,
+  };
+}
+
+function normalizeOfflineDelivery(payload, isTest, endAt) {
+  const deliveryMode = ["offline_sync", "offline_standalone"].includes(payload.deliveryMode) ? payload.deliveryMode : "online";
+  if (deliveryMode === "online") return { deliveryMode, offlineConfiguration: undefined };
+  if (!isTest) throw new Error("Offline deployment is available for tests and examinations.");
+  const input = payload.offlineConfiguration ?? {};
+  const packageExpiresAt = Number(input.packageExpiresAt);
+  if (!Number.isFinite(packageExpiresAt) || packageExpiresAt <= Date.now()) throw new Error("Choose a future offline package expiry date and time.");
+  if (packageExpiresAt < endAt) throw new Error("The offline package cannot expire before the activity closes.");
+  const deploymentFormat = ["android", "exam_hub", "printable_pdf"].includes(input.deploymentFormat) ? input.deploymentFormat : "android";
+  const responseMode = ["paper", "device_export", "exam_hub"].includes(input.responseMode) ? input.responseMode : "paper";
+  if (deploymentFormat === "exam_hub" && responseMode !== "exam_hub") throw new Error("Exam Hub deployment must submit responses to Exam Hub.");
+  if (deploymentFormat === "printable_pdf" && responseMode !== "paper") throw new Error("Printable-paper deployment must collect answers on paper.");
+  if (deploymentFormat === "android" && responseMode === "exam_hub") throw new Error("Exam Hub response handling requires an Exam Hub deployment.");
+  if ((deploymentFormat === "exam_hub" || responseMode === "paper") && deliveryMode !== "offline_standalone") throw new Error("Exam Hub and paper deployment are school-managed standalone modes.");
+  const parsedMaxDevices = Number(input.maxDevices ?? 1);
+  if (!Number.isFinite(parsedMaxDevices) || parsedMaxDevices < 1) throw new Error("Enter a valid maximum candidate/device count.");
+  return {
+    deliveryMode,
+    offlineConfiguration: {
+      deploymentFormat,
+      responseMode,
+      packageExpiresAt,
+      maxDevices: Math.max(1, Math.min(5000, Math.floor(parsedMaxDevices))),
+      allowLocalResponseExport: deliveryMode === "offline_standalone" && input.allowLocalResponseExport !== false,
+      includeTeacherPackage: input.includeTeacherPackage !== false,
+      showQuestionPoints: input.showQuestionPoints !== false,
+    },
   };
 }
 
@@ -969,6 +1003,7 @@ export async function createClassroomActivity(payload, appVariant) {
         ? startAt + durationMinutes * 60 * 1000
         : startAt + Math.max(1, Number(payload.availabilityHours ?? 24)) * 60 * 60 * 1000;
     const activityId = randomUUID();
+    const offline = normalizeOfflineDelivery(payload, isTest, endAt);
 
     const topicIds = Array.isArray(payload.topicIds)
       ? payload.topicIds.filter((topicId) => typeof topicId === "string" && topicId.trim())
@@ -1018,6 +1053,9 @@ export async function createClassroomActivity(payload, appVariant) {
       autoSubmit: payload.autoSubmit !== false,
       passMark: Math.max(0, Math.min(100, Number(payload.passMark ?? 50))),
       instructions: String(payload.instructions ?? "").trim().slice(0, 2000) || undefined,
+      deliveryMode: offline.deliveryMode,
+      offlineConfiguration: offline.offlineConfiguration,
+      offlinePackageVersion: 1,
       accessCode: isTest ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined,
       questions: normalizedQuestions,
       questionCount,
@@ -1240,6 +1278,8 @@ export async function updateClassroomActivity(payload, appVariant) {
     const explicitEndAt = Number(payload.endAt ?? 0);
     const startAt = Number.isFinite(explicitStartAt) && explicitStartAt > 0 ? explicitStartAt : activity.startAt;
     const endAt = Number.isFinite(explicitEndAt) && explicitEndAt > startAt ? explicitEndAt : activity.endAt;
+    const isTest = payload.type === "test" || payload.type === "exam";
+    const offline = normalizeOfflineDelivery(payload, isTest, endAt);
 
     activity.type = payload.type === "exam" ? "exam" : payload.type === "test" ? "test" : "assignment";
     activity.title = payload.title.trim();
@@ -1285,6 +1325,9 @@ export async function updateClassroomActivity(payload, appVariant) {
     activity.autoSubmit = payload.autoSubmit !== false;
     activity.passMark = Math.max(0, Math.min(100, Number(payload.passMark ?? 50)));
     activity.instructions = String(payload.instructions ?? "").trim().slice(0, 2000) || undefined;
+    activity.deliveryMode = offline.deliveryMode;
+    activity.offlineConfiguration = offline.offlineConfiguration;
+    activity.offlinePackageVersion = Math.max(1, Number(activity.offlinePackageVersion ?? 1)) + 1;
     activity.accessCode = activity.type !== "assignment" ? String(payload.accessCode ?? "").trim().slice(0, 32) || undefined : undefined;
     activity.questions = normalizedQuestions;
     activity.questionCount = questionCount;
@@ -1296,6 +1339,18 @@ export async function updateClassroomActivity(payload, appVariant) {
     });
 
     return buildActivitySummary(store, activity, payload.teacherProfile.id);
+  });
+}
+
+export async function exportOfflineExamPackages(teacherProfile, activityId, appVariant, options = {}) {
+  return mutateStore(async (store) => {
+    store.profiles[teacherProfile.id] = normalizeProfileRecord(teacherProfile, appVariant);
+    const activity = store.activities[activityId];
+    if (!activity) throw Object.assign(new Error("Activity not found."), { statusCode: 404 });
+    const classroom = store.classrooms[activity.classId];
+    ensureTeacherOwnsClass(classroom, teacherProfile.id);
+    if (classroom.appVariant !== appVariant) throw new Error("This examination belongs to another Quiks variant.");
+    return createOfflineExamPackages({ activity, classroom: { ...classroom, name: classroom.className }, ...options });
   });
 }
 

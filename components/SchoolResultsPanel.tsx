@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { palette } from "../lib/theme";
 import { approveSchoolReport, createSchoolReport, editSchoolReport, exportSchoolReport, getSchoolReports, getSchoolResults, sendSchoolReport } from "../services/ai";
@@ -18,6 +19,21 @@ function Button({ label, onPress, disabled = false }: { label: string; onPress: 
 }
 const statusLabel = (report: SchoolReport) => report.status === "sent" ? "Accepted by email provider" : report.status === "delivery_unknown" ? "Delivery uncertain — contact support before retrying" : report.status;
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]!);
+}
+
+function reportSheetHtml(report: SchoolReport) {
+  const rows = report.rows.map((row) => `<tr><td>${escapeHtml(row.subject)}</td><td>${escapeHtml(row.title)}</td><td>${escapeHtml(row.className)}</td><td>${escapeHtml(row.adjustedScore ?? row.score)}%</td></tr>`).join("");
+  const signature = (name: string | undefined, label: string) => `<div class="signature"><div class="line">${escapeHtml(name || "")}</div><strong>${escapeHtml(label)}</strong><div>Date: __________________</div></div>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(report.title)}</title><style>
+    @page{size:A4;margin:18mm}body{font-family:Arial,sans-serif;color:#183c48;font-size:12px}h1,h2{text-align:center;margin:4px}.meta{text-align:center;margin:12px 0 22px}table{width:100%;border-collapse:collapse;margin:18px 0}th,td{border:1px solid #8aa1aa;padding:8px;text-align:left}th{background:#eaf4f6}.average{font-size:16px;font-weight:bold}.comment{border:1px solid #8aa1aa;min-height:60px;padding:10px}.signatures{display:flex;gap:50px;margin-top:60px}.signature{flex:1;text-align:center}.line{border-bottom:1px solid #183c48;min-height:24px;margin-bottom:7px}@media print{button{display:none}}
+  </style></head><body><h1>${escapeHtml(report.schoolName)}</h1><h2>${escapeHtml(report.title)}</h2><div class="meta"><strong>Student:</strong> ${escapeHtml(report.studentName)}</div>
+  <table><thead><tr><th>Subject</th><th>Activity</th><th>Class</th><th>Report mark</th></tr></thead><tbody>${rows}</tbody></table>
+  <p class="average">Average: ${escapeHtml(report.average)}%</p><p>${escapeHtml(report.calculation)}</p><h3>School comment</h3><div class="comment">${escapeHtml(report.comment || "No additional comment.")}</div>
+  <div class="signatures">${signature(report.teacherName, "Class Teacher's signature")}${signature(report.principalName, "Principal / Head Teacher's signature")}</div></body></html>`;
+}
+
 export function SchoolResultsPanel({ schoolId, memberships }: { schoolId: string; memberships: SchoolMembership[] }) {
   const [data, setData] = useState<SchoolResultsResponse | null>(null);
   const [reports, setReports] = useState<SchoolReport[]>([]);
@@ -27,13 +43,17 @@ export function SchoolResultsPanel({ schoolId, memberships }: { schoolId: string
   const [title, setTitle] = useState("");
   const [selected, setSelected] = useState<SchoolReport | null>(null);
   const [comment, setComment] = useState("");
+  const [teacherName, setTeacherName] = useState("");
+  const [principalName, setPrincipalName] = useState("");
+  const [recipientType, setRecipientType] = useState<"student" | "guardian">("student");
   const [marks, setMarks] = useState<Record<string, { score: string; reason: string }>>({});
   const [dirty, setDirty] = useState(false); const [reviewed, setReviewed] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const students = memberships.filter((member) => member.role === "student");
   const chooseReport = (report: SchoolReport) => {
-    setSelected(report); setComment(report.comment); setDirty(false); setReviewed(false);
+    setSelected(report); setComment(report.comment); setTeacherName(report.teacherName ?? ""); setPrincipalName(report.principalName ?? "");
+    setRecipientType(report.recipientType === "guardian" ? "guardian" : "student"); setDirty(false); setReviewed(false);
     setMarks(Object.fromEntries(report.rows.map((row) => [row.resultId, { score: row.adjustedScore == null ? "" : String(row.adjustedScore), reason: row.adjustmentReason ?? "" }])));
   };
   async function run(action: () => Promise<void>) {
@@ -75,6 +95,9 @@ export function SchoolResultsPanel({ schoolId, memberships }: { schoolId: string
       await Sharing.shareAsync(path, { mimeType: "text/csv", dialogTitle: "Save school report" });
     }
   }
+  async function printReport(report: SchoolReport) {
+    await Print.printAsync({ html: reportSheetHtml(report) });
+  }
   const editable = Boolean(selected && ["draft", "approved"].includes(selected.status));
   return <View style={styles.card}>
     <Text style={styles.heading}>School results register</Text><Text style={styles.copy}>Results appear here only after the class teacher submits an activity to the school portal. Latest attempt means the latest teacher-submitted attempt for each student and activity within the selected dates.</Text>
@@ -111,10 +134,12 @@ export function SchoolResultsPanel({ schoolId, memberships }: { schoolId: string
       </View>)}
       <Text style={styles.label}>Unweighted average: {selected.average}%</Text>
       <TextInput accessibilityLabel="Administrator report comment" multiline editable={editable && !busy} value={comment} onChangeText={(value) => { setComment(value); setDirty(true); }} placeholder="Administrator's comment" style={[styles.input, { minHeight: 80 }]}/>
+      <View style={styles.row}><View style={styles.filter}><Text style={styles.label}>Class Teacher</Text><TextInput accessibilityLabel="Class Teacher name" editable={editable && !busy} value={teacherName} onChangeText={(value) => { setTeacherName(value); setDirty(true); }} placeholder="Name printed above signature line" style={styles.input}/></View><View style={styles.filter}><Text style={styles.label}>Principal / Head Teacher</Text><TextInput accessibilityLabel="Principal or Head Teacher name" editable={editable && !busy} value={principalName} onChangeText={(value) => { setPrincipalName(value); setDirty(true); }} placeholder="Name printed above signature line" style={styles.input}/></View></View>
+      {editable ? <Choose label="Email report to" value={recipientType} options={[{ id: "student", name: `Student — ${selected.studentEmail || selected.email}` }, ...((selected.guardianEmail || memberships.find((member) => member.membershipId === selected.studentMembershipId)?.profileData?.parentEmail) ? [{ id: "guardian", name: `Parent / guardian — ${selected.guardianEmail || memberships.find((member) => member.membershipId === selected.studentMembershipId)?.profileData?.parentEmail}` }] : [])]} onChange={(value) => { setRecipientType(value === "guardian" ? "guardian" : "student"); setDirty(true); }}/> : <Text style={styles.copy}>Shared with: {selected.recipientType === "guardian" ? "Parent / guardian" : "Student"} — {selected.email}</Text>}
       {dirty && <Text style={styles.warning}>Unsaved changes: save the draft before approving, exporting or selecting another report.</Text>}
-      {editable && <Button label="Save draft changes" disabled={busy} onPress={() => void run(() => acceptUpdate(() => editSchoolReport(schoolId, { reportId: selected.reportId, revision: selected.revision, comment, adjustments: Object.entries(marks).filter(([, mark]) => mark.score.trim() !== "").map(([resultId, mark]) => ({ resultId, score: Number(mark.score), reason: mark.reason })) })))}/>}
+      {editable && <Button label="Save draft changes" disabled={busy} onPress={() => void run(() => acceptUpdate(() => editSchoolReport(schoolId, { reportId: selected.reportId, revision: selected.revision, comment, teacherName, principalName, recipientType, adjustments: Object.entries(marks).filter(([, mark]) => mark.score.trim() !== "").map(([resultId, mark]) => ({ resultId, score: Number(mark.score), reason: mark.reason })) })))}/>}
       {selected.status === "draft" && <><View style={styles.row}><Switch accessibilityLabel="I have reviewed this report" value={reviewed} onValueChange={setReviewed}/><Text style={styles.copy}>I have reviewed the marks, corrections and recipient.</Text></View><Button label="Approve reviewed report" disabled={busy || dirty || !reviewed} onPress={() => void run(() => acceptUpdate(() => approveSchoolReport(schoolId, selected)))}/></>}
-      <View style={styles.row}><Button label="Export CSV" disabled={busy || dirty} onPress={() => void run(() => download(selected))}/><Button label="Send report by email" disabled={busy || dirty || selected.status !== "approved"} onPress={() => setConfirmSend(true)}/></View>
+      <View style={styles.row}><Button label="Print / Save report sheet" disabled={busy || dirty} onPress={() => void run(() => printReport(selected))}/><Button label="Export CSV" disabled={busy || dirty} onPress={() => void run(() => download(selected))}/><Button label="Send report by email" disabled={busy || dirty || selected.status !== "approved"} onPress={() => setConfirmSend(true)}/></View>
       {selected.delivery && <Text style={styles.copy}>Email: {selected.delivery.status === "sent" ? "Accepted by the email provider; inbox delivery is not confirmed." : selected.delivery.status === "not_configured" ? "Configure RESEND_API_KEY and QUIKS_SCHOOL_EMAIL_FROM on the backend." : selected.delivery.status === "unknown" || selected.delivery.status === "sending" ? "Contact support to check the provider log before sending another copy." : "Provider rejected the message. Check email settings, then retry."}</Text>}
       <Text style={styles.label}>Audit history</Text>{selected.audit.map((event, index) => <Text style={styles.small} key={index}>{event.action} · {event.name} · {new Date(event.at).toLocaleString()}</Text>)}
     </View> : null}

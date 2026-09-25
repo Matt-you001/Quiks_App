@@ -63,6 +63,8 @@ export async function sendSchoolResultEmail(report, fetcher = fetch) {
       ...(row.adjustmentReason ? [`Original mark: ${row.score}% | Reviewed adjustment: ${row.adjustmentReason}`] : []), "",
     ]), `Average: ${report.average}%`, report.calculation, "",
     `Administrator's comment: ${report.comment || "No additional comment."}`,
+    "", `Class Teacher: ${report.teacherName || "____________________________"}`,
+    `Head Teacher / Principal: ${report.principalName || "____________________________"}`,
     "", "Marks have been reviewed for this report by the school. Contact the school with any questions."];
   try {
     const response = await fetcher("https://api.resend.com/emails", {

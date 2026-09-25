@@ -101,6 +101,11 @@ function csvCell(value) {
   return `"${result.replace(/"/g, '""')}"`;
 }
 
+function email(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : "";
+}
+
 export function processSchoolResults(store, operation, scope, payload = {}) {
   backfillSchoolResults(store);
   if (operation === "list") {
@@ -135,9 +140,12 @@ export function processSchoolResults(store, operation, scope, payload = {}) {
     const title = text(payload.title, 160);
     if (!title) fail("Enter a report title, such as First Term 2026.");
     const now = Date.now();
+    const studentEmail = email(member.email);
+    const guardianEmail = email(member.profileData?.parentEmail);
     const report = { reportId: randomUUID(), schoolId: scope.school.id, schoolName: scope.school.name,
-      studentMembershipId: member.membershipId, studentName: member.displayName, email: member.email,
-      title, comment: "", rows: clone(rows), average: average(rows), status: "draft", revision: 1,
+      studentMembershipId: member.membershipId, studentName: member.displayName,
+      studentEmail, guardianEmail, recipientType: "student", email: studentEmail,
+      title, comment: "", teacherName: "", principalName: "", rows: clone(rows), average: average(rows), status: "draft", revision: 1,
       calculation: "Unweighted mean of the latest submitted attempt for each included activity; not a weighted term grade.",
       createdAt: now, updatedAt: now, audit: [], delivery: null };
     audit(report, scope, "created"); store.schoolReports[report.reportId] = report;
@@ -145,9 +153,10 @@ export function processSchoolResults(store, operation, scope, payload = {}) {
   }
   const report = reportFor(store, scope, payload.reportId);
   if (operation === "export") {
-    const cells = [["School", "Student", "Report", "Class", "Subject", "Activity", "Type", "Submitted", "Attempt", "Original %", "Report %", "Adjustment reason", "Score source", "Admin comment", "Status"]];
+    const cells = [["School", "Student", "Report", "Class", "Subject", "Activity", "Type", "Submitted", "Attempt", "Original %", "Report %", "Adjustment reason", "Score source", "Admin comment", "Class teacher", "Head Teacher / Principal", "Recipient", "Status"]];
     for (const row of report.rows) cells.push([report.schoolName, report.studentName, report.title, row.className, row.subject, row.title, row.type,
-      new Date(row.submittedAt).toISOString(), row.attemptNumber, row.score, row.adjustedScore ?? row.score, row.adjustmentReason ?? "", row.scoreSource, report.comment, report.status]);
+      new Date(row.submittedAt).toISOString(), row.attemptNumber, row.score, row.adjustedScore ?? row.score, row.adjustmentReason ?? "", row.scoreSource,
+      report.comment, report.teacherName ?? "", report.principalName ?? "", report.recipientType ?? "student", report.status]);
     audit(report, scope, "exported");
     return { filename: `quiks-report-${report.reportId}.csv`, csv: cells.map((row) => row.map(csvCell).join(",")).join("\r\n") };
   }
@@ -155,6 +164,18 @@ export function processSchoolResults(store, operation, scope, payload = {}) {
   if (operation === "update") {
     if (["sending", "sent", "delivery_unknown"].includes(report.status)) fail("This report is locked. Create a new report for corrections.", 409);
     report.comment = text(payload.comment, 2000);
+    report.teacherName = text(payload.teacherName, 160);
+    report.principalName = text(payload.principalName, 160);
+    const recipientType = payload.recipientType === "guardian" ? "guardian" : "student";
+    const member = currentMember(scope, report.studentMembershipId);
+    const studentEmail = email(member.email);
+    const guardianEmail = email(member.profileData?.parentEmail);
+    if (recipientType === "guardian" && !guardianEmail) fail("This student does not have a valid parent or guardian email in the school enrolment record.");
+    if (recipientType === "student" && !studentEmail) fail("This student does not have a valid enrolled email address.");
+    report.studentEmail = studentEmail;
+    report.guardianEmail = guardianEmail;
+    report.recipientType = recipientType;
+    report.email = recipientType === "guardian" ? guardianEmail : studentEmail;
     const adjustments = payload.adjustments ?? [];
     if (!Array.isArray(adjustments)) fail("Invalid mark adjustments.");
     if (new Set(adjustments.map((item) => item.resultId)).size !== adjustments.length) fail("Duplicate mark adjustment.");
@@ -175,7 +196,9 @@ export function processSchoolResults(store, operation, scope, payload = {}) {
   } else if (operation === "begin-send") {
     if (report.status !== "approved" || payload.confirm !== true) fail("Approve the report and confirm the recipient before sending.");
     const member = currentMember(scope, report.studentMembershipId);
-    if (member.status !== "active" || member.email !== report.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(report.email)) fail("The enrolled recipient has changed or is inactive. Create a new report after checking enrolment.");
+    const recipientType = report.recipientType === "guardian" ? "guardian" : "student";
+    const expectedEmail = recipientType === "guardian" ? email(member.profileData?.parentEmail) : email(member.email);
+    if (member.status !== "active" || !expectedEmail || expectedEmail !== report.email) fail("The enrolled recipient has changed or is inactive. Update and approve a new report revision after checking enrolment.");
     report.status = "sending";
     report.delivery = { status: "sending", key: `quiks-result-${report.reportId}-v${report.revision}`, startedAt: Date.now() };
     audit(report, scope, "send_requested");

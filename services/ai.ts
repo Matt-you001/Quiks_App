@@ -1418,3 +1418,9 @@ export async function publishClassroomActivityResultsToSchool(
 ): Promise<import("../types/app").ClassroomActivityPublishSchoolResultsResponse> {
   return postJson("/classroom/assignments/publish-school-results", withVariantMeta(request));
 }
+
+export async function exportOfflineExamPackages(
+  request: import("../types/app").OfflineExamPackageExportRequest
+): Promise<import("../types/app").OfflineExamPackageExportResponse> {
+  return postJson("/classroom/assignments/offline-export", withVariantMeta(request));
+}

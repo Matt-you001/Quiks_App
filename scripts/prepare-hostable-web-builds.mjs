@@ -34,6 +34,7 @@ const hostedRouteWrappers = {
   children: [
     { route: "login", title: "Login" },
     { route: "signup", title: "Sign up" },
+    { route: "verify-email", title: "Verify email" },
     { route: "select-profile", title: "Choose learner" },
     { route: "profile", title: "Profile" },
     { route: "profile-editor", title: "Create profile" },
@@ -41,6 +42,7 @@ const hostedRouteWrappers = {
     { route: "classroom", title: "Classroom" },
     { route: "classroom-activity", title: "Classroom activity" },
     { route: "classroom-result", title: "Classroom results" },
+    { route: "offline-exam", title: "Offline exam" },
     { route: "competition", title: "Competition" },
     { route: "session", title: "Session" },
     { route: "results", title: "Results" },
@@ -56,6 +58,7 @@ const hostedRouteWrappers = {
   teens: [
     { route: "login", title: "Login" },
     { route: "signup", title: "Sign up" },
+    { route: "verify-email", title: "Verify email" },
     { route: "select-profile", title: "Choose learner" },
     { route: "profile", title: "Profile" },
     { route: "profile-editor", title: "Create profile" },
@@ -63,6 +66,7 @@ const hostedRouteWrappers = {
     { route: "classroom", title: "Classroom" },
     { route: "classroom-activity", title: "Classroom activity" },
     { route: "classroom-result", title: "Classroom results" },
+    { route: "offline-exam", title: "Offline exam" },
     { route: "competition", title: "Competition" },
     { route: "session", title: "Session" },
     { route: "results", title: "Results" },
@@ -78,6 +82,7 @@ const hostedRouteWrappers = {
   uni: [
     { route: "login", title: "Login" },
     { route: "signup", title: "Sign up" },
+    { route: "verify-email", title: "Verify email" },
     { route: "select-profile", title: "Choose learner" },
     { route: "profile", title: "Profile" },
     { route: "profile-editor", title: "Create profile" },
@@ -85,6 +90,7 @@ const hostedRouteWrappers = {
     { route: "classroom", title: "Classroom" },
     { route: "classroom-activity", title: "Classroom activity" },
     { route: "classroom-result", title: "Classroom results" },
+    { route: "offline-exam", title: "Offline exam" },
     { route: "competition", title: "Competition" },
     { route: "session", title: "Session" },
     { route: "results", title: "Results" },

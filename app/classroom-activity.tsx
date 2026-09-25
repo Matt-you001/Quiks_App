@@ -1,6 +1,9 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
@@ -9,7 +12,7 @@ import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
 import { getSubjectDisplayName } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
-import { getClassroomActivityDetails, gradeClassroomActivitySubmission, publishClassroomActivityResultsToSchool } from "../services/ai";
+import { exportOfflineExamPackages, getClassroomActivityDetails, gradeClassroomActivitySubmission, publishClassroomActivityResultsToSchool } from "../services/ai";
 import type {
   ClassroomActivityDetailsResponse,
   ClassroomSubmissionDetail,
@@ -47,6 +50,10 @@ function activityTypeLabel(type: string) {
   return type === "exam" ? "Exam" : type === "test" ? "Test" : "Assignment";
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]!);
+}
+
 export default function ClassroomActivityScreen() {
   const params = useLocalSearchParams<{ activityId?: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -58,6 +65,9 @@ export default function ClassroomActivityScreen() {
   const [teacherFeedback, setTeacherFeedback] = useState("");
   const [savingMarks, setSavingMarks] = useState(false);
   const [publishingSchoolResults, setPublishingSchoolResults] = useState(false);
+  const [offlineActivationCode, setOfflineActivationCode] = useState("");
+  const [teacherPackagePassword, setTeacherPackagePassword] = useState("");
+  const [exportingOfflinePackage, setExportingOfflinePackage] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -100,6 +110,45 @@ export default function ClassroomActivityScreen() {
       setLoading(false);
     }
   };
+
+  async function savePackage(filename: string, content: string, mimeType: string) {
+    if (Platform.OS === "web") {
+      const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename;
+      document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    }
+    if (!FileSystem.cacheDirectory || !await Sharing.isAvailableAsync()) throw new Error("File sharing is unavailable on this device.");
+    const path = `${FileSystem.cacheDirectory}${filename}`;
+    await FileSystem.writeAsStringAsync(path, content, { encoding: FileSystem.EncodingType.UTF8 });
+    await Sharing.shareAsync(path, { mimeType, dialogTitle: `Save ${filename}` });
+  }
+
+  async function exportOfflinePackages() {
+    if (!profile || !details || exportingOfflinePackage) return;
+    setExportingOfflinePackage(true);
+    try {
+      const exported = await exportOfflineExamPackages({
+        teacherProfile: profile,
+        activityId: details.activity.activityId,
+        activationCode: offlineActivationCode,
+        teacherPackagePassword: details.activity.offlineConfiguration?.includeTeacherPackage ? teacherPackagePassword : undefined,
+      });
+      await savePackage(exported.studentFilename, exported.studentPackage, "application/vnd.quiks.exam+json");
+      if (exported.teacherFilename && exported.teacherPackage) await savePackage(exported.teacherFilename, exported.teacherPackage, "application/vnd.quiks.marking+json");
+      Alert.alert("Offline packages created", "Keep the activation code separate from the student file. Share the teacher package and its password only with authorised staff.");
+    } catch (error) {
+      Alert.alert("Offline export failed", error instanceof Error ? error.message : "Unable to export this examination.");
+    } finally {
+      setExportingOfflinePackage(false);
+    }
+  }
+
+  async function printQuestionPaper() {
+    if (!details) return;
+    const questions = details.questions.map((question, index) => `<section><h3>${index + 1}. ${escapeHtml(question.prompt)} ${details.activity.offlineConfiguration?.showQuestionPoints !== false ? `<span>(${escapeHtml(question.points ?? 1)} mark${Number(question.points ?? 1) === 1 ? "" : "s"})</span>` : ""}</h3>${question.image ? `<img src="data:${question.image.mimeType};base64,${question.image.dataBase64}" alt="${escapeHtml(question.image.altText || "Question illustration")}"/>` : ""}${question.type === "written" ? `<div class="answer"></div>` : `<ol type="A">${question.options.map((option) => `<li>${escapeHtml(option)}</li>`).join("")}</ol>`}</section>`).join("");
+    await Print.printAsync({ html: `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:18mm}body{font-family:Arial,sans-serif;color:#172b35}header{text-align:center;border-bottom:2px solid #172b35;margin-bottom:22px}section{break-inside:avoid;margin:18px 0}h3{font-size:14px}h3 span{float:right;font-weight:normal}img{max-width:80%;max-height:280px;display:block;margin:12px auto}.answer{height:120px;border-bottom:1px dotted #888}li{margin:7px}</style></head><body><header><h1>${escapeHtml(details.activity.title)}</h1><p>${escapeHtml(details.className)} · ${escapeHtml(details.activity.subjectName)} · ${escapeHtml(details.activity.grade)}</p><p>Duration: ${details.activity.durationMinutes} minutes</p></header>${questions}</body></html>` });
+  }
 
   const submissions = details?.submissions ?? [];
   const submittedLearners = useMemo(
@@ -253,6 +302,16 @@ export default function ClassroomActivityScreen() {
 
         {isTeacher ? (
           <>
+            {details.activity.deliveryMode && details.activity.deliveryMode !== "online" ? <View style={styles.card}>
+              <Text style={styles.cardTitle}>Offline examination deployment</Text>
+              <Text style={styles.bodyText}>{details.activity.deliveryMode === "offline_sync" ? "Offline with later Quiks synchronization" : "Standalone offline — school managed"} · Package version {details.activity.offlinePackageVersion ?? 1}</Text>
+              <Text style={styles.bodyText}>The student package contains no answers. Its contents are encrypted with the activation code and signed by Quiks. The marking package is encrypted separately.</Text>
+              <TextInput value={offlineActivationCode} onChangeText={setOfflineActivationCode} autoCapitalize="characters" placeholder="Activation code — at least 8 characters" style={styles.input}/>
+              {details.activity.offlineConfiguration?.includeTeacherPackage ? <TextInput value={teacherPackagePassword} onChangeText={setTeacherPackagePassword} secureTextEntry placeholder="Teacher package password — at least 10 characters" style={styles.input}/> : null}
+              <PrimaryButton label="Export encrypted offline packages" onPress={() => void exportOfflinePackages()} loading={exportingOfflinePackage}/>
+              <PrimaryButton label="Print / Save question paper" variant="secondary" onPress={() => void printQuestionPaper()}/>
+              <Text style={styles.bodyText}>Never distribute the teacher marking package or its password with the student package.</Text>
+            </View> : null}
             <View style={styles.statRow}>
               <View style={styles.statCard}>
                 <Text style={styles.statLabel}>Submitted</Text>
@@ -396,6 +455,7 @@ export default function ClassroomActivityScreen() {
 }
 
 const styles = StyleSheet.create({
+  input: { borderWidth: 1, borderColor: "#CBDDE4", borderRadius: 14, padding: 13, color: palette.ink, backgroundColor: "#F8FBFC" },
   heroCard: {
     marginTop: 12,
     borderRadius: 28,

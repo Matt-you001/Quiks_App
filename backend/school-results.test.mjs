@@ -14,7 +14,7 @@ const student = { id: "school-teens-student", name: "Student", role: "student", 
 const licence = { status: "active", startAt: Date.now() - 10000, endAt: Date.now() + 86400000, features: { reports: true } };
 await writeFile(process.env.SCHOOL_STORE_PATH, JSON.stringify({ schools: { s1: { id: "s1", name: "Test School", licence }, s2: { id: "s2", name: "Other School", licence } }, memberships: {
   admin: { membershipId: "admin", schoolId: "s1", principalId: admin.principalId, role: "school_admin", status: "active" },
-  student: { membershipId: "student", schoolId: "s1", principalId: "project:student", role: "student", status: "active", email: "student@example.com", displayName: "=Student" },
+  student: { membershipId: "student", schoolId: "s1", principalId: "project:student", role: "student", status: "active", email: "student@example.com", displayName: "=Student", profileData: { parentEmail: "guardian@example.com" } },
   otherAdmin: { membershipId: "otherAdmin", schoolId: "s2", principalId: "project:otherAdmin", role: "school_admin", status: "active" },
 } }));
 const store = await import("./classroom-store.mjs");
@@ -98,6 +98,34 @@ test("uncertain email result remains locked and persists without blind retry", a
   await assert.rejects(request("send", { reportId: draft.reportId, revision: draft.revision, confirm: true }), /Approve/);
   const disk = JSON.parse(await readFile(process.env.CLASSROOM_STORE_PATH, "utf8"));
   assert.equal(disk.schoolReports[draft.reportId].status, "delivery_unknown");
+});
+
+test("reports can be addressed to the verified enrolment guardian and retain signatories", async () => {
+  let guardianReport = (await request("create", { studentMembershipId: "student", title: "Guardian copy" })).report;
+  guardianReport = (await request("update", {
+    reportId: guardianReport.reportId,
+    revision: guardianReport.revision,
+    comment: "Shared with home",
+    teacherName: "A. Teacher",
+    principalName: "P. Principal",
+    recipientType: "guardian",
+    adjustments: [],
+  })).report;
+  assert.equal(guardianReport.email, "guardian@example.com");
+  assert.equal(guardianReport.teacherName, "A. Teacher");
+  assert.equal(guardianReport.principalName, "P. Principal");
+  guardianReport = (await request("approve", { reportId: guardianReport.reportId, revision: guardianReport.revision, reviewed: true })).report;
+  guardianReport = (await request("send", { reportId: guardianReport.reportId, revision: guardianReport.revision, confirm: true }, {
+    send: async (sent) => {
+      assert.equal(sent.recipientType, "guardian");
+      assert.equal(sent.email, "guardian@example.com");
+      return { status: "sent", messageId: "guardian-message" };
+    },
+  })).report;
+  assert.equal(guardianReport.status, "sent");
+  const exported = await request("export", { reportId: guardianReport.reportId });
+  assert.ok(exported.csv.includes("A. Teacher"));
+  assert.ok(exported.csv.includes("P. Principal"));
 });
 
 test("written results cannot be published until the teacher finalizes marking", async () => {

@@ -38,7 +38,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     const route = String(rootSegment ?? "");
-    if (route === "login" || route === "signup" || route === "verify-email") {
+    if (route === "login" || route === "signup" || route === "verify-email" || route === "offline-exam") {
       setWebAuthReady(true);
       return;
     }

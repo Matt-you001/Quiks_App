@@ -1,6 +1,6 @@
 import { useFocusEffect, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
@@ -44,6 +44,9 @@ import type {
   ClassroomActivitySummary,
   ClassroomAssessmentFormat,
   ClassroomExitPolicy,
+  ClassroomDeliveryMode,
+  OfflineExamDeploymentFormat,
+  OfflineExamResponseMode,
   ClassroomActivityType,
   ClassroomClassDetailsResponse,
   ClassroomMemberSummary,
@@ -187,6 +190,15 @@ export default function ClassroomScreen() {
   const [passMark, setPassMark] = useState("50");
   const [cbtInstructions, setCbtInstructions] = useState("");
   const [cbtAccessCode, setCbtAccessCode] = useState("");
+  const [deliveryMode, setDeliveryMode] = useState<ClassroomDeliveryMode>("online");
+  const [deploymentFormat, setDeploymentFormat] = useState<OfflineExamDeploymentFormat>("android");
+  const [offlineResponseMode, setOfflineResponseMode] = useState<OfflineExamResponseMode>("paper");
+  const [packageExpiryDate, setPackageExpiryDate] = useState("");
+  const [packageExpiryTime, setPackageExpiryTime] = useState("");
+  const [offlineMaxDevices, setOfflineMaxDevices] = useState("50");
+  const [includeTeacherPackage, setIncludeTeacherPackage] = useState(true);
+  const [allowLocalResponseExport, setAllowLocalResponseExport] = useState(true);
+  const [showOfflineQuestionPoints, setShowOfflineQuestionPoints] = useState(true);
   const [activityAccessCodes, setActivityAccessCodes] = useState<Record<string, string>>({});
   const [candidateQuestions, setCandidateQuestions] = useState<Question[]>([]);
   const [acceptedQuestions, setAcceptedQuestions] = useState<Question[]>([]);
@@ -594,6 +606,15 @@ export default function ClassroomScreen() {
     setPassMark("50");
     setCbtInstructions("");
     setCbtAccessCode("");
+    setDeliveryMode("online");
+    setDeploymentFormat("android");
+    setOfflineResponseMode("paper");
+    setPackageExpiryDate("");
+    setPackageExpiryTime("");
+    setOfflineMaxDevices("50");
+    setIncludeTeacherPackage(true);
+    setAllowLocalResponseExport(true);
+    setShowOfflineQuestionPoints(true);
     setCustomQuestionType("objective");
     setCustomQuestionPoints("1");
     setCustomQuestionMarkingGuide("");
@@ -1166,6 +1187,7 @@ export default function ClassroomScreen() {
     const parsedStartAt = isTimedActivity(activityType) ? parseDateTimeInput(startDate, startTime) : null;
     const parsedEndAt = isTimedActivity(activityType) ? computedTestEndAt : null;
     const parsedDeadline = activityType === "assignment" ? parseDateTimeInput(deadlineDate, deadlineTime) : null;
+    const parsedPackageExpiry = deliveryMode === "online" ? null : parseDateTimeInput(packageExpiryDate, packageExpiryTime);
 
     if (isTimedActivity(activityType) && !parsedStartAt) {
       Alert.alert(t(language, "publishTestTitle"), t(language, "enterValidTestStart"));
@@ -1194,6 +1216,11 @@ export default function ClassroomScreen() {
         Alert.alert(t(language, "publishTestTitle"), t(language, "testEndSameDay"));
         return;
       }
+    }
+
+    if (deliveryMode !== "online" && (!parsedPackageExpiry || (parsedEndAt && parsedPackageExpiry < parsedEndAt))) {
+      Alert.alert("Offline deployment", "Choose a package expiry date and time that is after the examination closes.");
+      return;
     }
 
     if (activityType === "assignment" && !parsedDeadline) {
@@ -1253,6 +1280,16 @@ export default function ClassroomScreen() {
         autoSubmit: true,
         passMark: Math.max(0, Math.min(100, Number(passMark) || 0)),
         instructions: cbtInstructions.trim() || undefined,
+        deliveryMode,
+        offlineConfiguration: deliveryMode === "online" ? undefined : {
+          deploymentFormat,
+          responseMode: offlineResponseMode,
+          packageExpiresAt: parsedPackageExpiry!,
+          maxDevices: Math.max(1, Math.min(5000, Number(offlineMaxDevices) || 1)),
+          allowLocalResponseExport: deliveryMode === "offline_standalone" && allowLocalResponseExport,
+          includeTeacherPackage,
+          showQuestionPoints: showOfflineQuestionPoints,
+        },
         accessCode: cbtAccessCode.trim() || undefined,
         questions: questionsForPublishing.slice(0, desiredQuestionCount),
       };
@@ -1360,6 +1397,15 @@ export default function ClassroomScreen() {
       setPassMark(String(activity.passMark ?? 50));
       setCbtInstructions(activity.instructions ?? "");
       setCbtAccessCode("");
+      setDeliveryMode(activity.deliveryMode ?? "online");
+      setDeploymentFormat(activity.offlineConfiguration?.deploymentFormat ?? "android");
+      setOfflineResponseMode(activity.offlineConfiguration?.responseMode ?? "paper");
+      setPackageExpiryDate(activity.offlineConfiguration?.packageExpiresAt ? formatLocalDateValue(new Date(activity.offlineConfiguration.packageExpiresAt)) : "");
+      setPackageExpiryTime(activity.offlineConfiguration?.packageExpiresAt ? new Date(activity.offlineConfiguration.packageExpiresAt).toTimeString().slice(0, 5) : "");
+      setOfflineMaxDevices(String(activity.offlineConfiguration?.maxDevices ?? 50));
+      setIncludeTeacherPackage(activity.offlineConfiguration?.includeTeacherPackage !== false);
+      setAllowLocalResponseExport(activity.offlineConfiguration?.allowLocalResponseExport !== false);
+      setShowOfflineQuestionPoints(activity.offlineConfiguration?.showQuestionPoints !== false);
       setAcceptedQuestions(details.questions);
       setQuestionPointsDrafts(Object.fromEntries(details.questions.map((question) => [question.id, String(question.points ?? 1)])));
       setCandidateQuestions([]);
@@ -1521,6 +1567,7 @@ export default function ClassroomScreen() {
           </Pressable>
         </View>
       </View>
+      <PrimaryButton label="Open Quiks Exam Player" variant="secondary" onPress={() => router.push("/offline-exam" as never)}/>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {profile.role === "teacher" ? (
@@ -1961,6 +2008,31 @@ export default function ClassroomScreen() {
                       {isTimedActivity(activityType) ? <>
                         <Text style={styles.sectionLabel}>Assessment delivery</Text>
                         <View style={styles.inlineActions}><PrimaryButton label="Standard test" onPress={() => setAssessmentMode("standard")} variant={assessmentMode === "standard" ? "primary" : "secondary"} style={styles.inlineButton}/><PrimaryButton label="CBT mode" onPress={() => setAssessmentMode("cbt")} variant={assessmentMode === "cbt" ? "primary" : "secondary"} style={styles.inlineButton}/></View>
+                        <Text style={styles.sectionLabel}>Exam delivery mode</Text>
+                        <View style={styles.inlineActions}>
+                          <PrimaryButton label="Online only" onPress={() => setDeliveryMode("online")} variant={deliveryMode === "online" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                          <PrimaryButton label="Offline + Quiks sync" onPress={() => { setDeliveryMode("offline_sync"); setDeploymentFormat("android"); setOfflineResponseMode("device_export"); }} variant={deliveryMode === "offline_sync" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                          <PrimaryButton label="Standalone offline" onPress={() => setDeliveryMode("offline_standalone")} variant={deliveryMode === "offline_standalone" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                        </View>
+                        {deliveryMode !== "online" ? <View style={styles.questionCard}>
+                          <Text style={styles.helperText}>{deliveryMode === "offline_sync" ? "Answers are saved offline and submitted to Quiks when the device reconnects." : "The school keeps and marks responses locally; nothing is sent back to Quiks."}</Text>
+                          <Text style={styles.sectionLabel}>Deployment format</Text>
+                          <View style={styles.inlineActions}>
+                            <PrimaryButton label="Quiks Exam Player" onPress={() => { setDeploymentFormat("android"); if (offlineResponseMode === "exam_hub") setOfflineResponseMode("device_export"); }} variant={deploymentFormat === "android" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                            <PrimaryButton label="Exam Hub" onPress={() => { setDeliveryMode("offline_standalone"); setDeploymentFormat("exam_hub"); setOfflineResponseMode("exam_hub"); }} variant={deploymentFormat === "exam_hub" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                            <PrimaryButton label="Printable paper" onPress={() => { setDeliveryMode("offline_standalone"); setDeploymentFormat("printable_pdf"); setOfflineResponseMode("paper"); }} variant={deploymentFormat === "printable_pdf" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                          </View>
+                          <Text style={styles.sectionLabel}>Response handling</Text>
+                          <View style={styles.inlineActions}>
+                            <PrimaryButton label="Answer on paper" onPress={() => { setDeliveryMode("offline_standalone"); setDeploymentFormat("printable_pdf"); setOfflineResponseMode("paper"); }} variant={offlineResponseMode === "paper" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                            <PrimaryButton label="Save/export on device" onPress={() => setOfflineResponseMode("device_export")} variant={offlineResponseMode === "device_export" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                            <PrimaryButton label="Submit to Exam Hub" onPress={() => { setDeliveryMode("offline_standalone"); setDeploymentFormat("exam_hub"); setOfflineResponseMode("exam_hub"); }} variant={offlineResponseMode === "exam_hub" ? "primary" : "secondary"} style={styles.inlineButton}/>
+                          </View>
+                          <View style={styles.inlineActions}><View style={styles.flexInput}><Text style={styles.sectionLabel}>Package expiry date</Text><TextInput value={packageExpiryDate} onChangeText={setPackageExpiryDate} placeholder="YYYY-MM-DD" style={styles.input}/></View><View style={styles.flexInput}><Text style={styles.sectionLabel}>Expiry time</Text><TextInput value={packageExpiryTime} onChangeText={setPackageExpiryTime} placeholder="HH:MM" style={styles.input}/></View><View style={styles.flexInput}><Text style={styles.sectionLabel}>Maximum devices</Text><TextInput value={offlineMaxDevices} onChangeText={setOfflineMaxDevices} keyboardType="number-pad" style={styles.input}/></View></View>
+                          <View style={styles.switchRow}><Switch value={includeTeacherPackage} onValueChange={setIncludeTeacherPackage}/><Text style={styles.helperText}>Create a separate password-protected teacher marking package</Text></View>
+                          {deliveryMode === "offline_standalone" ? <View style={styles.switchRow}><Switch value={allowLocalResponseExport} onValueChange={setAllowLocalResponseExport}/><Text style={styles.helperText}>Allow the school to export responses locally</Text></View> : null}
+                          <View style={styles.switchRow}><Switch value={showOfflineQuestionPoints} onValueChange={setShowOfflineQuestionPoints}/><Text style={styles.helperText}>Show assigned marks to candidates</Text></View>
+                        </View> : null}
                         <Text style={styles.sectionLabel}>Leaving the activity</Text>
                         <Pressable style={styles.dropdownTrigger} onPress={() => setExitPolicyDropdownOpen((current) => !current)}>
                           <Text style={styles.dropdownValue}>
@@ -2672,6 +2744,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     flexWrap: "wrap",
+  },
+  flexInput: {
+    flex: 1,
+    minWidth: 150,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   inlineButton: {
     flex: 1,

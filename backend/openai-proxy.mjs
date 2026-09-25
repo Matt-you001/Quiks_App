@@ -11,6 +11,7 @@ import {
   deleteClassroomActivity,
   deleteLessonNote,
   duplicateActivity,
+  exportOfflineExamPackages,
   getActivityDetails,
   getLessonNoteAttachment,
   getLessonNoteForTeacher,
@@ -35,6 +36,7 @@ import {
   updateLessonNote,
   upsertClassroomProfile,
 } from "./classroom-store.mjs";
+import { getOfflineExamPackageDiagnostics } from "./offline-exam-packages.mjs";
 import { getFirebaseAuthDiagnostics, verifyFirebaseRequest } from "./firebase-auth.mjs";
 import {
   getPastQuestionGenerationContext,
@@ -3550,6 +3552,17 @@ async function handleAssignmentDetails(body, response) {
   sendJson(response, 200, payload);
 }
 
+async function handleOfflineExamExport(body, response) {
+  if (!body.teacherProfile?.id || !body.activityId || !body.activationCode) {
+    sendJson(response, 400, { error: "Teacher profile, examination and offline activation code are required." });
+    return;
+  }
+  sendJson(response, 200, await exportOfflineExamPackages(body.teacherProfile, body.activityId, body.appVariant ?? "children", {
+    activationCode: body.activationCode,
+    teacherPackagePassword: body.teacherPackagePassword,
+  }));
+}
+
 async function handleAssignmentSubmit(body, response) {
   if (!body.profile?.id || !body.activityId) {
     sendJson(response, 400, { error: "Profile and assignment are required." });
@@ -3627,6 +3640,7 @@ const server = http.createServer(async (request, response) => {
       imageModel: openAiImageModel || null,
       imageGenerationConfigured: Boolean(openAiApiKey && openAiImageModel),
       classroomStore: getClassroomStoreDiagnostics(),
+      offlineExamPackages: getOfflineExamPackageDiagnostics(),
       schoolStore: getSchoolStoreDiagnostics(),
       pastQuestionStore: getPastQuestionStoreDiagnostics(),
       schoolEmail: getSchoolEmailDiagnostics(),
@@ -4097,6 +4111,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/classroom/assignments/details") {
       await handleAssignmentDetails(body, response);
+      return;
+    }
+
+    if (url.pathname === "/classroom/assignments/offline-export") {
+      await handleOfflineExamExport(body, response);
       return;
     }
 

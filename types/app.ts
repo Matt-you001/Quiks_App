@@ -20,6 +20,19 @@ export type ClassroomNavigationMode = "free" | "linear";
 export type ClassroomAssessmentFormat = "objective" | "written" | "mixed";
 export type ClassroomExitPolicy = "warn_record" | "confirm_submit" | "strict_submit";
 export type ClassroomQuestionType = "objective" | "written";
+export type ClassroomDeliveryMode = "online" | "offline_sync" | "offline_standalone";
+export type OfflineExamResponseMode = "paper" | "device_export" | "exam_hub";
+export type OfflineExamDeploymentFormat = "android" | "exam_hub" | "printable_pdf";
+
+export interface OfflineExamConfiguration {
+  deploymentFormat: OfflineExamDeploymentFormat;
+  responseMode: OfflineExamResponseMode;
+  packageExpiresAt: number;
+  maxDevices: number;
+  allowLocalResponseExport: boolean;
+  includeTeacherPackage: boolean;
+  showQuestionPoints: boolean;
+}
 
 export interface QuestionImage {
   name: string;
@@ -804,6 +817,9 @@ export interface ClassroomActivitySummary {
   autoSubmit?: boolean;
   passMark?: number;
   instructions?: string;
+  deliveryMode?: ClassroomDeliveryMode;
+  offlineConfiguration?: OfflineExamConfiguration;
+  offlinePackageVersion?: number;
   accessCodeRequired?: boolean;
   status: "scheduled" | "open" | "closed";
   teacherProfileId: string;
@@ -851,6 +867,8 @@ export interface ClassroomActivityCreateRequest {
   autoSubmit?: boolean;
   passMark?: number;
   instructions?: string;
+  deliveryMode?: ClassroomDeliveryMode;
+  offlineConfiguration?: OfflineExamConfiguration;
   accessCode?: string;
   questions: Question[];
 }
@@ -981,6 +999,70 @@ export interface ClassroomActivityPublishSchoolResultsResponse {
   activity: ClassroomActivitySummary;
   publishedCount: number;
   publishedAt: number;
+}
+
+export interface OfflineExamPackageExportRequest {
+  teacherProfile: UserProfile;
+  activityId: string;
+  activationCode: string;
+  teacherPackagePassword?: string;
+}
+
+export interface OfflineExamPackageExportResponse {
+  studentFilename: string;
+  studentPackage: string;
+  teacherFilename?: string;
+  teacherPackage?: string;
+  keyId: string;
+}
+
+export interface OfflineExamStudentQuestion {
+  id: string;
+  prompt: string;
+  options: string[];
+  type: ClassroomQuestionType;
+  points: number;
+  maxWords?: number;
+  image?: QuestionImage;
+}
+
+export interface OfflineExamPayload {
+  format: "quiks-offline-exam";
+  version: 1;
+  packageId: string;
+  packageVersion: number;
+  activityId: string;
+  deliveryMode: Exclude<ClassroomDeliveryMode, "online">;
+  responseMode: OfflineExamResponseMode;
+  deploymentFormat: OfflineExamDeploymentFormat;
+  schoolId?: string;
+  schoolName?: string;
+  className: string;
+  title: string;
+  subjectName: string;
+  grade: string;
+  instructions?: string;
+  durationMinutes: number;
+  startsAt: number;
+  expiresAt: number;
+  maxDevices: number;
+  allowLocalResponseExport: boolean;
+  showQuestionPoints: boolean;
+  questionOrderMode: ClassroomQuestionOrderMode;
+  randomizeOptions: boolean;
+  navigationMode: ClassroomNavigationMode;
+  exitPolicy: ClassroomExitPolicy;
+  activationCodeHash?: string;
+  questions: OfflineExamStudentQuestion[];
+  issuedAt: number;
+}
+
+export interface OfflineExamEnvelope {
+  algorithm: "Ed25519";
+  keyId: string;
+  encryption: { algorithm: "AES-256-GCM"; salt: string; nonce: string };
+  payload: string;
+  signature: string;
 }
 
 export type LessonNoteRefinementLevel = "none" | "minimal" | "rich" | "deep";

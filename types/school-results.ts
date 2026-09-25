@@ -18,7 +18,9 @@ export interface SchoolResultsResponse {
 }
 export interface SchoolReport {
   reportId: string; schoolId: string; schoolName: string; studentMembershipId: string;
-  studentName: string; email: string; title: string; comment: string; rows: SchoolResultRow[];
+  studentName: string; studentEmail?: string; guardianEmail?: string;
+  recipientType?: "student" | "guardian"; email: string;
+  title: string; comment: string; teacherName?: string; principalName?: string; rows: SchoolResultRow[];
   average: number; calculation: string; revision: number;
   status: "draft" | "approved" | "sending" | "sent" | "delivery_unknown";
   createdAt: number; updatedAt: number;
@@ -26,6 +28,7 @@ export interface SchoolReport {
   delivery: null | { status: string; messageId?: string; startedAt: number; finishedAt?: number };
 }
 export interface SchoolReportEdit {
-  reportId: string; revision: number; comment: string;
+  reportId: string; revision: number; comment: string; teacherName?: string; principalName?: string;
+  recipientType?: "student" | "guardian";
   adjustments: Array<{ resultId: string; score: number; reason: string }>;
 }

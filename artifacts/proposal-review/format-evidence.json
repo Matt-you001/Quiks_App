@@ -1,0 +1,2817 @@
+{
+  "paragraph_samples": [
+    {
+      "index": 0,
+      "style": "Title",
+      "text": "Quiks School Partnership Proposal",
+      "alignment": "None",
+      "space_before_pt": 34.0,
+      "space_after_pt": 10.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Quiks School Partnership Proposal",
+          "font": "Aptos Display",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "style": "Normal",
+      "text": "A structured digital learning partnership for students, teachers and school leadership",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 20.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "A structured digital learning partnership for students, teachers and school lead",
+          "font": null,
+          "size_pt": 14.0,
+          "bold": null,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "style": "Normal",
+      "text": "Partnership purpose",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Partnership purpose",
+          "font": null,
+          "size_pt": 12.0,
+          "bold": true,
+          "italic": null,
+          "color": "000000"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "style": "Normal",
+      "text": "To give students structured practice and learning support beyond lesson time, while equipping teachers and school leaders with practical tools for classroom del",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "To give students structured practice and learning support beyond lesson time, wh",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "style": "Normal",
+      "text": "1  |  OVERVIEW",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "1  |  OVERVIEW",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "style": "Heading 1",
+      "text": "Why Quiks",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Why Quiks",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "style": "Normal",
+      "text": "Quiks is a learning and practice platform designed for different stages of education. Quiks Children supports younger learners, Quiks Teens serves secondary-sch",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Quiks is a learning and practice platform designed for different stages of educa",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "style": "Normal",
+      "text": "The platform complements classroom teaching. Students can practise across subjects, revise selected topics, receive explanations and use the Learning Hub for fu",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "The platform complements classroom teaching. Students can practise across subjec",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "style": "Normal",
+      "text": "Quiks is available on web and mobile. Signed-in users can access the same school membership and learning records across supported devices within the appropriate",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Quiks is available on web and mobile. Signed-in users can access the same school",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "style": "Heading 2",
+      "text": "What the school receives",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "What the school receives",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "style": "List Bullet",
+      "text": "A school administration portal. Authorised administrators can manage school enrolment, roles, licence dates, class links and central activity records.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "A school administration portal. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Authorised administrators can manage school enrolment, roles, licence dates, cla",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 14,
+      "style": "List Bullet",
+      "text": "Flexible enrolment. Schools may use a shared enrolment code or issue unique codes to individual students and staff. The school can configure the profile fields ",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Flexible enrolment. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Schools may use a shared enrolment code or issue unique codes to individual stud",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 15,
+      "style": "List Bullet",
+      "text": "Connected classrooms. Classes may be created centrally by an administrator or created by teachers and linked to the school portal, keeping classroom activities ",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Connected classrooms. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Classes may be created centrally by an administrator or created by teachers and ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 16,
+      "style": "List Bullet",
+      "text": "Digital assessment support. Teachers can prepare tests and assignments for classroom use and computer-based testing, set deadlines, review generated questions a",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Digital assessment support. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Teachers can prepare tests and assignments for classroom use and computer-based ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 17,
+      "style": "List Bullet",
+      "text": "Teaching and learning tools. Lesson notes, class communication, practice sessions, the Learning Hub and Competition Arena support both directed and independent ",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Teaching and learning tools. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Lesson notes, class communication, practice sessions, the Learning Hub and Compe",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 18,
+      "style": "List Bullet",
+      "text": "Cross-device access. Students and staff can use supported mobile or web access without a school having to maintain a separate app for each campus.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Cross-device access. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Students and staff can use supported mobile or web access without a school havin",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "style": "Heading 2",
+      "text": "A practical role in school delivery",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "A practical role in school delivery",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 20,
+      "style": "Normal",
+      "text": "A school can use Quiks for homework, revision, intervention, enrichment, lesson-note distribution, continuous assessment and selected CBT activities. Teachers r",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "A school can use Quiks for homework, revision, intervention, enrichment, lesson-",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 22,
+      "style": "Normal",
+      "text": "2  |  VALUE TO STAKEHOLDERS",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "2  |  VALUE TO STAKEHOLDERS",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 23,
+      "style": "Heading 1",
+      "text": "Value to the school",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Value to the school",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 24,
+      "style": "List Bullet",
+      "text": "Central academic visibility. The school portal brings together authorised enrolment records, linked classes and submitted activity results so administrators can",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Central academic visibility. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The school portal brings together authorised enrolment records, linked classes a",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 25,
+      "style": "List Bullet",
+      "text": "A structured CBT pathway. Schools can use teacher-reviewed tests and assignments for routine assessments and CBT practice, reducing dependence on separate syste",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "A structured CBT pathway. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Schools can use teacher-reviewed tests and assignments for routine assessments a",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 26,
+      "style": "List Bullet",
+      "text": "Consistent learning beyond school hours. Class activities, lesson notes and practice sessions give students an organised route to continue learning at home.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Consistent learning beyond school hours. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Class activities, lesson notes and practice sessions give students an organised ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 27,
+      "style": "List Bullet",
+      "text": "Scalable access. Licence bands support small schools, growing schools, larger enrolments and multi-campus school groups.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Scalable access. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Licence bands support small schools, growing schools, larger enrolments and mult",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 28,
+      "style": "List Bullet",
+      "text": "Operational control. Role-based school administration, enrolment codes, licence validity dates and configurable enrolment fields allow each school to control wh",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Operational control. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Role-based school administration, enrolment codes, licence validity dates and co",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 29,
+      "style": "List Bullet",
+      "text": "Clearer performance evidence. Central results and classroom records can support follow-up, intervention planning and communication with parents, subject to the ",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Clearer performance evidence. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Central results and classroom records can support follow-up, intervention planni",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 30,
+      "style": "List Bullet",
+      "text": "Commercial flexibility. A school may sponsor access, include it in an approved technology or learning fee, or use the per-learner option, as agreed in the final",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Commercial flexibility. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "A school may sponsor access, include it in an approved technology or learning fe",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 31,
+      "style": "Heading 1",
+      "text": "Value to teachers",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Value to teachers",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 32,
+      "style": "List Bullet",
+      "text": "Faster activity preparation. Teachers can create tests and assignments by subject, topic, difficulty, question count and deadline, then review and edit the ques",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Faster activity preparation. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Teachers can create tests and assignments by subject, topic, difficulty, questio",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 33,
+      "style": "List Bullet",
+      "text": "Lesson-note support. Teachers can upload notes as prepared or request minimal, substantial or deep refinement. The refined note remains available for teacher re",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Lesson-note support. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Teachers can upload notes as prepared or request minimal, substantial or deep re",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 34,
+      "style": "List Bullet",
+      "text": "Controlled access to notes. A teacher can publish a note as read-only or allow students to download it, and can later edit or delete the note with confirmation.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Controlled access to notes. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "A teacher can publish a note as read-only or allow students to download it, and ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 35,
+      "style": "List Bullet",
+      "text": "Activities based on lesson content. A teacher can generate a test or assignment from a lesson note, helping assessment stay connected to material already taught",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Activities based on lesson content. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "A teacher can generate a test or assignment from a lesson note, helping assessme",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 36,
+      "style": "List Bullet",
+      "text": "Reduced marking workload. Objective questions can be scored automatically, allowing teachers to spend more time reviewing misconceptions and planning follow-up ",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Reduced marking workload. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Objective questions can be scored automatically, allowing teachers to spend more",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 37,
+      "style": "List Bullet",
+      "text": "Class communication. The shared class chat allows teachers and enrolled students to exchange messages within the classroom space.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Class communication. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The shared class chat allows teachers and enrolled students to exchange messages",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 38,
+      "style": "List Bullet",
+      "text": "Accessible teaching resources. The Learning Hub supports research, lesson preparation and classroom enrichment across subjects and levels.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Accessible teaching resources. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The Learning Hub supports research, lesson preparation and classroom enrichment ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 40,
+      "style": "Normal",
+      "text": "2  |  VALUE TO STAKEHOLDERS CONTINUED",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "2  |  VALUE TO STAKEHOLDERS CONTINUED",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 41,
+      "style": "Heading 1",
+      "text": "Value to students",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Value to students",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 42,
+      "style": "List Bullet",
+      "text": "Guided independent study. Students can practise broadly across a subject or focus on selected topics, with difficulty and level settings suited to their learnin",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Guided independent study. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Students can practise broadly across a subject or focus on selected topics, with",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 43,
+      "style": "List Bullet",
+      "text": "Immediate learning support. Explanations and the Learning Hub help students understand why an answer is correct and study a concept in more depth.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Immediate learning support. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Explanations and the Learning Hub help students understand why an answer is corr",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 44,
+      "style": "List Bullet",
+      "text": "Exam-focused preparation. Students can practise within relevant grade, curriculum and target-examination contexts.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Exam-focused preparation. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Students can practise within relevant grade, curriculum and target-examination c",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 45,
+      "style": "List Bullet",
+      "text": "Classroom continuity. Learners can receive lesson notes, complete tests and assignments, view permitted resources and communicate within their class from suppor",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Classroom continuity. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Learners can receive lesson notes, complete tests and assignments, view permitte",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 46,
+      "style": "List Bullet",
+      "text": "Motivation and participation. The Competition Arena and Top Performers view provide an additional way to practise, compare performance and represent the learner",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Motivation and participation. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The Competition Arena and Top Performers view provide an additional way to pract",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 47,
+      "style": "List Bullet",
+      "text": "Study habit tracking. Daily study targets and recorded learning time help students build a more consistent practice routine. Time spent on classroom tests and a",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Study habit tracking. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Daily study targets and recorded learning time help students build a more consis",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 48,
+      "style": "Heading 1",
+      "text": "Value to parents and guardians",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Value to parents and guardians",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 49,
+      "style": "List Bullet",
+      "text": "A structured home-study option. Quiks gives families an organised learning resource for practice, revision and assigned work outside school hours.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "A structured home-study option. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Quiks gives families an organised learning resource for practice, revision and a",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 50,
+      "style": "List Bullet",
+      "text": "Better continuity with schoolwork. Published lesson notes and classroom activities help parents understand what the learner has been asked to study or complete.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Better continuity with schoolwork. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Published lesson notes and classroom activities help parents understand what the",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 51,
+      "style": "List Bullet",
+      "text": "Visible study habits. The learner's study target, time spent and performance records can support practical conversations about consistency and areas requiring a",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Visible study habits. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The learner's study target, time spent and performance records can support pract",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 52,
+      "style": "List Bullet",
+      "text": "Lower school-channel pricing. School and per-learner packages provide a lower-cost route than purchasing the standard individual subscription separately, depend",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Lower school-channel pricing. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "School and per-learner packages provide a lower-cost route than purchasing the s",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 53,
+      "style": "Normal",
+      "text": "Quiks does not replace parental supervision or teacher judgement. Schools and families should agree appropriate expectations for devices, screen time, acceptabl",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Quiks does not replace parental supervision or teacher judgement. Schools and fa",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 55,
+      "style": "Normal",
+      "text": "3  |  FINANCIAL IMPLICATIONS",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "3  |  FINANCIAL IMPLICATIONS",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 56,
+      "style": "Heading 1",
+      "text": "Pricing and licence options",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Pricing and licence options",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 57,
+      "style": "Normal",
+      "text": "The school may begin with a four-week pilot at no licence cost. A pilot extension of up to eight weeks may be agreed where the school calendar or evaluation pla",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "The school may begin with a four-week pilot at no licence cost. A pilot extensio",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 58,
+      "style": "Normal",
+      "text": "If the school adopts Quiks, a one-time onboarding fee of NGN 50,000 becomes payable. The school then selects the licence option that matches its enrolment and p",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "If the school adopts Quiks, a one-time onboarding fee of NGN 50,000 becomes paya",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 59,
+      "style": "Heading 2",
+      "text": "Session payment savings",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Session payment savings",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 60,
+      "style": "Normal",
+      "text": "A session licence costs less than purchasing three separate term licences:",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "A session licence costs less than purchasing three separate term licences:",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 62,
+      "style": "Normal",
+      "text": "3  |  FINANCIAL IMPLICATIONS CONTINUED",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "3  |  FINANCIAL IMPLICATIONS CONTINUED",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 63,
+      "style": "Heading 1",
+      "text": "What the licence price covers",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "What the licence price covers",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 64,
+      "style": "List Bullet",
+      "text": "Platform access. Use of the relevant Quiks variant on supported web and mobile devices for the licensed users and validity period.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Platform access. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Use of the relevant Quiks variant on supported web and mobile devices for the li",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 65,
+      "style": "List Bullet",
+      "text": "School administration. Access to school enrolment, role management, class linkage, licence information and central activity records.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "School administration. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Access to school enrolment, role management, class linkage, licence information ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 66,
+      "style": "List Bullet",
+      "text": "Teaching and assessment features. Classroom management, lesson notes, tests, assignments, class chat, practice sessions, the Learning Hub and Competition Arena,",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Teaching and assessment features. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Classroom management, lesson notes, tests, assignments, class chat, practice ses",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 67,
+      "style": "List Bullet",
+      "text": "Initial onboarding support. Account setup guidance, school administrator orientation, enrolment configuration and a short teacher introduction are covered by th",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Initial onboarding support. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Account setup guidance, school administrator orientation, enrolment configuratio",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 68,
+      "style": "List Bullet",
+      "text": "Advertising-free school use. School-licensed access will not display advertising to enrolled users.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Advertising-free school use. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "School-licensed access will not display advertising to enrolled users.",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 69,
+      "style": "Heading 1",
+      "text": "Commercial conditions",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Commercial conditions",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 70,
+      "style": "List Bullet",
+      "text": "Seat band. The selected school licence applies to the agreed student population. A school that exceeds its licensed band will move to the next appropriate optio",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Seat band. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The selected school licence applies to the agreed student population. A school t",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 71,
+      "style": "List Bullet",
+      "text": "Effective cost per learner. The licence fee is fixed for each enrolment band, so the effective per-learner cost depends on the number of active students. It fal",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Effective cost per learner. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The licence fee is fixed for each enrolment band, so the effective per-learner c",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 72,
+      "style": "List Bullet",
+      "text": "Licence validity. Access begins on the agreed start date and remains active until the stated term or session expiry date. Renewal is required to continue premiu",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Licence validity. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Access begins on the agreed start date and remains active until the stated term ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 73,
+      "style": "List Bullet",
+      "text": "Payment and invoicing. The final service agreement and invoice will confirm the payment schedule, applicable taxes, licensed population and start and expiry dat",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Payment and invoicing. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The final service agreement and invoice will confirm the payment schedule, appli",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 74,
+      "style": "List Bullet",
+      "text": "School-funded or learner-funded access. The school may sponsor the licence or agree an approved learner contribution. Any amount charged to families should be t",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "School-funded or learner-funded access. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The school may sponsor the licence or agree an approved learner contribution. An",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 75,
+      "style": "List Bullet",
+      "text": "Items outside the standard fee. Devices, internet or mobile data, extensive on-site training, custom integrations, special data migration and school-specific so",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Items outside the standard fee. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Devices, internet or mobile data, extensive on-site training, custom integration",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 76,
+      "style": "Heading 2",
+      "text": "Choosing the right option",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Choosing the right option",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 77,
+      "style": "Normal",
+      "text": "The school should select a licence based on the number of students expected to use Quiks during the paid period, rather than total school enrolment where only s",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "The school should select a licence based on the number of students expected to u",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 79,
+      "style": "Normal",
+      "text": "4  |  SCHOOL USE AND IMPLEMENTATION",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "4  |  SCHOOL USE AND IMPLEMENTATION",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 80,
+      "style": "Heading 1",
+      "text": "How a school can use Quiks",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "How a school can use Quiks",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 81,
+      "style": "List Number",
+      "text": "Define the learning focus. The school identifies the classes, subjects, curriculum or examination priorities and the teachers responsible for the pilot or rollo",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Define the learning focus. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The school identifies the classes, subjects, curriculum or examination prioritie",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 82,
+      "style": "List Number",
+      "text": "Configure the school account. The administrator selects enrolment fields, chooses shared or individual codes, enrols staff and students, and confirms authorised",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Configure the school account. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The administrator selects enrolment fields, chooses shared or individual codes, ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 83,
+      "style": "List Number",
+      "text": "Create or connect classrooms. The administrator may create classes centrally and issue class codes, or teachers may create classrooms and submit their codes for",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Create or connect classrooms. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The administrator may create classes centrally and issue class codes, or teacher",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 84,
+      "style": "List Number",
+      "text": "Publish learning materials and activities. Teachers upload lesson notes, set read or download permissions, create tests and assignments, review questions and se",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Publish learning materials and activities. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Teachers upload lesson notes, set read or download permissions, create tests and",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 85,
+      "style": "List Number",
+      "text": "Students participate. Learners read notes, complete assigned work, practise independently, use explanations and open the Learning Hub when a topic needs more at",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Students participate. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Learners read notes, complete assigned work, practise independently, use explana",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 86,
+      "style": "List Number",
+      "text": "Review and respond. Teachers review classroom results, while authorised administrators use the central results view for school-level follow-up and reporting wor",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Review and respond. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Teachers review classroom results, while authorised administrators use the centr",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 87,
+      "style": "Heading 2",
+      "text": "Suggested uses across the school",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Suggested uses across the school",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 89,
+      "style": "Normal",
+      "text": "5  |  PILOT AND PARTNERSHIP RECOMMENDATION",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "5  |  PILOT AND PARTNERSHIP RECOMMENDATION",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 90,
+      "style": "Heading 1",
+      "text": "Start with a focused school pilot",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Start with a focused school pilot",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 91,
+      "style": "Normal",
+      "text": "We recommend a four-week pilot with selected classes and teacher champions. The pilot should test usability, curriculum fit, teacher workflow, learner participa",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "We recommend a four-week pilot with selected classes and teacher champions. The ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 92,
+      "style": "Heading 2",
+      "text": "Responsible adoption",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Responsible adoption",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 93,
+      "style": "List Bullet",
+      "text": "Teacher-guided use. Quiks should follow the school's scheme of work, approved resources and professional judgement.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Teacher-guided use. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Quiks should follow the school's scheme of work, approved resources and professi",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 94,
+      "style": "List Bullet",
+      "text": "Account continuity. Students and staff should use their assigned signed-in accounts so authorised school membership, classroom records and licence access remain",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Account continuity. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Students and staff should use their assigned signed-in accounts so authorised sc",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 95,
+      "style": "List Bullet",
+      "text": "Review before publication. Teachers should review AI-assisted lesson notes and questions before students use them.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Review before publication. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Teachers should review AI-assisted lesson notes and questions before students us",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 96,
+      "style": "List Bullet",
+      "text": "Age-appropriate supervision. The school and parents should agree expectations for devices, screen time, acceptable use and communication within class spaces.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Age-appropriate supervision. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The school and parents should agree expectations for devices, screen time, accep",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 97,
+      "style": "List Bullet",
+      "text": "Data protection arrangements. The parties should complete the applicable service, privacy and data-processing documentation before full deployment.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Data protection arrangements. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The parties should complete the applicable service, privacy and data-processing ",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 98,
+      "style": "Heading 2",
+      "text": "Agreements",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Agreements",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 99,
+      "style": "Normal",
+      "text": "Before the pilot, the parties may enter a confidentiality agreement where required. If the school proceeds after the pilot, the parties will document the select",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Before the pilot, the parties may enter a confidentiality agreement where requir",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 101,
+      "style": "Normal",
+      "text": "6  |  NEXT STEPS",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 7.0,
+      "line_spacing": null,
+      "keep_with_next": true,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "6  |  NEXT STEPS",
+          "font": null,
+          "size_pt": 9.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    },
+    {
+      "index": 102,
+      "style": "Heading 1",
+      "text": "Proposed next step",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Proposed next step",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 103,
+      "style": "Normal",
+      "text": "We propose a 30-minute demonstration and scoping meeting with the school's decision-maker and nominated teacher representatives. The meeting will confirm the re",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "We propose a 30-minute demonstration and scoping meeting with the school's decis",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 104,
+      "style": "Heading 2",
+      "text": "Information to confirm during scoping",
+      "alignment": "None",
+      "space_before_pt": 7.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Information to confirm during scoping",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 105,
+      "style": "List Bullet",
+      "text": "Pilot population. The classes, year groups and estimated number of students who will participate.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Pilot population. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The classes, year groups and estimated number of students who will participate.",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 106,
+      "style": "List Bullet",
+      "text": "Academic scope. Priority subjects, curriculum requirements and any target examinations.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Academic scope. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Priority subjects, curriculum requirements and any target examinations.",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 107,
+      "style": "List Bullet",
+      "text": "School roles. The decision-maker, school administrator and teacher champions responsible for the rollout.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "School roles. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "The decision-maker, school administrator and teacher champions responsible for t",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 108,
+      "style": "List Bullet",
+      "text": "Technology readiness. Available devices, internet access and whether learners will use school or personal devices.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Technology readiness. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Available devices, internet access and whether learners will use school or perso",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 109,
+      "style": "List Bullet",
+      "text": "Assessment use. Whether the school plans to use Quiks for homework, continuous assessment, CBT practice or another approved purpose.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Assessment use. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "Whether the school plans to use Quiks for homework, continuous assessment, CBT p",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 110,
+      "style": "List Bullet",
+      "text": "Commercial preference. School-funded access, per-learner access or the appropriate school licence band.",
+      "alignment": "None",
+      "space_before_pt": null,
+      "space_after_pt": 4.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Commercial preference. ",
+          "font": null,
+          "size_pt": null,
+          "bold": true,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "School-funded access, per-learner access or the appropriate school licence band.",
+          "font": null,
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 111,
+      "style": "Heading 1",
+      "text": "Contact",
+      "alignment": "None",
+      "space_before_pt": 10.0,
+      "space_after_pt": 5.0,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Contact",
+          "font": "Aptos",
+          "size_pt": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": 112,
+      "style": "Normal",
+      "text": "Quiks  Learn fast  Grow steadily",
+      "alignment": "CENTER (1)",
+      "space_before_pt": 18.0,
+      "space_after_pt": null,
+      "line_spacing": null,
+      "keep_with_next": null,
+      "page_break_before": null,
+      "runs": [
+        {
+          "text": "Quiks  Learn fast  Grow steadily",
+          "font": null,
+          "size_pt": 10.0,
+          "bold": true,
+          "italic": null,
+          "color": "6F2DBD"
+        }
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "index": 0,
+      "rows": 3,
+      "cols": 2,
+      "style": "Normal Table",
+      "grid_twips": [
+        1944,
+        7848
+      ]
+    },
+    {
+      "index": 1,
+      "rows": 1,
+      "cols": 3,
+      "style": "Normal Table",
+      "grid_twips": [
+        3168,
+        3168,
+        3168
+      ]
+    },
+    {
+      "index": 2,
+      "rows": 6,
+      "cols": 5,
+      "style": "Normal Table",
+      "grid_twips": [
+        1944,
+        2951,
+        1584,
+        1655,
+        1655
+      ]
+    },
+    {
+      "index": 3,
+      "rows": 5,
+      "cols": 4,
+      "style": "Normal Table",
+      "grid_twips": [
+        3024,
+        2088,
+        2088,
+        2088
+      ]
+    },
+    {
+      "index": 4,
+      "rows": 6,
+      "cols": 3,
+      "style": "Normal Table",
+      "grid_twips": [
+        1944,
+        4536,
+        2880
+      ]
+    },
+    {
+      "index": 5,
+      "rows": 5,
+      "cols": 2,
+      "style": "Normal Table",
+      "grid_twips": [
+        2232,
+        7128
+      ]
+    },
+    {
+      "index": 6,
+      "rows": 4,
+      "cols": 2,
+      "style": "Normal Table",
+      "grid_twips": [
+        2232,
+        7128
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "path": "[Content_Types].xml",
+      "size": 2019,
+      "crc": 620813103
+    },
+    {
+      "path": "_rels/.rels",
+      "size": 590,
+      "crc": 3071971614
+    },
+    {
+      "path": "word/document.xml",
+      "size": 108605,
+      "crc": 2334886194
+    },
+    {
+      "path": "word/_rels/document.xml.rels",
+      "size": 1884,
+      "crc": 2664714739
+    },
+    {
+      "path": "word/footnotes.xml",
+      "size": 3158,
+      "crc": 3568832649
+    },
+    {
+      "path": "word/endnotes.xml",
+      "size": 3152,
+      "crc": 3371842923
+    },
+    {
+      "path": "word/footer1.xml",
+      "size": 3475,
+      "crc": 2336993463
+    },
+    {
+      "path": "word/media/image1.png",
+      "size": 25636,
+      "crc": 988202245
+    },
+    {
+      "path": "word/media/image2.png",
+      "size": 47751,
+      "crc": 3212194659
+    },
+    {
+      "path": "word/media/image3.png",
+      "size": 49076,
+      "crc": 1640889443
+    },
+    {
+      "path": "word/theme/theme1.xml",
+      "size": 7643,
+      "crc": 2225232417
+    },
+    {
+      "path": "word/settings.xml",
+      "size": 3973,
+      "crc": 806041593
+    },
+    {
+      "path": "customXml/item1.xml",
+      "size": 260,
+      "crc": 111274750
+    },
+    {
+      "path": "customXml/itemProps1.xml",
+      "size": 341,
+      "crc": 1812421312
+    },
+    {
+      "path": "word/numbering.xml",
+      "size": 7477,
+      "crc": 1018376166
+    },
+    {
+      "path": "word/styles.xml",
+      "size": 344988,
+      "crc": 645863869
+    },
+    {
+      "path": "word/webSettings.xml",
+      "size": 1046,
+      "crc": 2430450582
+    },
+    {
+      "path": "word/fontTable.xml",
+      "size": 3383,
+      "crc": 2347295122
+    },
+    {
+      "path": "docProps/core.xml",
+      "size": 960,
+      "crc": 1766473080
+    },
+    {
+      "path": "docProps/app.xml",
+      "size": 1043,
+      "crc": 1690454263
+    },
+    {
+      "path": "customXml/_rels/item1.xml.rels",
+      "size": 296,
+      "crc": 2050572148
+    }
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "input": "C:\\Users\\USER\\Documents\\deliverables\\Quiks_School_Partnership_Reviewed_Proposal.docx",
+  "fonts_by_char_count": {
+    "Aptos": 459,
+    "Aptos Display": 33
+  },
+  "direct_run_formatting_runs": 188,
+  "direct_paragraph_formatting_paragraphs": 192,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 5,
+      "text": "Partnership purpose",
+      "style": "Normal"
+    },
+    {
+      "para_index": 8,
+      "text": "1  |  OVERVIEW",
+      "style": "Normal"
+    },
+    {
+      "para_index": 23,
+      "text": "2  |  VALUE TO STAKEHOLDERS",
+      "style": "Normal"
+    },
+    {
+      "para_index": 41,
+      "text": "2  |  VALUE TO STAKEHOLDERS CONTINUED",
+      "style": "Normal"
+    },
+    {
+      "para_index": 56,
+      "text": "3  |  FINANCIAL IMPLICATIONS",
+      "style": "Normal"
+    },
+    {
+      "para_index": 63,
+      "text": "3  |  FINANCIAL IMPLICATIONS CONTINUED",
+      "style": "Normal"
+    },
+    {
+      "para_index": 80,
+      "text": "4  |  SCHOOL USE AND IMPLEMENTATION",
+      "style": "Normal"
+    },
+    {
+      "para_index": 90,
+      "text": "5  |  PILOT AND PARTNERSHIP RECOMMENDATION",
+      "style": "Normal"
+    },
+    {
+      "para_index": 102,
+      "text": "6  |  NEXT STEPS",
+      "style": "Normal"
+    },
+    {
+      "para_index": 113,
+      "text": "Quiks  Learn fast  Grow steadily",
+      "style": "Normal"
+    },
+    {
+      "para_index": 114,
+      "text": "PREPARED FOR",
+      "style": "Normal"
+    },
+    {
+      "para_index": 115,
+      "text": "[SCHOOL NAME]",
+      "style": "Normal"
+    },
+    {
+      "para_index": 116,
+      "text": "PREPARED BY",
+      "style": "Normal"
+    },
+    {
+      "para_index": 118,
+      "text": "DATE",
+      "style": "Normal"
+    },
+    {
+      "para_index": 121,
+      "text": "QUIKS CHILDREN",
+      "style": "Normal"
+    },
+    {
+      "para_index": 123,
+      "text": "QUIKS TEENS",
+      "style": "Normal"
+    },
+    {
+      "para_index": 125,
+      "text": "QUIKS UNI",
+      "style": "Normal"
+    },
+    {
+      "para_index": 126,
+      "text": "Licence option",
+      "style": "Normal"
+    },
+    {
+      "para_index": 127,
+      "text": "Eligible users",
+      "style": "Normal"
+    },
+    {
+      "para_index": 128,
+      "text": "Monthly fee",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "Quiks School Partnership Proposal",
+        "style": "Title"
+      },
+      {
+        "para_index": 2,
+        "text": "A structured digital learning partnership for students, teachers and school leadership",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "text": "",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "text": "",
+        "style": "Normal"
+      },
+      {
+        "para_index": 5,
+        "text": "Partnership purpose",
+        "style": "Normal"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "Quiks School Partnership Proposal",
+        "style": "Title"
+      },
+      {
+        "para_index": 2,
+        "run_text": "A structured digital learning partnership for students, teachers and school lead",
+        "style": "Normal"
+      },
+      {
+        "para_index": 5,
+        "run_text": "Partnership purpose",
+        "style": "Normal"
+      },
+      {
+        "para_index": 8,
+        "run_text": "1  |  OVERVIEW",
+        "style": "Normal"
+      },
+      {
+        "para_index": 9,
+        "run_text": "Why Quiks",
+        "style": "Heading 1"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

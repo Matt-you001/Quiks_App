@@ -9,6 +9,7 @@ const routesByVariant = {
   children: [
     ["login", "Login"],
     ["signup", "Sign up"],
+    ["verify-email", "Verify email"],
     ["select-profile", "Choose learner"],
     ["profile", "Profile"],
     ["profile-editor", "Create profile"],
@@ -16,6 +17,7 @@ const routesByVariant = {
     ["classroom", "Classroom"],
     ["classroom-activity", "Classroom activity"],
     ["classroom-result", "Classroom results"],
+    ["offline-exam", "Offline exam"],
     ["competition", "Competition"],
     ["session", "Session"],
     ["results", "Results"],
@@ -31,6 +33,7 @@ const routesByVariant = {
   teens: [
     ["login", "Login"],
     ["signup", "Sign up"],
+    ["verify-email", "Verify email"],
     ["select-profile", "Choose learner"],
     ["profile", "Profile"],
     ["profile-editor", "Create profile"],
@@ -38,6 +41,7 @@ const routesByVariant = {
     ["classroom", "Classroom"],
     ["classroom-activity", "Classroom activity"],
     ["classroom-result", "Classroom results"],
+    ["offline-exam", "Offline exam"],
     ["competition", "Competition"],
     ["session", "Session"],
     ["results", "Results"],
@@ -53,6 +57,7 @@ const routesByVariant = {
   uni: [
     ["login", "Login"],
     ["signup", "Sign up"],
+    ["verify-email", "Verify email"],
     ["select-profile", "Choose learner"],
     ["profile", "Profile"],
     ["profile-editor", "Create profile"],
@@ -60,6 +65,7 @@ const routesByVariant = {
     ["classroom", "Classroom"],
     ["classroom-activity", "Classroom activity"],
     ["classroom-result", "Classroom results"],
+    ["offline-exam", "Offline exam"],
     ["competition", "Competition"],
     ["session", "Session"],
     ["results", "Results"],
