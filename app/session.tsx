@@ -1159,6 +1159,21 @@ export default function SessionScreen() {
     );
   };
 
+  const confirmQuitSession = () => {
+    if (isClassroomActivity || !["active", "review"].includes(activePhaseRef.current) || isFinishingRef.current) return;
+    const unanswered = answersRef.current.filter((answer) => !String(answer ?? "").trim()).length;
+    Alert.alert(
+      "Quit this session?",
+      unanswered > 0
+        ? `${unanswered} question(s) are unanswered. Your current answers will be scored and the session will end.`
+        : "Your current answers will be scored and the session will end.",
+      [
+        { text: "Continue session", style: "cancel" },
+        { text: "Quit and finish", style: "destructive", onPress: () => void finishSession(answersRef.current, { exitReason: "user_quit" }) },
+      ]
+    );
+  };
+
   useEffect(() => {
     if (!isClassroomActivity) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", requestClassroomExit);
@@ -1520,6 +1535,7 @@ export default function SessionScreen() {
             <View style={styles.timerBadge}>
               <Text style={styles.timerText}>{mode === "quiz" ? `${timeLeft}s` : `${elapsed}s`}</Text>
             </View>
+            {!isClassroomActivity ? <Pressable accessibilityRole="button" style={styles.quitButton} onPress={confirmQuitSession}><Text style={styles.quitButtonText}>Quit</Text></Pressable> : null}
           </View>
         </View>
 
@@ -1626,7 +1642,7 @@ export default function SessionScreen() {
           <View style={styles.classroomNavigationActions}>
             <PrimaryButton label="Skip and return later" variant="secondary" onPress={skipClassroomQuestion} style={styles.classroomNavigationButton}/>
             <PrimaryButton label="Submit activity" onPress={confirmClassroomSubmission} style={styles.classroomNavigationButton}/>
-            <PrimaryButton label="Leave activity" variant="ghost" onPress={requestClassroomExit} style={styles.classroomNavigationButton}/>
+            <PrimaryButton label="Quit activity" variant="ghost" onPress={requestClassroomExit} style={styles.classroomNavigationButton}/>
           </View>
         ) : null}
 
@@ -1943,6 +1959,20 @@ const styles = StyleSheet.create({
     color: palette.navy,
     fontWeight: "800",
     fontSize: 16,
+  },
+  quitButton: {
+    minWidth: 78,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#B42318",
+    backgroundColor: "#FFF0EE",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  quitButtonText: {
+    color: "#B42318",
+    fontWeight: "900",
   },
   countdownText: {
     color: palette.white,

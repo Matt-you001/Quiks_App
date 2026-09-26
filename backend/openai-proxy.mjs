@@ -48,6 +48,8 @@ import { authenticateClassroomRequest } from "./classroom-auth.mjs";
 import { schoolResultsRequest } from "./school-results-api.mjs";
 import { schoolClassroomsRequest } from "./school-classrooms-api.mjs";
 import { schoolAdministrationRequest } from "./school-administration-api.mjs";
+import { schoolAcademicPackagesRequest } from "./school-academic-packages-api.mjs";
+import { replaceAcademicGrants } from "./school-admin-grants.mjs";
 import { getSchoolEmailDiagnostics, sendOperationalAlert, sendSchoolInvitationEmail } from "./school-email.mjs";
 import { getPostgresDiagnostics, initializePostgres } from "./postgres.mjs";
 import {
@@ -78,6 +80,7 @@ import {
   updateSchoolLicence,
   updateSchoolRecord,
   updateSchoolProfileFields,
+  assertInstitutionalAcademicPackage,
 } from "./school-store.mjs";
 
 const port = Number(process.env.PORT || 8787);
@@ -3670,6 +3673,15 @@ const server = http.createServer(async (request, response) => {
       body = await authenticateClassroomRequest(request, url.pathname, body);
     }
 
+    const studentPackagePaths = new Set([
+      "/questions", "/learning-hub/lesson", "/learning-hub/ask", "/learning-hub/past-questions/submit",
+      "/competition/join", "/competition/group/create", "/competition/group/join",
+      "/competition/challenge/create", "/competition/challenge/accept",
+    ]);
+    if (studentPackagePaths.has(url.pathname) && (body.profile?.schoolId || body.profile?.schoolMembershipId)) {
+      await assertInstitutionalAcademicPackage(await requireFirebasePrincipal(request), body.profile, "academic.student", body.appVariant ?? "children");
+    }
+
     if (url.pathname === "/questions") {
       await handleQuestions(body, response);
       return;
@@ -3929,6 +3941,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/school/owner/academic/packages") {
+      sendJson(response, 200, await schoolAcademicPackagesRequest(await requireFirebasePrincipal(request), body));
+      return;
+    }
+
     if (url.pathname.startsWith("/school/admin/operations/")) {
       const action = url.pathname.slice("/school/admin/operations/".length);
       sendJson(response, 200, await schoolAdministrationRequest(await requireFirebasePrincipal(request), action, body));
@@ -3936,7 +3953,15 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/school/owner/create") {
-      const created = await createSchool(await requireFirebasePrincipal(request), body);
+      const principal = await requireFirebasePrincipal(request);
+      const created = await createSchool(principal, body);
+      await replaceAcademicGrants({
+        school: created.school,
+        principal,
+        packages: Array.isArray(body.academicPackages) ? body.academicPackages : ["academic.student", "academic.school"],
+        startsAt: new Date(created.school.licence.startAt).toISOString(),
+        endsAt: new Date(created.school.licence.endAt).toISOString(),
+      });
       const emailDelivery = await sendSchoolInvitationEmail({
         email: created.administratorInvitation.email,
         schoolName: created.school.name,

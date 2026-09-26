@@ -13,6 +13,7 @@ import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { ClassroomLessonNotes } from "../components/ClassroomLessonNotes";
 import { ClassroomChat } from "../components/ClassroomChat";
 import { appVariant } from "../lib/app-variant";
+import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
 import { createClassroomInvitationLink, createClassroomInvitationMessage } from "../lib/classroom-invite";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { canUseClassroom } from "../lib/subscription";
@@ -495,12 +496,19 @@ export default function ClassroomScreen() {
       return;
     }
 
+    if (!hasAcademicPackage(activeProfile, "academic.school")) {
+      setLoading(false);
+      Alert.alert("School Package not included", academicPackageMessage("academic.school"));
+      router.replace("/" as never);
+      return;
+    }
+
     try {
       if (activeProfile.schoolMembershipId) {
         const identity = await getSchoolIdentity();
         const membership = identity.memberships?.find((entry) => entry.membershipId === activeProfile?.schoolMembershipId);
         if (membership) {
-          activeProfile = { ...activeProfile, schoolName: membership.schoolName, schoolClassNaming: membership.schoolClassNaming, schoolCurriculum: membership.schoolCurriculum, preferredCurriculum: membership.schoolCurriculum || activeProfile.preferredCurriculum };
+          activeProfile = { ...activeProfile, schoolName: membership.schoolName, schoolClassNaming: membership.schoolClassNaming, schoolCurriculum: membership.schoolCurriculum, preferredCurriculum: membership.schoolCurriculum || activeProfile.preferredCurriculum, academicPackages: membership.academicPackages };
           await upsertProfile(activeProfile);
         }
       }

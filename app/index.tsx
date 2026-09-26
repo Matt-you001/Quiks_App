@@ -1,13 +1,14 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
 import { appVariant } from "../lib/app-variant";
+import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
 import { canShowAds } from "../lib/ads";
 import { readClassroomInvitationCodeFromLocation } from "../lib/classroom-invite";
 import { getLanguageLabel, t } from "../lib/i18n";
@@ -450,7 +451,7 @@ export default function HomeScreen() {
       <View style={[styles.practiceAction, isWeb ? styles.homeSurfaceWeb : null]}>
         <PrimaryButton
           label="Practice/Quiz"
-          onPress={() => router.push("/practice" as never)}
+          onPress={() => hasAcademicPackage(activeProfile, "academic.student") ? router.push("/practice" as never) : Alert.alert("Student Package not included", academicPackageMessage("academic.student"))}
         />
       </View>
 
@@ -469,6 +470,10 @@ export default function HomeScreen() {
               setPremiumPrompt("classroom");
               return;
             }
+            if (!hasAcademicPackage(activeProfile, "academic.school")) {
+              Alert.alert("School Package not included", academicPackageMessage("academic.school"));
+              return;
+            }
 
             activeProfile
               ? router.push("/classroom" as never)
@@ -479,7 +484,9 @@ export default function HomeScreen() {
         <PrimaryButton
           label={t(language, "competitionArena")}
           onPress={() =>
-            activeProfile
+            !hasAcademicPackage(activeProfile, "academic.student")
+              ? Alert.alert("Student Package not included", academicPackageMessage("academic.student"))
+              : activeProfile
               ? router.push("/competition" as never)
               : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
           }
@@ -488,7 +495,7 @@ export default function HomeScreen() {
         <PrimaryButton
           label={t(language, "learningHub")}
           variant="secondary"
-          onPress={() => router.push("/learning-hub" as never)}
+          onPress={() => hasAcademicPackage(activeProfile, "academic.student") ? router.push("/learning-hub" as never) : Alert.alert("Student Package not included", academicPackageMessage("academic.student"))}
           style={showWideActions ? styles.homeActionButtonDesktop : undefined}
         />
         <PrimaryButton

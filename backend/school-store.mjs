@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { hasActiveAdministrationGrant } from "./school-admin-grants.mjs";
+import { hasActiveAdministrationGrant, hasActiveAcademicPackage, listActiveAcademicPackageCodes } from "./school-admin-grants.mjs";
 import { sendOperationalAlert } from "./school-email.mjs";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
@@ -1126,10 +1126,11 @@ export async function getOwnerDashboard(principal) {
 
 export async function listPrincipalMemberships(principal) {
   const store = await ensureStore();
-  return Object.values(store.memberships)
+  const memberships = Object.values(store.memberships)
     .filter((membership) => membershipMatchesPrincipal(membership, principal))
     .map((membership) => buildMembership(store, membership))
     .sort((left, right) => left.schoolName.localeCompare(right.schoolName));
+  return Promise.all(memberships.map(async (membership) => ({ ...membership, academicPackages: await listActiveAcademicPackageCodes(membership.schoolId) })));
 }
 
 export async function getPrincipalSchoolIdentity(principal, appVariant) {
@@ -1154,14 +1155,18 @@ export async function getPrincipalSchoolIdentity(principal, appVariant) {
     }
     return current;
   });
-  const administratorMemberships = Object.values(store.memberships)
+  const administratorMemberships = await Promise.all(Object.values(store.memberships)
     .filter(
       (membership) =>
         membershipMatchesPrincipal(membership, principal) &&
         membership.role === "school_admin" &&
         membership.status === "active"
     )
-    .map((membership) => buildMembership(store, membership));
+    .map(async (membership) => ({ ...buildMembership(store, membership), academicPackages: await listActiveAcademicPackageCodes(membership.schoolId) })));
+
+  const memberships = await Promise.all(Object.values(store.memberships)
+    .filter((membership) => membershipMatchesPrincipal(membership, principal))
+    .map(async (membership) => ({ ...buildMembership(store, membership), academicPackages: await listActiveAcademicPackageCodes(membership.schoolId) })));
 
   return {
     viewer: {
@@ -1170,9 +1175,7 @@ export async function getPrincipalSchoolIdentity(principal, appVariant) {
     },
     isAppOwner: isOwner(principal),
     administratorMemberships,
-    memberships: Object.values(store.memberships)
-      .filter((membership) => membershipMatchesPrincipal(membership, principal))
-      .map((membership) => buildMembership(store, membership)),
+    memberships,
   };
 }
 
@@ -1181,6 +1184,9 @@ export async function getSchoolDetails(principal, schoolId) {
   requireSchoolAdmin(store, schoolId, principal);
   const school = store.schools[schoolId];
   if (!school) throw new Error("School not found.");
+  if (!isOwner(principal) && !await hasActiveAcademicPackage(schoolId, "academic.school")) {
+    throw Object.assign(new Error("Your school's licence does not include the School Package."), { statusCode: 403 });
+  }
   // The Quiks App Owner keeps read-only visibility for renewal/support. School
   // administrators must have a currently active licence to enter the portal.
   if (!isOwner(principal) && getEffectiveLicenceStatus(school.licence) !== "active") {
@@ -1210,6 +1216,12 @@ export async function getSchoolAdministrationContext(principal, schoolId) {
   requireSchoolAdmin(store, schoolId, principal);
   const school = store.schools[schoolId];
   if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+  if (!isOwner(principal)) {
+    requireActiveSchoolLicence(store, schoolId);
+    if (!await hasActiveAcademicPackage(schoolId, "academic.school")) {
+      throw Object.assign(new Error("Your school's licence does not include the School Package."), { statusCode: 403 });
+    }
+  }
   return {
     principal,
     isAppOwner: isOwner(principal),
@@ -1224,6 +1236,9 @@ export async function getSchoolReportingContext(principal, schoolId) {
   requireSchoolAdmin(store, schoolId, principal);
   const school = store.schools[schoolId];
   if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
+  if (!isOwner(principal) && !await hasActiveAcademicPackage(schoolId, "academic.school")) {
+    throw Object.assign(new Error("Your school's licence does not include the School Package."), { statusCode: 403 });
+  }
   if (getEffectiveLicenceStatus(school.licence) !== "active" || !school.licence.features?.reports) {
     throw Object.assign(new Error("An active school licence with Reports enabled is required."), { statusCode: 403 });
   }
@@ -1236,6 +1251,9 @@ export async function getSchoolClassroomContext(principal, schoolId) {
   const school = store.schools[schoolId];
   if (!school || getEffectiveLicenceStatus(school.licence) !== "active" || !school.licence.features?.classroom) {
     throw Object.assign(new Error("An active school licence with Classroom enabled is required."), { statusCode: 403 });
+  }
+  if (!await hasActiveAcademicPackage(schoolId, "academic.school")) {
+    throw Object.assign(new Error("Your school's licence does not include the School Package."), { statusCode: 403 });
   }
   return { principal, school: cloneValue(school), memberships: cloneValue(membershipsForSchool(store, schoolId)) };
 }
@@ -1407,7 +1425,8 @@ export async function getInstitutionalEntitlement(principal, appVariant) {
     .map((membership) => buildEntitlement(store, membership, appVariant))
     .filter(Boolean)
     .sort((left, right) => Number(right.active) - Number(left.active) || new Date(right.expiresAt).getTime() - new Date(left.expiresAt).getTime());
-  return entitlements[0] ?? null;
+  const entitlement = entitlements[0] ?? null;
+  return entitlement ? { ...entitlement, academicPackages: await listActiveAcademicPackageCodes(entitlement.schoolId) } : null;
 }
 
 export async function getOwnerIssuedIndividualEntitlement(principal) {
@@ -1437,6 +1456,24 @@ export async function assertInstitutionalFeature(principal, schoolId, feature, a
   const school = store.schools[schoolId];
   const entitlement = buildEntitlement(store, membership, appVariant);
   if (!entitlement?.active) throw new Error("The school's Quiks licence is not active for this app.");
+  if (!await hasActiveAcademicPackage(schoolId, "academic.school")) throw new Error("The school's licence does not include the School Package.");
   if (!school.licence.features?.[feature]) throw new Error(`The school licence does not include ${feature}.`);
   return { school, membership, entitlement };
+}
+
+export async function assertInstitutionalAcademicPackage(principal, profile, packageCode, appVariant) {
+  if (!profile?.schoolId && !profile?.schoolMembershipId) return null;
+  const store = await ensureStore();
+  const membership = Object.values(store.memberships).find((entry) =>
+    entry.status === "active" && membershipMatchesPrincipal(entry, principal) &&
+    (profile.schoolMembershipId ? entry.membershipId === profile.schoolMembershipId : entry.schoolId === profile.schoolId)
+  );
+  if (!membership) throw Object.assign(new Error("An active school membership is required."), { statusCode: 403 });
+  const entitlement = buildEntitlement(store, membership, appVariant);
+  if (!entitlement?.active) throw Object.assign(new Error("The school's Quiks licence is not active for this app."), { statusCode: 403 });
+  if (!await hasActiveAcademicPackage(membership.schoolId, packageCode)) {
+    const name = packageCode === "academic.student" ? "Student Package" : "School Package";
+    throw Object.assign(new Error(`The school's licence does not include the ${name}.`), { statusCode: 403 });
+  }
+  return { school: store.schools[membership.schoolId], membership, entitlement };
 }

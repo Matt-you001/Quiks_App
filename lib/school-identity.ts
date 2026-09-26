@@ -35,6 +35,7 @@ export async function syncAdministrativeProfileForAccount(account: AppAccount) {
       schoolCurriculum: membership.schoolCurriculum || "",
       schoolMembershipId: membership.membershipId,
       schoolClassNaming: membership.schoolClassNaming,
+      academicPackages: membership.academicPackages,
       ...(membership.role === "school_admin" ? { administrativeRole: "school_admin" as const, administrativeAccountUid: account.uid, administrativeSchoolId: membership.schoolId } : {}),
     });
   }

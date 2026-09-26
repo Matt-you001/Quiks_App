@@ -2,9 +2,10 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { appVariant } from "../lib/app-variant";
+import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
 import { readAppState } from "../lib/storage";
 import { getLocalizedSubjects } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -24,6 +25,11 @@ export default function PracticeScreen() {
         return;
       }
       const selected = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? state.profiles[0] ?? null;
+      if (!hasAcademicPackage(selected, "academic.student")) {
+        Alert.alert("Student Package not included", academicPackageMessage("academic.student"));
+        router.replace("/" as never);
+        return;
+      }
       setProfile(selected);
       setChecked(true);
     })();

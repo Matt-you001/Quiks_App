@@ -97,6 +97,7 @@ export interface UserProfile {
   schoolMembershipId?: string;
   schoolClassNaming?: SchoolClassNaming;
   schoolCurriculum?: string;
+  academicPackages?: SchoolAcademicPackageCode[];
 }
 
 export interface Question {
@@ -518,6 +519,7 @@ export interface SchoolMembership {
   profileData: Record<string, string | number | boolean>;
   createdAt: number;
   joinedAt?: number;
+  academicPackages?: SchoolAcademicPackageCode[];
 }
 
 export interface SchoolEntitlementSummary {
@@ -528,6 +530,7 @@ export interface SchoolEntitlementSummary {
   expiresAt: string | null;
   allowedVariants: Array<"children" | "teens" | "uni">;
   reason?: "active" | "not_started" | "expired" | "suspended" | "variant_not_licensed";
+  academicPackages?: SchoolAcademicPackageCode[];
 }
 
 export interface SchoolOwnerDashboardResponse {
@@ -601,6 +604,16 @@ export interface SchoolCreateRequest {
   teacherSeatLimit: number;
   allowedVariants: SchoolLicence["allowedVariants"];
   gracePeriodDays?: number;
+  academicPackages?: SchoolAcademicPackageCode[];
+}
+
+export type SchoolAcademicPackageCode = "academic.student" | "academic.school";
+
+export interface SchoolAcademicGrant {
+  featureCode: SchoolAcademicPackageCode;
+  status: "pending" | "active" | "expired" | "revoked";
+  startsAt: string;
+  endsAt: string | null;
 }
 
 export interface SchoolCreateResponse {

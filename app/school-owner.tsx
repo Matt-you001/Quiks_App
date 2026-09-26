@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { AppBackground } from "../components/AppBackground";
 import { CalendarDateField, getTodayDateValue } from "../components/CalendarDateField";
 import { SchoolAdministrationLicenceEditor } from "../components/SchoolAdministrationLicenceEditor";
+import { SchoolAcademicPackageEditor } from "../components/SchoolAcademicPackageEditor";
 import { palette, shadows } from "../lib/theme";
 import { archiveSchool, createOwnerIssuedIndividualLicence, createSchool, getSchoolOwnerDashboard, restoreSchool, updateSchoolRecord } from "../services/ai";
 import type { SchoolEnrolmentMode, SchoolOwnerDashboardResponse, SchoolSummary } from "../types/app";
@@ -44,6 +45,7 @@ export default function SchoolOwnerScreen() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [individualSignupsOpen, setIndividualSignupsOpen] = useState(false);
   const [individualLicencesOpen, setIndividualLicencesOpen] = useState(false);
+  const [academicPackages, setAcademicPackages] = useState<Array<"academic.student" | "academic.school">>(["academic.student", "academic.school"]);
 
   async function copyCode(code: string, label: string) {
     await Clipboard.setStringAsync(code);
@@ -125,6 +127,7 @@ export default function SchoolOwnerScreen() {
         teacherSeatLimit,
         allowedVariants: ["children", "teens", "uni"],
         gracePeriodDays: 0,
+        academicPackages,
       });
       if (!created?.school?.schoolCode || !created?.administratorInvitation?.invitationCode) {
         throw new Error("The server returned an incomplete school record. Deploy the latest backend and try again.");
@@ -219,6 +222,18 @@ export default function SchoolOwnerScreen() {
           <Text style={styles.copy}>Choose the first school administrator. They receive a one-time, email-locked invitation and can approve subsequent staff and student requests.</Text>
           <TextInput value={name} onChangeText={setName} placeholder="School name" style={styles.input} />
           <TextInput value={administratorEmail} onChangeText={setAdministratorEmail} autoCapitalize="none" keyboardType="email-address" placeholder="School administrator email" style={styles.input} />
+          <Text style={styles.fieldLabel}>Academic packages</Text>
+          {([[
+            "academic.student", "Student Package", "Practice/Quiz, Competition Arena and Learning Hub",
+          ], [
+            "academic.school", "School Package", "Classroom and School Control",
+          ]] as const).map(([code, label, description]) => {
+            const selected = academicPackages.includes(code);
+            return <Pressable key={code} style={[styles.academicOption, selected && styles.academicOptionActive]} onPress={() => setAcademicPackages((current) => selected ? current.filter((item) => item !== code) : [...current, code])}>
+              <Text style={[styles.academicOptionTitle, selected && styles.academicOptionTitleActive]}>{selected ? "✓ " : ""}{label}</Text>
+              <Text style={[styles.academicOptionDescription, selected && styles.academicOptionDescriptionActive]}>{description}</Text>
+            </Pressable>;
+          })}
           <Text style={styles.fieldLabel}>Student and staff enrolment codes</Text>
           <Pressable style={styles.dropdownTrigger} onPress={() => setEnrolmentModeOpen((current) => !current)}>
             <Text style={styles.dropdownValue}>{enrolmentMode === "individual_codes" ? "Unique individual codes" : "One shared code"}</Text>
@@ -289,6 +304,7 @@ export default function SchoolOwnerScreen() {
                 <Text style={styles.secondaryButtonText}>View enrolment records</Text>
               </Pressable>
               <SchoolAdministrationLicenceEditor schoolId={school.schoolId}/>
+              <SchoolAcademicPackageEditor school={school}/>
               <View style={styles.row}><Pressable style={[styles.secondaryButton, styles.flex]} onPress={() => openEditor(school)}><Text style={styles.secondaryButtonText}>Edit / renew</Text></Pressable><Pressable style={[styles.deleteButton, styles.flex]} onPress={() => { setDeletingSchool(school); setDeleteConfirmation(""); setError(""); }}><Text style={styles.deleteButtonText}>Delete school</Text></Pressable></View>
               </View> : null}
             </View>
@@ -352,6 +368,12 @@ const styles = StyleSheet.create({
   copy: { color: "#587180", lineHeight: 21, marginBottom: 8 },
   input: { backgroundColor: "#F6F9FB", borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, padding: 13, marginVertical: 6 },
   fieldLabel: { color: palette.navy, fontWeight: "900", marginTop: 12, marginBottom: 7 },
+  academicOption: { borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, padding: 12, marginBottom: 7, backgroundColor: "#F6F9FB" },
+  academicOptionActive: { backgroundColor: palette.navy, borderColor: palette.navy },
+  academicOptionTitle: { color: palette.navy, fontWeight: "900" },
+  academicOptionTitleActive: { color: "white" },
+  academicOptionDescription: { color: "#587180", marginTop: 3 },
+  academicOptionDescriptionActive: { color: "#D8E8EE" },
   dropdownTrigger: { minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F6F9FB", borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, paddingHorizontal: 13, marginBottom: 6 },
   dropdownValue: { color: palette.navy, fontWeight: "800" },
   dropdownMenu: { borderWidth: 1, borderColor: "#D4E0E7", borderRadius: 13, overflow: "hidden", backgroundColor: "white", marginBottom: 6 },

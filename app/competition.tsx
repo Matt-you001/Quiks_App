@@ -10,6 +10,7 @@ import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { canShowAds } from "../lib/ads";
 import { appVariant } from "../lib/app-variant";
+import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { calculateQuizTime, getLevelProgressForGrade } from "../lib/quiz";
 import {
@@ -104,6 +105,11 @@ export default function CompetitionScreen() {
   useEffect(() => {
     readAppState().then((state) => {
       const current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
+      if (!hasAcademicPackage(current, "academic.student")) {
+        Alert.alert("Student Package not included", academicPackageMessage("academic.student"));
+        router.replace("/" as never);
+        return;
+      }
       setProfile(current);
       setResults(current ? state.results[current.id] ?? [] : []);
       setSubscriptionTier(state.subscriptionTier);

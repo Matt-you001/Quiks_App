@@ -359,6 +359,22 @@ export async function createSchool(request: SchoolCreateRequest): Promise<School
   return postJson("/school/owner/create", request);
 }
 
+export function getSchoolAcademicPackages(schoolId: string): Promise<{
+  packages: Array<{ code: import("../types/app").SchoolAcademicPackageCode; name: string; description: string }>;
+  grants: import("../types/app").SchoolAcademicGrant[];
+}> {
+  return postJson("/school/owner/academic/packages", { schoolId });
+}
+
+export function updateSchoolAcademicPackages(request: {
+  schoolId: string;
+  packages: import("../types/app").SchoolAcademicPackageCode[];
+  startsAt: string;
+  endsAt: string;
+}): ReturnType<typeof getSchoolAcademicPackages> {
+  return postJson("/school/owner/academic/packages", { ...request, update: true });
+}
+
 export async function createOwnerIssuedIndividualLicence(request: OwnerIssuedIndividualLicenceCreateRequest): Promise<OwnerIssuedIndividualLicenceCreateResponse> {
   return postJson("/school/owner/individual-licence", request);
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SCHOOL_ADMIN_MODULES } from "./school-admin-grants.mjs";
+import { SCHOOL_ADMIN_MODULES, SCHOOL_ACADEMIC_PACKAGES } from "./school-admin-grants.mjs";
 import { POSTGRES_MIGRATIONS } from "./postgres-migrations.mjs";
 
 test("administration modules are separate, bounded licence features", () => {
@@ -11,6 +11,15 @@ test("administration modules are separate, bounded licence features", () => {
     "operations.staff",
     "operations.transport",
   ]);
+});
+
+test("academic access is divided into independently selectable student and school packages", () => {
+  assert.deepEqual(SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code), [
+    "academic.student",
+    "academic.school",
+  ]);
+  assert.match(SCHOOL_ACADEMIC_PACKAGES[0].description, /Practice\/Quiz.*Competition Arena.*Learning Hub/);
+  assert.match(SCHOOL_ACADEMIC_PACKAGES[1].description, /Classroom.*School Control/);
 });
 
 test("school-controlled sensitive collection options default off", () => {
