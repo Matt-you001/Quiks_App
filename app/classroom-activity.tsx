@@ -10,6 +10,8 @@ import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { t } from "../lib/i18n";
 import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
+import { getAcademicPackageAccess } from "../lib/academic-packages";
 import { getSubjectDisplayName } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import { exportOfflineExamPackages, getClassroomActivityDetails, gradeClassroomActivitySubmission, publishClassroomActivityResultsToSchool } from "../services/ai";
@@ -83,10 +85,17 @@ export default function ClassroomActivityScreen() {
       return;
     }
 
-    const activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
+    let activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
+    if (activeProfile?.schoolMembershipId) activeProfile = await refreshSchoolProfileAccess(activeProfile);
     setProfile(activeProfile);
 
-    if (!canUseClassroom(state.subscriptionTier)) {
+    const access = getAcademicPackageAccess(activeProfile, "academic.school");
+    if (!access.allowed) {
+      Alert.alert(access.title, access.message);
+      setLoading(false);
+      return;
+    }
+    if (!activeProfile?.schoolMembershipId && !canUseClassroom(state.subscriptionTier)) {
       setPremiumBlocked(true);
       setLoading(false);
       return;
@@ -104,8 +113,9 @@ export default function ClassroomActivityScreen() {
         activityId: params.activityId,
       });
       setDetails(response);
-    } catch {
+    } catch (caught) {
       setDetails(null);
+      Alert.alert("Unable to open activity", caught instanceof Error ? caught.message : "The activity could not be loaded.");
     } finally {
       setLoading(false);
     }

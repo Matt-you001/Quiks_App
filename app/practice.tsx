@@ -2,11 +2,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { appVariant } from "../lib/app-variant";
-import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
 import { readAppState } from "../lib/storage";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
 import { getLocalizedSubjects } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import type { UserProfile } from "../types/app";
@@ -24,12 +24,8 @@ export default function PracticeScreen() {
         router.replace("/login" as never);
         return;
       }
-      const selected = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? state.profiles[0] ?? null;
-      if (!hasAcademicPackage(selected, "academic.student")) {
-        Alert.alert("Student Package not included", academicPackageMessage("academic.student"));
-        router.replace("/" as never);
-        return;
-      }
+      let selected = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? state.profiles[0] ?? null;
+      if (selected?.schoolMembershipId) selected = await refreshSchoolProfileAccess(selected);
       setProfile(selected);
       setChecked(true);
     })();

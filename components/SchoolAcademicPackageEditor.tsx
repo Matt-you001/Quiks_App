@@ -27,7 +27,8 @@ export function SchoolAcademicPackageEditor({ school }: { school: SchoolSummary 
           return;
         }
         const now = Date.now();
-        const active = response.grants.filter((grant) => grant.status === "active" && new Date(grant.startsAt).getTime() <= now && (!grant.endsAt || new Date(grant.endsAt).getTime() > now));
+        const packageCodes = new Set(response.packages.map((entry) => entry.code));
+        const active = response.grants.filter((grant) => packageCodes.has(grant.featureCode) && grant.status === "active" && new Date(grant.startsAt).getTime() <= now && (!grant.endsAt || new Date(grant.endsAt).getTime() > now));
         const hasLegacyCore = response.grants.some((grant) => (grant.featureCode as string) === "academic.core" && grant.status === "active");
         setSelected(hasLegacyCore ? response.packages.map((entry) => entry.code) : active.map((grant) => grant.featureCode));
       } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load academic packages."); }

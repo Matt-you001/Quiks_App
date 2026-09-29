@@ -12,6 +12,39 @@ function administrativeQuiksId(account: AppAccount) {
   return `QX-A-${compact.slice(0, 8).padEnd(8, "0")}`;
 }
 
+function unavailablePackageEntitlements() {
+  return {
+    "academic.student": { status: "unavailable" as const, startsAt: null, expiresAt: null },
+    "academic.school": { status: "unavailable" as const, startsAt: null, expiresAt: null },
+  };
+}
+
+export async function refreshSchoolProfileAccess(profile: UserProfile) {
+  if (!profile.schoolMembershipId) return profile;
+  try {
+    const identity = await getSchoolIdentity();
+    const membership = identity.memberships?.find((entry) => entry.membershipId === profile.schoolMembershipId);
+    if (!membership) return { ...profile, academicPackageEntitlements: unavailablePackageEntitlements() };
+    const updated: UserProfile = {
+      ...profile,
+      updatedAt: Date.now(),
+      schoolName: membership.schoolName,
+      schoolId: membership.schoolId,
+      schoolClassNaming: membership.schoolClassNaming,
+      schoolCurriculum: membership.schoolCurriculum,
+      preferredCurriculum: membership.schoolCurriculum || profile.preferredCurriculum,
+      academicPackages: membership.academicPackages,
+      academicPackageEntitlements: membership.academicPackageEntitlements,
+      schoolLicenceStatus: membership.schoolLicenceStatus,
+      schoolLicenceExpiresAt: membership.schoolLicenceExpiresAt,
+    };
+    await upsertProfile(updated);
+    return updated;
+  } catch {
+    return { ...profile, academicPackageEntitlements: unavailablePackageEntitlements() };
+  }
+}
+
 export async function syncAdministrativeProfileForAccount(account: AppAccount) {
   const identity = await getSchoolIdentity();
   // Stable membership-derived profiles connect enrolment, classrooms and CBT.
@@ -36,6 +69,9 @@ export async function syncAdministrativeProfileForAccount(account: AppAccount) {
       schoolMembershipId: membership.membershipId,
       schoolClassNaming: membership.schoolClassNaming,
       academicPackages: membership.academicPackages,
+      academicPackageEntitlements: membership.academicPackageEntitlements,
+      schoolLicenceStatus: membership.schoolLicenceStatus,
+      schoolLicenceExpiresAt: membership.schoolLicenceExpiresAt,
       ...(membership.role === "school_admin" ? { administrativeRole: "school_admin" as const, administrativeAccountUid: account.uid, administrativeSchoolId: membership.schoolId } : {}),
     });
   }

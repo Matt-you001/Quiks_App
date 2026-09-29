@@ -3,6 +3,7 @@ import { appVariant } from "../lib/app-variant";
 import { getFirebaseIdToken } from "../lib/firebase";
 import { getLanguageLabel, getLanguagePromptLabel, normalizeLanguage } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
+import { filterDiverseQuestions } from "../lib/question-diversity";
 import type { SchoolResultFilters, SchoolResultsResponse, SchoolReport, SchoolReportEdit } from "../types/school-results";
 import type {
   BreatherContent,
@@ -239,6 +240,10 @@ function buildPromptLines(request: QuestionRequest) {
     `App audience: ${appVariant.appName} (${appVariant.audienceLabel})`,
     `Learner language: ${getLanguagePromptLabel(language)}`,
     `Learner target exam: ${request.profile?.targetExam ?? "General study"}`,
+    ...(request.recentQuestionPrompts?.length ? [
+      "Do not repeat or lightly reword any recent question below. Use different examples, source words, scenarios, calculations, and sub-skills.",
+      `Recent questions to avoid:\n${request.recentQuestionPrompts.slice(0, 60).map((prompt, index) => `${index + 1}. ${prompt}`).join("\n")}`,
+    ] : []),
     `Subject guidance: ${request.subject.aiPromptHint}`,
     `Variant guidance: ${appVariant.aiGuidance}`,
     `Academic stage guidance: ${describeAcademicStage(request)}`,
@@ -581,19 +586,22 @@ function buildDemoQuestions(request: QuestionRequest): Question[] {
   });
 }
 
-function buildFallbackQuestionResponse(request: QuestionRequest): QuestionResponse {
+function buildFallbackQuestionResponse(request: QuestionRequest, fallbackReason?: string): QuestionResponse {
   const localQuestions = getLocalQuestions(request);
+  const diverseLocalQuestions = filterDiverseQuestions(localQuestions, request.recentQuestionPrompts);
 
-  if (localQuestions.length >= request.questionCount) {
+  if (diverseLocalQuestions.length > 0) {
     return {
-      questions: localQuestions,
+      questions: diverseLocalQuestions,
       source: "local",
+      fallbackReason,
     };
   }
 
   return {
     questions: buildDemoQuestions(request),
     source: "demo",
+    fallbackReason,
   };
 }
 
@@ -601,14 +609,18 @@ function fillVerifiedQuestionsFromLocal(
   request: QuestionRequest,
   verifiedQuestions: Question[]
 ): Question[] {
-  const seenIds = new Set(verifiedQuestions.map((question) => question.id));
+  const diverseVerifiedQuestions = filterDiverseQuestions(verifiedQuestions, request.recentQuestionPrompts);
+  const seenIds = new Set(diverseVerifiedQuestions.map((question) => question.id));
   const seenPrompts = new Set(
-    verifiedQuestions.map((question) => normalizeForValidation(question.prompt).toLowerCase())
+    diverseVerifiedQuestions.map((question) => normalizeForValidation(question.prompt).toLowerCase())
   );
   const localQuestions = getLocalQuestions({ ...request, questionCount: request.questionCount });
-  const merged = [...verifiedQuestions];
+  const merged = [...diverseVerifiedQuestions];
 
-  for (const question of localQuestions) {
+  for (const question of filterDiverseQuestions(localQuestions, [
+    ...(request.recentQuestionPrompts ?? []),
+    ...diverseVerifiedQuestions.map((entry) => entry.prompt),
+  ])) {
     const normalizedPrompt = normalizeForValidation(question.prompt).toLowerCase();
     if (seenIds.has(question.id) || seenPrompts.has(normalizedPrompt)) continue;
     merged.push(question);
@@ -885,7 +897,7 @@ async function generateWithGemini(request: QuestionRequest): Promise<QuestionRes
   }
 
   const parsed = JSON.parse(text) as { questions: Question[] };
-  const candidates = validateQuestions(parsed.questions, candidateCount);
+  const candidates = filterDiverseQuestions(validateQuestions(parsed.questions, candidateCount), request.recentQuestionPrompts);
   const verificationResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${geminiVerifierModel}:generateContent`,
     {
@@ -995,8 +1007,10 @@ export async function generateQuestions(request: QuestionRequest): Promise<Quest
           withVariantMeta(request) as unknown as Record<string, unknown>
         );
         const verifiedQuestions = validateQuestions(response.questions, request.questionCount);
+        const questions = fillVerifiedQuestionsFromLocal(request, verifiedQuestions);
+        if (questions.length === 0) throw new Error("The generated set repeated questions from the learner's recent sessions.");
         return {
-          questions: fillVerifiedQuestionsFromLocal(request, verifiedQuestions),
+          questions,
           source: response.source === "local" || response.source === "demo" ? response.source : "remote",
         };
       }
@@ -1004,8 +1018,11 @@ export async function generateQuestions(request: QuestionRequest): Promise<Quest
       if (geminiApiKey) {
         return generateWithGemini(request);
       }
-    } catch {
-      return buildFallbackQuestionResponse(request);
+    } catch (error) {
+      return buildFallbackQuestionResponse(
+        request,
+        error instanceof Error ? error.message : "The AI question service is temporarily unavailable."
+      );
     }
   }
 

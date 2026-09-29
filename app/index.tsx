@@ -8,13 +8,13 @@ import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { StatPill } from "../components/StatPill";
 import { appVariant } from "../lib/app-variant";
-import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
+import { getAcademicPackageAccess, getEffectiveStudentTier } from "../lib/academic-packages";
 import { canShowAds } from "../lib/ads";
 import { readClassroomInvitationCodeFromLocation } from "../lib/classroom-invite";
 import { getLanguageLabel, t } from "../lib/i18n";
 import { syncRemotePushRegistration } from "../lib/notifications";
 import { canCreateAnotherProfile, canUseClassroom } from "../lib/subscription";
-import { countLearnerProfiles } from "../lib/school-identity";
+import { countLearnerProfiles, refreshSchoolProfileAccess } from "../lib/school-identity";
 import { readAppState, setCurrentProfile } from "../lib/storage";
 import { getLocalizedSubjects, SCORE_THRESHOLD } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
@@ -186,15 +186,21 @@ export default function HomeScreen() {
       state.currentProfileId && state.profiles.some((profile) => profile.id === state.currentProfileId)
         ? state.currentProfileId
         : state.profiles[0]?.id ?? null;
+    let refreshedProfiles = state.profiles;
+    const selectedProfile = state.profiles.find((profile) => profile.id === resolvedProfileId);
+    if (selectedProfile?.schoolMembershipId) {
+      const refreshed = await refreshSchoolProfileAccess(selectedProfile);
+      refreshedProfiles = state.profiles.map((profile) => profile.id === refreshed.id ? refreshed : profile);
+    }
 
-    setProfiles(state.profiles);
+    setProfiles(refreshedProfiles);
     setCurrentProfileIdState(resolvedProfileId);
     setResultsByProfile(state.results);
     setSubscriptionTier(state.subscriptionTier);
     setSubscriptionProfileLimit(state.subscriptionProfileLimit);
     setAuthChecked(true);
     if (classroomJoinCode) {
-      if (canUseClassroom(state.subscriptionTier)) {
+      if (selectedProfile?.schoolMembershipId || canUseClassroom(state.subscriptionTier)) {
         router.replace({ pathname: "/classroom", params: { joinCode: classroomJoinCode } } as never);
       } else {
         setPremiumPrompt("classroom");
@@ -213,11 +219,19 @@ export default function HomeScreen() {
     [profiles, currentProfileId]
   );
 
+  function showPackageAccessReason(code: "academic.student" | "academic.school") {
+    const access = getAcademicPackageAccess(activeProfile, code);
+    if (access.allowed) return true;
+    Alert.alert(access.title, access.message);
+    return false;
+  }
+
   const activeProfileResults = useMemo(
     () => (activeProfile ? resultsByProfile[activeProfile.id] ?? [] : []),
     [activeProfile, resultsByProfile]
   );
   const language = activeProfile?.language ?? "en";
+  const effectiveStudentTier = getEffectiveStudentTier(activeProfile, subscriptionTier);
   const selectedProfileLabel = activeProfile?.name ?? t(language, "noneSelected");
   const heroAudienceLabel = getVariantAudienceLabel(language);
   const heroSubtitle = getVariantHeroSubtitle(language);
@@ -451,7 +465,7 @@ export default function HomeScreen() {
       <View style={[styles.practiceAction, isWeb ? styles.homeSurfaceWeb : null]}>
         <PrimaryButton
           label="Practice/Quiz"
-          onPress={() => hasAcademicPackage(activeProfile, "academic.student") ? router.push("/practice" as never) : Alert.alert("Student Package not included", academicPackageMessage("academic.student"))}
+          onPress={() => router.push("/practice" as never)}
         />
       </View>
 
@@ -466,12 +480,9 @@ export default function HomeScreen() {
           label={canUseClassroom(subscriptionTier) ? "Classroom" : "Classroom"}
           variant="secondary"
           onPress={() => {
-            if (!canUseClassroom(subscriptionTier)) {
+            if (activeProfile?.schoolMembershipId && !showPackageAccessReason("academic.school")) return;
+            if (!activeProfile?.schoolMembershipId && !canUseClassroom(subscriptionTier)) {
               setPremiumPrompt("classroom");
-              return;
-            }
-            if (!hasAcademicPackage(activeProfile, "academic.school")) {
-              Alert.alert("School Package not included", academicPackageMessage("academic.school"));
               return;
             }
 
@@ -483,19 +494,17 @@ export default function HomeScreen() {
         />
         <PrimaryButton
           label={t(language, "competitionArena")}
-          onPress={() =>
-            !hasAcademicPackage(activeProfile, "academic.student")
-              ? Alert.alert("Student Package not included", academicPackageMessage("academic.student"))
-              : activeProfile
+          onPress={() => {
+            activeProfile
               ? router.push("/competition" as never)
-              : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)
-          }
+              : router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never);
+          }}
           style={showWideActions ? styles.homeActionButtonDesktop : styles.homeCompetitionButton}
         />
         <PrimaryButton
           label={t(language, "learningHub")}
           variant="secondary"
-          onPress={() => hasAcademicPackage(activeProfile, "academic.student") ? router.push("/learning-hub" as never) : Alert.alert("Student Package not included", academicPackageMessage("academic.student"))}
+          onPress={() => router.push("/learning-hub" as never)}
           style={showWideActions ? styles.homeActionButtonDesktop : undefined}
         />
         <PrimaryButton
@@ -506,7 +515,7 @@ export default function HomeScreen() {
         />
       </View>
 
-      {subscriptionTier === "free" ? (
+      {effectiveStudentTier === "free" ? (
         <View style={[styles.subscriptionCard, isWeb ? styles.homeSurfaceWeb : null]}>
           <Text style={styles.homeCompetitionTitle}>{t(language, "currentPlan")}</Text>
           <Text style={styles.homeCompetitionText}>{t(language, "freePlanStatus")}</Text>
@@ -518,7 +527,7 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {canShowAds(subscriptionTier) ? <DemoAdBanner language={language} format="banner" /> : null}
+      {canShowAds(effectiveStudentTier) ? <DemoAdBanner language={language} format="banner" /> : null}
 
       <PremiumFeatureDialog
         visible={premiumPrompt !== null}

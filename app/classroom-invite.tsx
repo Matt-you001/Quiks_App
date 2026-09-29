@@ -7,6 +7,8 @@ import { appVariant } from "../lib/app-variant";
 import { t } from "../lib/i18n";
 import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
+import { getAcademicPackageAccess } from "../lib/academic-packages";
 import { palette, shadows } from "../lib/theme";
 import { acceptClassroomInvitationLink } from "../services/ai";
 import type { AppLanguage, UserProfile } from "../types/app";
@@ -26,7 +28,9 @@ export default function ClassroomInviteScreen() {
     setLoading(true);
     const state = await readAppState();
     setIsAuthenticated(state.isAuthenticated);
-    setProfile(state.profiles.find((entry) => entry.id === state.currentProfileId) ?? state.profiles[0] ?? null);
+    let activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? state.profiles[0] ?? null;
+    if (activeProfile?.schoolMembershipId) activeProfile = await refreshSchoolProfileAccess(activeProfile);
+    setProfile(activeProfile);
     setSubscriptionTier(state.subscriptionTier);
     setLoading(false);
   }, []);
@@ -44,7 +48,8 @@ export default function ClassroomInviteScreen() {
   };
 
   const acceptInvitation = async () => {
-    if (!profile || !joinCode || !canUseClassroom(subscriptionTier)) {
+    const access = getAcademicPackageAccess(profile, "academic.school");
+    if (!profile || !joinCode || !access.allowed || (!profile.schoolMembershipId && !canUseClassroom(subscriptionTier))) {
       return;
     }
 
@@ -134,7 +139,21 @@ export default function ClassroomInviteScreen() {
     );
   }
 
-  if (!canUseClassroom(subscriptionTier)) {
+  const packageAccess = getAcademicPackageAccess(profile, "academic.school");
+  if (!packageAccess.allowed) {
+    return (
+      <AppBackground>
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>{appVariant.appName}</Text>
+          <Text style={styles.title}>{packageAccess.title}</Text>
+          <Text style={styles.message}>{packageAccess.message}</Text>
+          <PrimaryButton label="Back home" onPress={declineInvitation} />
+        </View>
+      </AppBackground>
+    );
+  }
+
+  if (!profile.schoolMembershipId && !canUseClassroom(subscriptionTier)) {
     return (
       <AppBackground>
         <View style={styles.card}>

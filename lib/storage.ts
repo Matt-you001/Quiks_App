@@ -9,7 +9,7 @@ import {
 } from "./firebase";
 import { DEFAULT_LANGUAGE, normalizeLanguage } from "./i18n";
 import { getSubjectDisplayName } from "./subjects";
-import type { AppAccount, SessionResult, StoredAppState, SubscriptionTier, UserProfile, UserRole } from "../types/app";
+import type { AppAccount, Question, SessionResult, StoredAppState, SubscriptionTier, UserProfile, UserRole } from "../types/app";
 
 const STORAGE_KEY = "quiks_mobile_state_v1";
 const QUESTION_HISTORY_KEY = "quiks_question_history_v1";
@@ -673,7 +673,23 @@ export async function getProfileResults(profileId: string) {
   return state.results[profileId] ?? [];
 }
 
-type QuestionHistoryState = Record<string, string[]>;
+interface QuestionHistoryEntry {
+  id: string;
+  prompt: string;
+}
+
+type StoredQuestionHistoryEntry = string | QuestionHistoryEntry;
+type QuestionHistoryState = Record<string, StoredQuestionHistoryEntry[]>;
+
+function normalizeQuestionHistoryEntries(entries: StoredQuestionHistoryEntry[] | undefined): QuestionHistoryEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.flatMap((entry) => {
+    if (typeof entry === "string") return entry.trim() ? [{ id: entry.trim(), prompt: "" }] : [];
+    const id = typeof entry?.id === "string" ? entry.id.trim() : "";
+    const prompt = typeof entry?.prompt === "string" ? entry.prompt.trim() : "";
+    return id || prompt ? [{ id, prompt }] : [];
+  });
+}
 
 async function readQuestionHistoryState(): Promise<QuestionHistoryState> {
   const raw = await AsyncStorage.getItem(QUESTION_HISTORY_KEY);
@@ -699,14 +715,33 @@ function createQuestionHistoryKey(profileId: string, subjectId: string) {
 
 export async function getRecentQuestionIds(profileId: string, subjectId: string) {
   const state = await readQuestionHistoryState();
-  return state[createQuestionHistoryKey(profileId, subjectId)] ?? [];
+  return normalizeQuestionHistoryEntries(state[createQuestionHistoryKey(profileId, subjectId)])
+    .map((entry) => entry.id)
+    .filter(Boolean);
 }
 
-export async function appendQuestionHistory(profileId: string, subjectId: string, questionIds: string[]) {
+export async function getRecentQuestionPrompts(profileId: string, subjectId: string) {
+  const state = await readQuestionHistoryState();
+  return normalizeQuestionHistoryEntries(state[createQuestionHistoryKey(profileId, subjectId)])
+    .map((entry) => entry.prompt)
+    .filter(Boolean);
+}
+
+export async function appendQuestionHistory(profileId: string, subjectId: string, questions: Question[] | string[]) {
   const state = await readQuestionHistoryState();
   const key = createQuestionHistoryKey(profileId, subjectId);
-  const existing = state[key] ?? [];
-  const merged = [...questionIds, ...existing.filter((id) => !questionIds.includes(id))].slice(0, 80);
+  const incoming = questions.flatMap((question) => {
+    if (typeof question === "string") return question.trim() ? [{ id: question.trim(), prompt: "" }] : [];
+    const id = String(question.id ?? "").trim();
+    const prompt = String(question.prompt ?? "").trim();
+    return id || prompt ? [{ id, prompt }] : [];
+  });
+  const existing = normalizeQuestionHistoryEntries(state[key]);
+  const incomingKeys = new Set(incoming.map((entry) => `${entry.id}\n${entry.prompt.toLowerCase()}`));
+  const merged = [
+    ...incoming,
+    ...existing.filter((entry) => !incomingKeys.has(`${entry.id}\n${entry.prompt.toLowerCase()}`)),
+  ].slice(0, 120);
   state[key] = merged;
   await writeQuestionHistoryState(state);
   return merged;

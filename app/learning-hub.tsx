@@ -8,10 +8,11 @@ import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { PastQuestionLibrary } from "../components/PastQuestionLibrary";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
-import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
+import { getEffectiveStudentTier } from "../lib/academic-packages";
 import { t } from "../lib/i18n";
 import { canGenerateLearningHubToday } from "../lib/subscription";
 import { readAppState, recordLearningHubGeneration } from "../lib/storage";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
 import { getLocalizedSubjects } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import { askLearningHubQuestion, generateLearningLesson } from "../services/ai";
@@ -61,18 +62,15 @@ export default function LearningHubScreen() {
   const [activeTab, setActiveTab] = useState<LearningHubTab>("lesson");
 
   useEffect(() => {
-    readAppState().then((state) => {
-      const active = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
-      if (!hasAcademicPackage(active, "academic.student")) {
-        Alert.alert("Student Package not included", academicPackageMessage("academic.student"));
-        router.replace("/" as never);
-        return;
-      }
+    void (async () => {
+      const state = await readAppState();
+      let active = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
+      if (active?.schoolMembershipId) active = await refreshSchoolProfileAccess(active);
       setProfile(active);
       setLanguage(active?.language ?? "en");
-      setSubscriptionTier(state.subscriptionTier);
+      setSubscriptionTier(getEffectiveStudentTier(active, state.subscriptionTier));
       setGenerationDates(state.learningHubGenerationDates);
-    });
+    })();
   }, []);
 
   useEffect(() => {

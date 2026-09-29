@@ -12,8 +12,10 @@ import { appVariant } from "../lib/app-variant";
 import { canShowAds } from "../lib/ads";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
-import { appendQuestionHistory, appendResult, getRecentQuestionIds, readAppState, upsertResult } from "../lib/storage";
+import { appendQuestionHistory, appendResult, getRecentQuestionIds, getRecentQuestionPrompts, readAppState, upsertResult } from "../lib/storage";
 import { canUseAiToday, canUseClassroom, hasProAccess } from "../lib/subscription";
+import { getAcademicPackageAccess, getEffectiveStudentTier } from "../lib/academic-packages";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
 import { calculateQuizTime, getDifficultyForLevel, getDifficultyLevelRange, getLevelProgressForGrade, getNextDifficulty, GRADE_LEVEL_COUNT, normalizeQuestions, scoreQuestions } from "../lib/quiz";
 import {
   getSubjectById,
@@ -160,8 +162,18 @@ export default function SessionScreen() {
   );
 
   useEffect(() => {
-    readAppState().then((state) => {
-      if (typeof params.classroomActivityId === "string" && !canUseClassroom(state.subscriptionTier)) {
+    void (async () => {
+      const state = await readAppState();
+      let current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
+      if (current?.schoolMembershipId) current = await refreshSchoolProfileAccess(current);
+      if (typeof params.classroomActivityId === "string") {
+        const access = getAcademicPackageAccess(current, "academic.school");
+        if (!access.allowed) {
+          Alert.alert(access.title, access.message, [{ text: "Back home", onPress: () => router.replace("/") }]);
+          return;
+        }
+      }
+      if (typeof params.classroomActivityId === "string" && !current?.schoolMembershipId && !canUseClassroom(state.subscriptionTier)) {
         Alert.alert(t("en", "classroomTitle"), t("en", "classroomProRequired"), [
           { text: t("en", "cancel"), style: "cancel", onPress: () => router.replace("/") },
           {
@@ -172,14 +184,13 @@ export default function SessionScreen() {
         return;
       }
 
-      const current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
       setProfile(current);
       setResults(current ? state.results[current.id] ?? [] : []);
-      setSubscriptionTier(state.subscriptionTier);
+      setSubscriptionTier(getEffectiveStudentTier(current, state.subscriptionTier));
       if (!current && params.subjectId) {
         router.replace({ pathname: "/select-profile", params: { subject: params.subjectId } });
       }
-    });
+    })();
   }, [params.subjectId]);
 
   useEffect(() => {
@@ -249,7 +260,7 @@ export default function SessionScreen() {
 
     if (isCustomTopic) {
       if (customTopicValidation?.status === "valid") {
-        return customTopicValidation.matchedTopicLabel ?? customTopicValidation.input;
+        return customTopicValidation.input;
       }
 
       const trimmedCustomTopic = customTopicInput.trim();
@@ -585,7 +596,7 @@ export default function SessionScreen() {
       await appendQuestionHistory(
         request.profile.id,
         request.subject.id,
-        nextQuestions.map((question) => question.id)
+        nextQuestions
       );
     }
     setQuestions(nextQuestions);
@@ -595,6 +606,12 @@ export default function SessionScreen() {
     setElapsed(0);
     setTimeLeft(request.mode === "quiz" ? calculateQuizTime(request.level) : 0);
     setPhase("active");
+    if (response.fallbackReason) {
+      Alert.alert(
+        "AI questions unavailable",
+        `Quiks could not load a new AI-generated set, so this session is using the smaller offline question bank. Some topic-focused questions may repeat.\n\nReason: ${response.fallbackReason}`
+      );
+    }
   };
 
   const continueWithLocalQuestions = async () => {
@@ -651,7 +668,7 @@ export default function SessionScreen() {
           freshTopicValidation.status === "valid" ? freshTopicValidation.matchedTopicId ?? undefined : undefined;
         requestTopicLabel =
           freshTopicValidation.status === "valid"
-            ? freshTopicValidation.matchedTopicLabel ?? freshTopicValidation.input
+            ? freshTopicValidation.input
             : freshTopicValidation.input;
 
       } else if (!selectedTopic) {
@@ -751,6 +768,7 @@ export default function SessionScreen() {
       }
 
       const recentQuestionIds = profile ? await getRecentQuestionIds(profile.id, effectiveSubject.id) : [];
+      const recentQuestionPrompts = profile ? await getRecentQuestionPrompts(profile.id, effectiveSubject.id) : [];
       const request: QuestionRequest = {
         subject: effectiveSubject,
         grade,
@@ -763,6 +781,7 @@ export default function SessionScreen() {
         topicLabel: requestTopicLabel,
         profile,
         recentQuestionIds,
+        recentQuestionPrompts,
       };
       const allowAi = hasProAccess(subscriptionTier) || canUseAiToday(subscriptionTier, results);
       if (!allowAi) {

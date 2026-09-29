@@ -52,6 +52,7 @@ import { schoolAcademicPackagesRequest } from "./school-academic-packages-api.mj
 import { replaceAcademicGrants } from "./school-admin-grants.mjs";
 import { getSchoolEmailDiagnostics, sendOperationalAlert, sendSchoolInvitationEmail } from "./school-email.mjs";
 import { getPostgresDiagnostics, initializePostgres } from "./postgres.mjs";
+import { filterDistinctQuestions } from "./question-diversity.mjs";
 import {
   createIndividualLicence,
   createPendingSchoolPurchase,
@@ -80,12 +81,13 @@ import {
   updateSchoolLicence,
   updateSchoolRecord,
   updateSchoolProfileFields,
-  assertInstitutionalAcademicPackage,
 } from "./school-store.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const openAiApiKey = process.env.OPENAI_API_KEY;
 const openAiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const openAiQuestionModel = process.env.OPENAI_QUESTION_MODEL || openAiModel;
+const openAiQuestionReasoningEffort = String(process.env.OPENAI_QUESTION_REASONING_EFFORT || "").trim() || undefined;
 const openAiImageModel = String(process.env.OPENAI_IMAGE_MODEL || "").trim();
 const openAiVerifierModel = process.env.OPENAI_VERIFIER_MODEL || "gpt-5.6-terra";
 const openAiVerifierReasoningEffort = process.env.OPENAI_VERIFIER_REASONING_EFFORT || "medium";
@@ -519,6 +521,9 @@ function describeGeneralCoverage(body) {
 }
 
 function buildQuestionPromptLines(body) {
+  const recentQuestionPrompts = Array.isArray(body.recentQuestionPrompts)
+    ? body.recentQuestionPrompts.map((prompt) => String(prompt).trim()).filter(Boolean).slice(0, 60)
+    : [];
   return [
     `Subject/Course: ${body.subject?.name ?? "Unknown"}`,
     `Grade/Band: ${body.grade ?? "Unknown"}`,
@@ -533,6 +538,10 @@ function buildQuestionPromptLines(body) {
     `Learner age: ${body.profile?.age ?? "Unknown"}`,
     `Target exam: ${body.profile?.targetExam ?? "General study"}`,
     `Preferred curriculum: ${body.profile?.preferredCurriculum || "Not specified"}`,
+    ...(recentQuestionPrompts.length > 0 ? [
+      "Novelty requirement: Do not repeat, lightly reword, or test the same example/word pair as any recent question below. Use different source words, scenarios, facts, calculations, sentence structures, and skills while remaining within the selected topic.",
+      `Recent questions to avoid:\n${recentQuestionPrompts.map((prompt, index) => `${index + 1}. ${prompt}`).join("\n")}`,
+    ] : []),
     ...(body.pastQuestionGuidance ? [
       "Past-question library guidance: Use the following retrieved examples only to match the target exam's scope, recurring concepts and assessment style. Do not copy any question verbatim and do not assume an old answer is correct.",
       String(body.pastQuestionGuidance).slice(0, 6000),
@@ -1120,14 +1129,15 @@ function validateGeneratedQuestions(questions, expectedCount) {
         question.explanation.length > 0 &&
         questionHasConsistentAnswer(question)
       );
-    })
-    .slice(0, expectedCount);
+    });
 
-  if (cleaned.length === 0) {
+  const distinct = filterDistinctQuestions(cleaned).slice(0, expectedCount);
+
+  if (distinct.length === 0) {
     throw new Error("AI returned invalid or inconsistent question data.");
   }
 
-  return cleaned;
+  return distinct;
 }
 
 async function verifyGeneratedQuestions(questions, body) {
@@ -1726,6 +1736,8 @@ async function generateQuestionSet(body) {
   const data = await createOpenAiResponse({
     schemaName: "competition_questions",
     schema: buildQuestionSchema(),
+    model: openAiQuestionModel,
+    reasoningEffort: openAiQuestionReasoningEffort,
     instructions: [
       "You generate multiple-choice educational quiz questions for a mobile learning app competition.",
       "Return only factual, age-appropriate questions.",
@@ -2067,50 +2079,58 @@ async function handleQuestions(body, response) {
     targetExam: body.profile?.targetExam,
     subject: body.subject?.name,
   });
-  const generationBody = { ...body, pastQuestionGuidance, questionCount: candidateCount, requestedQuestionCount: requestedCount };
-  const data = await createOpenAiResponse({
-    schemaName: "quiz_questions",
-    schema: buildQuestionSchema(),
-    instructions: [
-      "You generate multiple-choice educational quiz questions for a mobile learning app.",
-      "Return only factual, age-appropriate questions.",
-      "Each question must have exactly 4 options, one correct answer, and a short explanation.",
-      "Solve each question fully before writing the options.",
-      "Check that the marked answer, the reasoning, and the explanation agree exactly before returning the question.",
-      "If your explanation proves a different answer, rewrite the question and options so only one option remains correct.",
-      "Never return a question with more than one defensible correct option.",
-      "Do not include unsafe content or trick questions.",
-      "Use Nigerian/West African-friendly school context when appropriate, but keep questions globally understandable.",
-      "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
-      "Take the selected difficulty seriously as a real rigor band inside that stage.",
-      "If the course is university-level, produce genuine undergraduate-style questions rather than simplified school questions.",
-      "If the request is for Quiks Teens, do not generate primary-school style questions.",
-      "Return learner-facing content in the learner's selected language.",
-    ].join(" "),
-    input: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: [
-              ...buildQuestionPromptLines(generationBody),
-              `Generate ${candidateCount} distinct candidates so uncertain or ambiguous items can be rejected before learners see them.`,
-            ].join("\n"),
-          },
-        ],
-      },
-    ],
-  });
+  const recentPrompts = Array.isArray(body.recentQuestionPrompts) ? body.recentQuestionPrompts.map(String).filter(Boolean) : [];
+  const accepted = [];
+  for (let generationAttempt = 1; generationAttempt <= 2 && accepted.length < requestedCount; generationAttempt += 1) {
+    const generationBody = {
+      ...body,
+      pastQuestionGuidance,
+      questionCount: candidateCount,
+      requestedQuestionCount: requestedCount,
+      recentQuestionPrompts: [...recentPrompts, ...accepted.map((question) => question.prompt)],
+    };
+    const data = await createOpenAiResponse({
+      schemaName: "quiz_questions",
+      schema: buildQuestionSchema(),
+      model: openAiQuestionModel,
+      reasoningEffort: openAiQuestionReasoningEffort,
+      instructions: [
+        "You generate diverse multiple-choice educational quiz questions for a mobile learning app.",
+        "Return only factual, age-appropriate questions.",
+        "Each question must have exactly 4 options, one correct answer, and a short explanation.",
+        "Every candidate must test a meaningfully different example or sub-skill; changing option order or lightly paraphrasing a stem does not make a new question.",
+        "Solve each question fully before writing the options.",
+        "Check that the marked answer, the reasoning, and the explanation agree exactly before returning the question.",
+        "If your explanation proves a different answer, rewrite the question and options so only one option remains correct.",
+        "Never return a question with more than one defensible correct option.",
+        "Do not include unsafe content or trick questions.",
+        "Use Nigerian/West African-friendly school context when appropriate, but keep questions globally understandable.",
+        "Take grade/band, level, and app variant seriously so the academic standard matches the true learner stage.",
+        "Take the selected difficulty seriously as a real rigor band inside that stage.",
+        "If the course is university-level, produce genuine undergraduate-style questions rather than simplified school questions.",
+        "If the request is for Quiks Teens, do not generate primary-school style questions.",
+        "Return learner-facing content in the learner's selected language.",
+      ].join(" "),
+      input: [{ role: "user", content: [{ type: "input_text", text: [
+        ...buildQuestionPromptLines(generationBody),
+        `Generate ${candidateCount} genuinely distinct candidates so uncertain, ambiguous, or repetitive items can be rejected before learners see them.`,
+      ].join("\n") }] }],
+    });
 
-  const structurallyValid = validateGeneratedQuestions(data.questions, candidateCount);
-  const verified = await verifyGeneratedQuestions(structurallyValid, body);
-  if (verified.length === 0) {
+    const structurallyValid = validateGeneratedQuestions(data.questions, candidateCount);
+    const verified = await verifyGeneratedQuestions(structurallyValid, body);
+    const distinct = filterDistinctQuestions(verified, [...recentPrompts, ...accepted.map((question) => question.prompt)]);
+    accepted.push(...distinct.slice(0, requestedCount - accepted.length));
+    if (accepted.length < requestedCount && generationAttempt === 1) {
+      console.warn(`[questions] Only ${accepted.length}/${requestedCount} novel verified questions remained; retrying with the expanded avoidance list.`);
+    }
+  }
+  if (accepted.length === 0) {
     throw new Error("No generated questions passed independent verification.");
   }
 
   sendJson(response, 200, {
-    questions: verified.slice(0, requestedCount),
+    questions: accepted.slice(0, requestedCount),
     source: "remote",
   });
 }
@@ -3638,6 +3658,8 @@ const server = http.createServer(async (request, response) => {
       ok: true,
       provider: "openai",
       model: openAiModel,
+      questionModel: openAiQuestionModel,
+      questionReasoningEffort: openAiQuestionReasoningEffort ?? null,
       verifierModel: openAiVerifierModel,
       verifierReasoningEffort: openAiVerifierReasoningEffort,
       imageModel: openAiImageModel || null,
@@ -3671,15 +3693,6 @@ const server = http.createServer(async (request, response) => {
     // Firebase principal. Validate before reading records or calling AI.
     if (url.pathname.startsWith("/classroom/")) {
       body = await authenticateClassroomRequest(request, url.pathname, body);
-    }
-
-    const studentPackagePaths = new Set([
-      "/questions", "/learning-hub/lesson", "/learning-hub/ask", "/learning-hub/past-questions/submit",
-      "/competition/join", "/competition/group/create", "/competition/group/join",
-      "/competition/challenge/create", "/competition/challenge/accept",
-    ]);
-    if (studentPackagePaths.has(url.pathname) && (body.profile?.schoolId || body.profile?.schoolMembershipId)) {
-      await assertInstitutionalAcademicPackage(await requireFirebasePrincipal(request), body.profile, "academic.student", body.appVariant ?? "children");
     }
 
     if (url.pathname === "/questions") {

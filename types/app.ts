@@ -98,6 +98,9 @@ export interface UserProfile {
   schoolClassNaming?: SchoolClassNaming;
   schoolCurriculum?: string;
   academicPackages?: SchoolAcademicPackageCode[];
+  academicPackageEntitlements?: SchoolAcademicPackageEntitlements;
+  schoolLicenceStatus?: SchoolLicenceStatus;
+  schoolLicenceExpiresAt?: number | null;
 }
 
 export interface Question {
@@ -281,11 +284,13 @@ export interface QuestionRequest {
   topicLabel?: string;
   profile?: UserProfile | null;
   recentQuestionIds?: string[];
+  recentQuestionPrompts?: string[];
 }
 
 export interface QuestionResponse {
   questions: Question[];
   source: "remote" | "demo" | "local";
+  fallbackReason?: string;
 }
 
 export interface FeedbackRequest {
@@ -520,6 +525,7 @@ export interface SchoolMembership {
   createdAt: number;
   joinedAt?: number;
   academicPackages?: SchoolAcademicPackageCode[];
+  academicPackageEntitlements?: SchoolAcademicPackageEntitlements;
 }
 
 export interface SchoolEntitlementSummary {
@@ -531,6 +537,7 @@ export interface SchoolEntitlementSummary {
   allowedVariants: Array<"children" | "teens" | "uni">;
   reason?: "active" | "not_started" | "expired" | "suspended" | "variant_not_licensed";
   academicPackages?: SchoolAcademicPackageCode[];
+  academicPackageEntitlements?: SchoolAcademicPackageEntitlements;
 }
 
 export interface SchoolOwnerDashboardResponse {
@@ -608,6 +615,12 @@ export interface SchoolCreateRequest {
 }
 
 export type SchoolAcademicPackageCode = "academic.student" | "academic.school";
+export type SchoolAcademicPackageStatus = "active" | "not_purchased" | "not_started" | "expired" | "unavailable";
+export type SchoolAcademicPackageEntitlements = Record<SchoolAcademicPackageCode, {
+  status: SchoolAcademicPackageStatus;
+  startsAt: string | null;
+  expiresAt: string | null;
+}>;
 
 export interface SchoolAcademicGrant {
   featureCode: SchoolAcademicPackageCode;

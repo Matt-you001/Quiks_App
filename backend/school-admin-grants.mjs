@@ -17,7 +17,9 @@ const moduleCodes = new Set(SCHOOL_ADMIN_MODULES.map((module) => module.code));
 const academicPackageCodes = new Set(SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code));
 
 export async function listAcademicGrants(schoolId) {
-  if (!getPostgresDiagnostics().connected) return [];
+  if (!getPostgresDiagnostics().connected) {
+    throw Object.assign(new Error("Academic package verification is temporarily unavailable."), { statusCode: 503 });
+  }
   return withSchoolTransaction(schoolId, async (client) => {
     const result = await client.query(
       `SELECT feature_code AS "featureCode", status, starts_at AS "startsAt", ends_at AS "endsAt"
@@ -30,16 +32,43 @@ export async function listAcademicGrants(schoolId) {
   });
 }
 
+function unavailableAcademicPackages() {
+  return Object.fromEntries(SCHOOL_ACADEMIC_PACKAGES.map((entry) => [entry.code, { status: "unavailable", startsAt: null, expiresAt: null }]));
+}
+
+export function buildAcademicPackageEntitlements(grants, now = Date.now()) {
+  if (!grants.length) {
+    // Backward compatibility for schools created before package separation.
+    return Object.fromEntries(SCHOOL_ACADEMIC_PACKAGES.map((entry) => [entry.code, { status: "active", startsAt: null, expiresAt: null }]));
+  }
+  const configured = grants.some((grant) => grant.featureCode === "academic.selection");
+  const legacy = configured ? [] : grants.filter((grant) => grant.featureCode === "academic.core");
+  return Object.fromEntries(SCHOOL_ACADEMIC_PACKAGES.map((entry) => {
+    const matching = grants.filter((grant) => grant.featureCode === entry.code);
+    const candidates = matching.length ? matching : legacy;
+    const active = candidates.find((grant) => grant.status === "active" && new Date(grant.startsAt).getTime() <= now && (!grant.endsAt || new Date(grant.endsAt).getTime() > now));
+    if (active) return [entry.code, { status: "active", startsAt: active.startsAt ?? null, expiresAt: active.endsAt ?? null }];
+    const upcoming = candidates.find((grant) => grant.status === "active" && new Date(grant.startsAt).getTime() > now);
+    if (upcoming) return [entry.code, { status: "not_started", startsAt: upcoming.startsAt ?? null, expiresAt: upcoming.endsAt ?? null }];
+    const expired = candidates.find((grant) =>
+      grant.status === "expired" || (grant.status === "active" && grant.endsAt && new Date(grant.endsAt).getTime() <= now)
+    );
+    if (expired) return [entry.code, { status: "expired", startsAt: expired.startsAt ?? null, expiresAt: expired.endsAt ?? null }];
+    return [entry.code, { status: "not_purchased", startsAt: null, expiresAt: null }];
+  }));
+}
+
+export async function getAcademicPackageEntitlements(schoolId) {
+  try {
+    return buildAcademicPackageEntitlements(await listAcademicGrants(schoolId));
+  } catch {
+    return unavailableAcademicPackages();
+  }
+}
+
 export async function listActiveAcademicPackageCodes(schoolId) {
-  const grants = await listAcademicGrants(schoolId).catch(() => []);
-  if (!grants.length) return SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code);
-  const now = Date.now();
-  const legacyCoreActive = grants.some((grant) => grant.featureCode === "academic.core" && grant.status === "active" && new Date(grant.startsAt).getTime() <= now && (!grant.endsAt || new Date(grant.endsAt).getTime() > now));
-  if (legacyCoreActive) return SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code);
-  return [...new Set(grants.filter((grant) =>
-    academicPackageCodes.has(grant.featureCode) && grant.status === "active" &&
-    new Date(grant.startsAt).getTime() <= now && (!grant.endsAt || new Date(grant.endsAt).getTime() > now)
-  ).map((grant) => grant.featureCode))];
+  const entitlements = await getAcademicPackageEntitlements(schoolId);
+  return SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code).filter((code) => entitlements[code].status === "active");
 }
 
 export async function hasActiveAcademicPackage(schoolId, featureCode) {
@@ -64,6 +93,12 @@ export async function replaceAcademicGrants({ school, principal, packages, start
       `UPDATE quiks_school_feature_grants SET status = 'revoked', updated_at = now()
        WHERE school_id = $1 AND feature_code LIKE 'academic.%' AND status = 'active'`,
       [school.schoolId]
+    );
+    await client.query(
+      `INSERT INTO quiks_school_feature_grants (school_id, feature_code, source, status, starts_at, ends_at, metadata)
+       VALUES ($1, 'academic.selection', 'app_owner', 'active', $2, $3, $4::jsonb)
+       ON CONFLICT (school_id, feature_code, starts_at) DO UPDATE SET status = 'active', ends_at = EXCLUDED.ends_at, metadata = EXCLUDED.metadata, updated_at = now()`,
+      [school.schoolId, start.toISOString(), end.toISOString(), JSON.stringify({ packages: selected })]
     );
     for (const featureCode of selected) {
       await client.query(

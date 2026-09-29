@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { AppBackground } from "../components/AppBackground";
 import { getSchoolAdminDetails, getSchoolMemberships, getSchoolOwnerDashboard } from "../services/ai";
 import { readAppState } from "../lib/storage";
+import { getAcademicPackageAccess } from "../lib/academic-packages";
 import { palette, shadows } from "../lib/theme";
 import type { SchoolMembership } from "../types/app";
 
@@ -76,20 +77,22 @@ export default function QuiksSchoolScreen() {
         !memberships.some((item) => item.role === "school_admin" && item.schoolLicenceStatus === "active") ? (
           <Text style={styles.expiredNotice}>Your school's licence has expired. Renew it to view your school's portal.</Text>
         ) : null}
-        {memberships.map((item) => (
+        {memberships.map((item) => {
+          const access = getAcademicPackageAccess(item, "academic.school");
+          return (
           <View key={item.membershipId} style={styles.membership}>
             <View style={styles.flex}>
               <Text style={styles.memberName}>{item.schoolName}</Text>
               <Text style={styles.meta}>{item.role.replace("_", " ")} · {item.status}</Text>
               {item.schoolLicenceStatus && item.schoolLicenceStatus !== "active" ? (
                 <Text style={styles.expiredLicence}>Licence {item.schoolLicenceStatus}{item.schoolLicenceExpiresAt ? ` · ended ${new Date(item.schoolLicenceExpiresAt).toLocaleDateString()}` : ""}</Text>
-              ) : item.role === "school_admin" && !item.schoolLicenceStatus ? <Text style={styles.expiredLicence}>Licence status could not be verified. Refresh or sign in again.</Text> : null}
+              ) : item.role === "school_admin" && !item.schoolLicenceStatus ? <Text style={styles.expiredLicence}>Licence status could not be verified. Refresh or sign in again.</Text> : !access.allowed ? <Text style={access.reason === "unavailable" ? styles.unavailableLicence : styles.expiredLicence}>{access.message}</Text> : null}
             </View>
-            {item.role === "school_admin" && item.status === "active" && item.schoolLicenceStatus === "active" ? (
+            {item.role === "school_admin" && item.status === "active" && item.schoolLicenceStatus === "active" && access.allowed ? (
               <Pressable style={styles.smallButton} onPress={() => router.push({ pathname: "/school-admin", params: { schoolId: item.schoolId } } as never)}><Text style={styles.smallText}>Manage</Text></Pressable>
             ) : null}
           </View>
-        ))}
+        );})}
       </View>
       {isOwner ? <Pressable style={styles.ownerLink} onPress={() => router.push("/school-owner" as never)}><Text style={styles.ownerText}>Quiks owner dashboard</Text></Pressable> : null}
     </AppBackground>
@@ -104,5 +107,5 @@ const styles = StyleSheet.create({
   input: { backgroundColor: "#F5F8FB", borderWidth: 1, borderColor: "#D5E0E8", borderRadius: 16, padding: 16, fontSize: 16 },
   primary: { marginTop: 12, backgroundColor: palette.navy, borderRadius: 16, padding: 16, alignItems: "center" }, primaryText: { color: "white", fontWeight: "900", fontSize: 16 },
   membership: { flexDirection: "row", alignItems: "center", paddingVertical: 14, borderTopWidth: 1, borderTopColor: "#E6EDF2" }, flex: { flex: 1 }, memberName: { color: palette.navy, fontSize: 17, fontWeight: "800" }, meta: { color: "#587180", marginTop: 3, textTransform: "capitalize" },
-  smallButton: { backgroundColor: palette.navy, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12 }, smallText: { color: "white", fontWeight: "800" }, expiredNotice: { color: "#B42318", backgroundColor: "#FFF0EE", borderRadius: 12, padding: 12, fontWeight: "800", lineHeight: 21, marginBottom: 8 }, expiredLicence: { color: "#B42318", fontWeight: "800", marginTop: 4 }, error: { color: "#B42318", marginBottom: 8 }, ownerLink: { alignItems: "center", padding: 15 }, ownerText: { color: palette.navy, fontWeight: "800" },
+  smallButton: { backgroundColor: palette.navy, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12 }, smallText: { color: "white", fontWeight: "800" }, expiredNotice: { color: "#B42318", backgroundColor: "#FFF0EE", borderRadius: 12, padding: 12, fontWeight: "800", lineHeight: 21, marginBottom: 8 }, expiredLicence: { color: "#B42318", fontWeight: "800", marginTop: 4 }, unavailableLicence: { color: "#8A5A00", fontWeight: "800", marginTop: 4 }, error: { color: "#B42318", marginBottom: 8 }, ownerLink: { alignItems: "center", padding: 15 }, ownerText: { color: palette.navy, fontWeight: "800" },
 });

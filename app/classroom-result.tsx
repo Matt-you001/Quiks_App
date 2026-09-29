@@ -1,12 +1,14 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppBackground } from "../components/AppBackground";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { t } from "../lib/i18n";
 import { canUseClassroom } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
+import { getAcademicPackageAccess } from "../lib/academic-packages";
 import { palette, shadows } from "../lib/theme";
 import { getClassroomActivityDetails } from "../services/ai";
 import type {
@@ -53,10 +55,17 @@ export default function ClassroomResultScreen() {
       return;
     }
 
-    const activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
+    let activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
+    if (activeProfile?.schoolMembershipId) activeProfile = await refreshSchoolProfileAccess(activeProfile);
     setProfile(activeProfile);
 
-    if (!canUseClassroom(state.subscriptionTier)) {
+    const access = getAcademicPackageAccess(activeProfile, "academic.school");
+    if (!access.allowed) {
+      Alert.alert(access.title, access.message);
+      setLoading(false);
+      return;
+    }
+    if (!activeProfile?.schoolMembershipId && !canUseClassroom(state.subscriptionTier)) {
       setPremiumBlocked(true);
       setLoading(false);
       return;
@@ -74,8 +83,9 @@ export default function ClassroomResultScreen() {
         activityId: params.activityId,
       });
       setDetails(response);
-    } catch {
+    } catch (caught) {
       setDetails(null);
+      Alert.alert("Unable to open results", caught instanceof Error ? caught.message : "The results could not be loaded.");
     } finally {
       setLoading(false);
     }

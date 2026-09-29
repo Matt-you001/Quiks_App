@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SCHOOL_ADMIN_MODULES, SCHOOL_ACADEMIC_PACKAGES } from "./school-admin-grants.mjs";
+import { buildAcademicPackageEntitlements, SCHOOL_ADMIN_MODULES, SCHOOL_ACADEMIC_PACKAGES } from "./school-admin-grants.mjs";
 import { POSTGRES_MIGRATIONS } from "./postgres-migrations.mjs";
 
 test("administration modules are separate, bounded licence features", () => {
@@ -20,6 +20,17 @@ test("academic access is divided into independently selectable student and schoo
   ]);
   assert.match(SCHOOL_ACADEMIC_PACKAGES[0].description, /Practice\/Quiz.*Competition Arena.*Learning Hub/);
   assert.match(SCHOOL_ACADEMIC_PACKAGES[1].description, /Classroom.*School Control/);
+});
+
+test("academic package reasons distinguish active, expired and not purchased", () => {
+  const now = Date.parse("2026-09-29T12:00:00.000Z");
+  const entitlements = buildAcademicPackageEntitlements([
+    { featureCode: "academic.selection", status: "active", startsAt: "2026-01-01T00:00:00.000Z", endsAt: "2027-01-01T00:00:00.000Z" },
+    { featureCode: "academic.student", status: "active", startsAt: "2026-01-01T00:00:00.000Z", endsAt: "2026-09-01T00:00:00.000Z" },
+  ], now);
+  assert.equal(entitlements["academic.student"].status, "expired");
+  assert.equal(entitlements["academic.school"].status, "not_purchased");
+  assert.equal(buildAcademicPackageEntitlements([], now)["academic.student"].status, "active");
 });
 
 test("school-controlled sensitive collection options default off", () => {

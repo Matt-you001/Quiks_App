@@ -10,7 +10,7 @@ import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { canShowAds } from "../lib/ads";
 import { appVariant } from "../lib/app-variant";
-import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
+import { getEffectiveStudentTier } from "../lib/academic-packages";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { calculateQuizTime, getLevelProgressForGrade } from "../lib/quiz";
 import {
@@ -21,6 +21,7 @@ import {
 } from "../lib/notifications";
 import { canJoinCompetitionToday, shouldShowUpgradePrompts } from "../lib/subscription";
 import { readAppState } from "../lib/storage";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
 import { getLocalizedSubjects, getSubjectById, getSubjectDisplayName, getTopicById, grades } from "../lib/subjects";
 import { palette, shadows } from "../lib/theme";
 import {
@@ -103,17 +104,14 @@ export default function CompetitionScreen() {
   const canJoinMoreCompetitions = canJoinCompetitionToday(subscriptionTier, results);
 
   useEffect(() => {
-    readAppState().then((state) => {
-      const current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
-      if (!hasAcademicPackage(current, "academic.student")) {
-        Alert.alert("Student Package not included", academicPackageMessage("academic.student"));
-        router.replace("/" as never);
-        return;
-      }
+    void (async () => {
+      const state = await readAppState();
+      let current = state.profiles.find((item) => item.id === state.currentProfileId) ?? null;
+      if (current?.schoolMembershipId) current = await refreshSchoolProfileAccess(current);
       setProfile(current);
       setResults(current ? state.results[current.id] ?? [] : []);
-      setSubscriptionTier(state.subscriptionTier);
-    });
+      setSubscriptionTier(getEffectiveStudentTier(current, state.subscriptionTier));
+    })();
   }, []);
 
   useEffect(() => {

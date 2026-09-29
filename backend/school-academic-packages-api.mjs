@@ -15,5 +15,6 @@ export async function schoolAcademicPackagesRequest(principal, payload) {
   const grants = payload.update
     ? await replaceAcademicGrants({ school: context.school, principal, packages: payload.packages, startsAt: payload.startsAt, endsAt: payload.endsAt })
     : await listAcademicGrants(schoolId);
-  return { packages: SCHOOL_ACADEMIC_PACKAGES, grants };
+  const visibleCodes = new Set([...SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code), "academic.core"]);
+  return { packages: SCHOOL_ACADEMIC_PACKAGES, grants: grants.filter((grant) => visibleCodes.has(grant.featureCode)) };
 }

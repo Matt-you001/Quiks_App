@@ -13,11 +13,12 @@ import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
 import { ClassroomLessonNotes } from "../components/ClassroomLessonNotes";
 import { ClassroomChat } from "../components/ClassroomChat";
 import { appVariant } from "../lib/app-variant";
-import { academicPackageMessage, hasAcademicPackage } from "../lib/academic-packages";
+import { getAcademicPackageAccess } from "../lib/academic-packages";
 import { createClassroomInvitationLink, createClassroomInvitationMessage } from "../lib/classroom-invite";
 import { getDifficultyLabel, t } from "../lib/i18n";
 import { canUseClassroom } from "../lib/subscription";
-import { readAppState, upsertProfile } from "../lib/storage";
+import { readAppState } from "../lib/storage";
+import { refreshSchoolProfileAccess } from "../lib/school-identity";
 import { palette, shadows } from "../lib/theme";
 import {
   createClassroomAssignment,
@@ -29,7 +30,6 @@ import {
   generateClassroomQuestionCandidates,
   getClassroomActivityDetails,
   getClassroomDetails,
-  getSchoolIdentity,
   inviteStudentToClassroom,
   listClassroomActivities,
   listClassroomClasses,
@@ -483,35 +483,30 @@ export default function ClassroomScreen() {
 
     let activeProfile = state.profiles.find((entry) => entry.id === state.currentProfileId) ?? null;
 
-    if (!canUseClassroom(state.subscriptionTier)) {
-      setPremiumBlocked(true);
-      setLoading(false);
-      return;
-    }
-    setPremiumBlocked(false);
-
     if (!activeProfile) {
       setProfile(null);
       setLoading(false);
       return;
     }
 
-    if (!hasAcademicPackage(activeProfile, "academic.school")) {
+    if (activeProfile.schoolMembershipId) activeProfile = await refreshSchoolProfileAccess(activeProfile);
+
+    const schoolPackageAccess = getAcademicPackageAccess(activeProfile, "academic.school");
+    if (!schoolPackageAccess.allowed) {
       setLoading(false);
-      Alert.alert("School Package not included", academicPackageMessage("academic.school"));
+      Alert.alert(schoolPackageAccess.title, schoolPackageAccess.message);
       router.replace("/" as never);
       return;
     }
 
+    if (!activeProfile.schoolMembershipId && !canUseClassroom(state.subscriptionTier)) {
+      setPremiumBlocked(true);
+      setLoading(false);
+      return;
+    }
+    setPremiumBlocked(false);
+
     try {
-      if (activeProfile.schoolMembershipId) {
-        const identity = await getSchoolIdentity();
-        const membership = identity.memberships?.find((entry) => entry.membershipId === activeProfile?.schoolMembershipId);
-        if (membership) {
-          activeProfile = { ...activeProfile, schoolName: membership.schoolName, schoolClassNaming: membership.schoolClassNaming, schoolCurriculum: membership.schoolCurriculum, preferredCurriculum: membership.schoolCurriculum || activeProfile.preferredCurriculum, academicPackages: membership.academicPackages };
-          await upsertProfile(activeProfile);
-        }
-      }
       setProfile(activeProfile);
       await syncClassroomProfile({ profile: activeProfile });
       const [nextClasses, nextActivities] = await Promise.all([
