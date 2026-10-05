@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { AuthProgressOverlay } from "../components/AuthProgressOverlay";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getGoogleAuthRedirectUri, googleAuthConfig } from "../lib/auth-config";
@@ -42,9 +43,11 @@ import type { AppLanguage } from "../types/app";
 function GoogleSignupButton({
   onSuccess,
   onError,
+  onLoadingChange,
 }: {
   onSuccess: (idToken: string, accessToken?: string) => Promise<void>;
   onError: (message: string) => void;
+  onLoadingChange: (loading: boolean) => void;
 }) {
   const language = "en";
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -60,6 +63,10 @@ function GoogleSignupButton({
     : [null, null, null];
   const onSuccessRef = useRef(onSuccess);
   const handledGoogleResponseKeyRef = useRef<string | null>(null);
+  const updateGoogleLoading = useCallback((nextLoading: boolean) => {
+    setGoogleLoading(nextLoading);
+    onLoadingChange(nextLoading);
+  }, [onLoadingChange]);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
@@ -88,19 +95,20 @@ function GoogleSignupButton({
       handledGoogleResponseKeyRef.current = responseKey;
 
       if (response.type === "error") {
-        setGoogleLoading(false);
+        updateGoogleLoading(false);
         onError(response.error?.message || response.params.error_description || t(language, "invalidCredentialsMessage"));
         return;
       }
 
       if (response.type !== "success") {
+        updateGoogleLoading(false);
         return;
       }
 
       const idToken = response.params.id_token;
       const accessToken = response.params.access_token;
       if (!idToken) {
-        setGoogleLoading(false);
+        updateGoogleLoading(false);
         onError("Google did not return the identity token required to complete sign-up. Please try again.");
         return;
       }
@@ -108,30 +116,35 @@ function GoogleSignupButton({
       try {
         await onSuccessRef.current(idToken, accessToken);
       } finally {
-        setGoogleLoading(false);
+        updateGoogleLoading(false);
       }
     };
 
     void completeGoogle();
-  }, [isNativeFlow, onError, response]);
+  }, [isNativeFlow, onError, response, updateGoogleLoading]);
 
   return (
     <PrimaryButton
       label={t(language, "continueWithGoogle")}
       variant="secondary"
       onPress={async () => {
-        setGoogleLoading(true);
-        try {
-          if (isNativeFlow) {
+        updateGoogleLoading(true);
+        if (isNativeFlow) {
+          try {
             const { idToken, accessToken } = await beginNativeGoogleSignIn();
             await onSuccess(idToken, accessToken);
-          } else {
-            await promptAsync?.();
+          } catch (error) {
+            onError(formatGoogleSignInError(error));
+          } finally {
+            updateGoogleLoading(false);
           }
-        } catch (error) {
-          onError(formatGoogleSignInError(error));
-        } finally {
-          setGoogleLoading(false);
+        } else {
+          try {
+            await promptAsync?.();
+          } catch (error) {
+            onError(formatGoogleSignInError(error));
+            updateGoogleLoading(false);
+          }
         }
       }}
       loading={googleLoading}
@@ -148,6 +161,7 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [schoolCode, setSchoolCode] = useState(String(params.schoolCode ?? ""));
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
   const hasGoogleConfig = hasGoogleSignInConfig();
   const nextRoute = () => getContinuationRoute({ ...params, schoolCode: schoolCode.trim() });
@@ -274,6 +288,7 @@ export default function SignupScreen() {
               <PrimaryButton label={t(language, "signUp")} onPress={handleSignup} loading={loading} />
               {hasGoogleConfig ? (
                 <GoogleSignupButton
+                  onLoadingChange={setGoogleLoading}
                   onError={reportAuthError}
                   onSuccess={async (idToken, accessToken) => {
                     try {
@@ -309,6 +324,11 @@ export default function SignupScreen() {
               />
             </View>
           </View>
+          <AuthProgressOverlay
+            visible={loading || googleLoading}
+            title={googleLoading ? "Connecting with Google" : "Creating your account"}
+            message={googleLoading ? "Securely confirming your Google account and preparing Quiks…" : "Creating your secure Quiks account…"}
+          />
     </AppBackground>
   );
 }

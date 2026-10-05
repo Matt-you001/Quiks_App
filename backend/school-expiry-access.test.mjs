@@ -63,8 +63,10 @@ test("expired licence is exposed on membership lists and closes public enrolment
   assert.equal(publicDetails.enrolmentOpen, false);
 });
 
-test("school administrator cannot enter an expired school portal", async () => {
-  await assert.rejects(store.getSchoolDetails(admin, school.id), /licence expired/i);
+test("school administrator can enter the portal shell after expiry while licensed actions remain blocked", async () => {
+  const details = await store.getSchoolDetails(admin, school.id);
+  assert.equal(details.school.status, "expired");
+  await assert.rejects(store.inviteSchoolMember(admin, school.id, "new@example.com", "student"), /licence expired/i);
 });
 
 test("app owner keeps inspection access but cannot operate an expired school", async () => {

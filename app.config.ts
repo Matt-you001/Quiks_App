@@ -343,6 +343,11 @@ const variantConfig: Record<AppVariant, { name: string; slug: string; scheme: st
 };
 
 const current = variantConfig[variant] ?? variantConfig.children;
+const variantWebHosts: Record<AppVariant, string> = {
+  children: "children.quiks.site",
+  teens: "teens.quiks.site",
+  uni: "advance.quiks.site",
+};
 const variantBackgrounds: Record<AppVariant, string> = {
   children: "#7A2CC8",
   teens: "#11444A",
@@ -381,7 +386,7 @@ const config: ExpoConfig = {
         data: [
           {
             scheme: "https",
-            host: `${variant}.quiks.site`,
+            host: variantWebHosts[variant],
             pathPrefix: "/classroom-invite.html",
           },
         ],

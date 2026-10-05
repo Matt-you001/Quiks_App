@@ -410,7 +410,7 @@ export async function signOutAccount() {
   }
 
   await signOut(firebaseAuth);
-  await clearNativeGoogleSession();
+  void clearNativeGoogleSession();
 }
 
 export async function loadCloudState(userId: string) {

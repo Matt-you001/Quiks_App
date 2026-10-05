@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.quiks.uni",
+      "sha256_cert_fingerprints": [
+        "D7:65:7F:3F:9A:7F:E8:6D:36:F6:7F:A0:5F:94:09:97:E0:74:AF:7A:6F:FD:14:2E:B4:8A:19:D6:F2:B8:11:76",
+        "AA:A0:FA:E9:03:3E:42:5B:3E:BB:86:BF:4E:8B:91:BF:C1:F9:C7:AF:F8:F3:6F:EB:CA:E8:11:D6:3A:8E:0B:F1"
+      ]
+    }
+  }
+]

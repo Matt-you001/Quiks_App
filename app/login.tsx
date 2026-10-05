@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { AppBackground } from "../components/AppBackground";
+import { AuthProgressOverlay } from "../components/AuthProgressOverlay";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { appVariant } from "../lib/app-variant";
 import { getGoogleAuthRedirectUri, googleAuthConfig } from "../lib/auth-config";
@@ -43,9 +44,11 @@ import type { AppLanguage } from "../types/app";
 function GoogleLoginButton({
   onSuccess,
   onError,
+  onLoadingChange,
 }: {
   onSuccess: (idToken: string, accessToken?: string) => Promise<void>;
   onError: (message: string) => void;
+  onLoadingChange: (loading: boolean) => void;
 }) {
   const language = "en";
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -61,6 +64,10 @@ function GoogleLoginButton({
     : [null, null, null];
   const onSuccessRef = useRef(onSuccess);
   const handledGoogleResponseKeyRef = useRef<string | null>(null);
+  const updateGoogleLoading = useCallback((nextLoading: boolean) => {
+    setGoogleLoading(nextLoading);
+    onLoadingChange(nextLoading);
+  }, [onLoadingChange]);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
@@ -89,19 +96,20 @@ function GoogleLoginButton({
       handledGoogleResponseKeyRef.current = responseKey;
 
       if (response.type === "error") {
-        setGoogleLoading(false);
+        updateGoogleLoading(false);
         onError(response.error?.message || response.params.error_description || t(language, "invalidCredentialsMessage"));
         return;
       }
 
       if (response.type !== "success") {
+        updateGoogleLoading(false);
         return;
       }
 
       const idToken = response.params.id_token;
       const accessToken = response.params.access_token;
       if (!idToken) {
-        setGoogleLoading(false);
+        updateGoogleLoading(false);
         onError("Google did not return the identity token required to complete sign-in. Please try again.");
         return;
       }
@@ -109,30 +117,35 @@ function GoogleLoginButton({
       try {
         await onSuccessRef.current(idToken, accessToken);
       } finally {
-        setGoogleLoading(false);
+        updateGoogleLoading(false);
       }
     };
 
     void completeGoogle();
-  }, [isNativeFlow, onError, response]);
+  }, [isNativeFlow, onError, response, updateGoogleLoading]);
 
   return (
     <PrimaryButton
       label={t(language, "continueWithGoogle")}
       variant="secondary"
       onPress={async () => {
-        setGoogleLoading(true);
-        try {
-          if (isNativeFlow) {
+        updateGoogleLoading(true);
+        if (isNativeFlow) {
+          try {
             const { idToken, accessToken } = await beginNativeGoogleSignIn();
             await onSuccess(idToken, accessToken);
-          } else {
-            await promptAsync?.();
+          } catch (error) {
+            onError(formatGoogleSignInError(error));
+          } finally {
+            updateGoogleLoading(false);
           }
-        } catch (error) {
-          onError(formatGoogleSignInError(error));
-        } finally {
-          setGoogleLoading(false);
+        } else {
+          try {
+            await promptAsync?.();
+          } catch (error) {
+            onError(formatGoogleSignInError(error));
+            updateGoogleLoading(false);
+          }
         }
       }}
       loading={googleLoading}
@@ -148,6 +161,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [schoolCode, setSchoolCode] = useState(String(params.schoolCode ?? ""));
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const hasGoogleConfig = hasGoogleSignInConfig();
   const nextRoute = () => getContinuationRoute({ ...params, schoolCode: schoolCode.trim() });
@@ -273,6 +287,7 @@ export default function LoginScreen() {
               <PrimaryButton label={t(language, "signIn")} onPress={handleLogin} loading={loading} />
               {hasGoogleConfig ? (
                 <GoogleLoginButton
+                  onLoadingChange={setGoogleLoading}
                   onError={reportAuthError}
                   onSuccess={async (idToken, accessToken) => {
                     try {
@@ -309,6 +324,11 @@ export default function LoginScreen() {
               />
             </View>
           </View>
+          <AuthProgressOverlay
+            visible={loading || googleLoading}
+            title={googleLoading ? "Connecting with Google" : "Signing you in"}
+            message={googleLoading ? "Securely confirming your Google account and restoring your Quiks profile…" : "Securely restoring your account and learning progress…"}
+          />
     </AppBackground>
   );
 }

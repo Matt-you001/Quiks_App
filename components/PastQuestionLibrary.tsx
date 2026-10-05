@@ -115,7 +115,12 @@ export function PastQuestionLibrary({ profile, canGenerate, onGenerationUsed, on
       const response = await submitPastQuestions({ examTitle: examTitle.trim(), subject: subject.trim(), year: year.trim(), questionText: questionText.trim() || undefined, attachment, shareConfirmed, profile });
       setSolved([response.item]);
       await onGenerationUsed();
-      Alert.alert("Past Q&A", response.duplicate ? "This paper was already in the library. Its solved copy is shown below." : "Questions solved and added to the Past Q&A library.");
+      const message = response.duplicate
+        ? "No new questions were found. The matching solved paper already in the library is shown below."
+        : response.merged
+          ? `${response.addedQuestionCount ?? 0} new question${response.addedQuestionCount === 1 ? " was" : "s were"} added to the existing paper. The combined solved paper is shown below.`
+          : "Questions solved and added to the Past Q&A library.";
+      Alert.alert("Past Q&A", message);
     } catch (error) {
       Alert.alert("Past Q&A", error instanceof Error ? error.message : "The questions could not be processed.");
     } finally { setLoading(false); }

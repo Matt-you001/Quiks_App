@@ -33,28 +33,19 @@ test("owner edits the school identity and renews its dates", async () => {
   assert.equal(updated.status, "active", "untrusted patch cannot change licence status");
 });
 
-test("school administrator configures a preset class naming system", async () => {
-  const updated = await store.updateSchoolClassNaming(admin, school.id, { mode: "primary_secondary" });
-  assert.equal(updated.classNaming.mode, "primary_secondary");
-  assert.ok(updated.classNaming.names.includes("Primary 1"));
-  assert.ok(updated.classNaming.names.includes("SS 3"));
-  const [membership] = await store.listPrincipalMemberships(admin);
-  assert.deepEqual(membership.schoolClassNaming, updated.classNaming);
+test("academic school-control writes fail closed when package verification is unavailable", async () => {
+  await assert.rejects(store.updateSchoolClassNaming(admin, school.id, { mode: "primary_secondary" }), /temporarily/i);
 });
 
-test("school curriculum is stored centrally and propagated through verified membership", async () => {
-  const updated = await store.updateSchoolCurriculum(admin, school.id, ["Nigerian National Curriculum", "British National Curriculum"]);
-  assert.deepEqual(updated.curricula, ["Nigerian National Curriculum", "British National Curriculum"]);
-  assert.equal(updated.curriculum, "Nigerian National Curriculum + British National Curriculum");
-  const [membership] = await store.listPrincipalMemberships(admin);
-  assert.equal(membership.schoolCurriculum, "Nigerian National Curriculum + British National Curriculum");
+test("school curriculum writes also require a verified School Package", async () => {
+  await assert.rejects(store.updateSchoolCurriculum(admin, school.id, ["Nigerian National Curriculum"]), /temporarily/i);
 });
 
 test("delete is a verified archive: access is revoked while records remain restorable", async () => {
   await assert.rejects(store.archiveSchool(owner, school.id, "Wrong School"), /exactly/);
   const archived = await store.archiveSchool(owner, school.id, "Renewed School");
   assert.equal(archived.recordsPreserved, true);
-  await assert.rejects(store.getSchoolDetails(admin, school.id), /suspended/);
+  await assert.rejects(store.getSchoolDetails(admin, school.id), /archived/);
   let dashboard = await store.getOwnerDashboard(owner);
   assert.equal(dashboard.schools.length, 0);
   assert.equal(dashboard.archivedSchools[0].name, "Renewed School");

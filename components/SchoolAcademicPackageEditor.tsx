@@ -26,11 +26,21 @@ export function SchoolAcademicPackageEditor({ school }: { school: SchoolSummary 
           setSelected(response.packages.map((entry) => entry.code));
           return;
         }
-        const now = Date.now();
         const packageCodes = new Set(response.packages.map((entry) => entry.code));
-        const active = response.grants.filter((grant) => packageCodes.has(grant.featureCode) && grant.status === "active" && new Date(grant.startsAt).getTime() <= now && (!grant.endsAt || new Date(grant.endsAt).getTime() > now));
-        const hasLegacyCore = response.grants.some((grant) => (grant.featureCode as string) === "academic.core" && grant.status === "active");
-        setSelected(hasLegacyCore ? response.packages.map((entry) => entry.code) : active.map((grant) => grant.featureCode));
+        const selection = response.grants.find((grant) =>
+          grant.featureCode === "academic.selection" && grant.status !== "revoked" && Array.isArray(grant.metadata?.packages)
+        );
+        const selectedFromRecord = selection?.metadata?.packages
+          ?.filter((code): code is SchoolAcademicPackageCode => packageCodes.has(code)) ?? [];
+        const hasLegacyCore = response.grants.some((grant) => grant.featureCode === "academic.core" && grant.status !== "revoked");
+        const selectedFromHistory = response.grants
+          .filter((grant) => packageCodes.has(grant.featureCode) && grant.status !== "revoked")
+          .map((grant) => grant.featureCode as SchoolAcademicPackageCode);
+        setSelected(selection
+          ? selectedFromRecord
+          : hasLegacyCore
+            ? response.packages.map((entry) => entry.code)
+            : [...new Set(selectedFromHistory)]);
       } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load academic packages."); }
     })();
   }, [open, school.schoolId]);

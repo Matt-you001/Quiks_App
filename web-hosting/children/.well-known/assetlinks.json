@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.quiks.mobile",
+      "sha256_cert_fingerprints": [
+        "7C:D4:83:7F:6D:DC:94:C9:B4:97:F2:33:6A:86:8B:04:6A:5E:A7:CD:10:AA:4F:4B:FD:B4:B1:9D:60:54:44:96"
+      ]
+    }
+  }
+]

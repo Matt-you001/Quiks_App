@@ -251,6 +251,8 @@ export interface PastQuestionSubmitRequest {
 export interface PastQuestionSubmitResponse {
   item: PastQuestionSet;
   duplicate: boolean;
+  merged?: boolean;
+  addedQuestionCount?: number;
 }
 
 export interface PastQuestionSearchResponse {
@@ -526,6 +528,7 @@ export interface SchoolMembership {
   joinedAt?: number;
   academicPackages?: SchoolAcademicPackageCode[];
   academicPackageEntitlements?: SchoolAcademicPackageEntitlements;
+  administrationLicence?: SchoolAdministrationLicenceEntitlement;
 }
 
 export interface SchoolEntitlementSummary {
@@ -623,10 +626,11 @@ export type SchoolAcademicPackageEntitlements = Record<SchoolAcademicPackageCode
 }>;
 
 export interface SchoolAcademicGrant {
-  featureCode: SchoolAcademicPackageCode;
+  featureCode: SchoolAcademicPackageCode | "academic.core" | "academic.selection";
   status: "pending" | "active" | "expired" | "revoked";
   startsAt: string;
   endsAt: string | null;
+  metadata?: { packages?: SchoolAcademicPackageCode[] };
 }
 
 export interface SchoolCreateResponse {
@@ -683,6 +687,10 @@ export interface SchoolDetailsResponse {
     role: "app_owner" | "school_owner" | "school_admin";
   };
   school: SchoolSummary;
+  access?: {
+    academicSchool: SchoolAcademicPackageEntitlements["academic.school"];
+    administration: SchoolAdministrationLicenceEntitlement;
+  };
   profileFields: SchoolProfileFieldDefinition[];
   memberships: SchoolMembership[];
   billingHistory?: SchoolBillingPurchase[];
@@ -700,6 +708,13 @@ export interface SchoolAdministrationGrant {
   status: "pending" | "active" | "expired" | "revoked";
   startsAt: string;
   endsAt: string | null;
+}
+
+export interface SchoolAdministrationLicenceEntitlement {
+  status: "active" | "not_purchased" | "not_started" | "expired" | "unavailable";
+  startsAt: string | null;
+  expiresAt: string | null;
+  activeModules: SchoolAdministrationModuleCode[];
 }
 
 export interface SchoolAdministrationSettings {

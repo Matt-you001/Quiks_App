@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.quiks.teens",
+      "sha256_cert_fingerprints": [
+        "F1:99:EE:49:6C:A0:F8:EA:45:8C:F4:F7:E8:ED:2E:6E:ED:EB:D5:84:0F:42:77:7F:74:FB:66:B4:E4:36:CF:E2"
+      ]
+    }
+  }
+]

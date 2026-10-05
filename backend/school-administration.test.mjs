@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAcademicPackageEntitlements, SCHOOL_ADMIN_MODULES, SCHOOL_ACADEMIC_PACKAGES } from "./school-admin-grants.mjs";
+import { buildAcademicPackageEntitlements, buildAdministrationLicenceEntitlement, configuredAcademicPackageCodes, SCHOOL_ADMIN_MODULES, SCHOOL_ACADEMIC_PACKAGES } from "./school-admin-grants.mjs";
 import { POSTGRES_MIGRATIONS } from "./postgres-migrations.mjs";
 
 test("administration modules are separate, bounded licence features", () => {
@@ -33,11 +33,43 @@ test("academic package reasons distinguish active, expired and not purchased", (
   assert.equal(buildAcademicPackageEntitlements([], now)["academic.student"].status, "active");
 });
 
+test("school renewal preserves configured academic packages even after their former dates expire", () => {
+  const grants = [
+    { featureCode: "academic.selection", status: "expired", startsAt: "2026-01-01T00:00:00.000Z", endsAt: "2026-09-01T00:00:00.000Z", metadata: { packages: ["academic.school"] } },
+    { featureCode: "academic.school", status: "expired", startsAt: "2026-01-01T00:00:00.000Z", endsAt: "2026-09-01T00:00:00.000Z", metadata: {} },
+  ];
+  assert.deepEqual(configuredAcademicPackageCodes(grants), ["academic.school"]);
+  assert.deepEqual(configuredAcademicPackageCodes([]), ["academic.student", "academic.school"]);
+  assert.deepEqual(configuredAcademicPackageCodes([
+    { featureCode: "academic.selection", status: "active", metadata: {} },
+    { featureCode: "academic.school", status: "expired", metadata: {} },
+  ]), ["academic.school"]);
+  assert.deepEqual(configuredAcademicPackageCodes([
+    { featureCode: "academic.selection", status: "active", metadata: { packages: ["academic.school"] } },
+    { featureCode: "academic.school", status: "expired", metadata: {} },
+  ]), ["academic.school"]);
+  assert.deepEqual(configuredAcademicPackageCodes([
+    { featureCode: "academic.selection", status: "active", metadata: {} },
+    { featureCode: "academic.school", status: "revoked", metadata: {} },
+  ]), ["academic.school"]);
+});
+
 test("school-controlled sensitive collection options default off", () => {
   const sql = POSTGRES_MIGRATIONS.at(-1).sql;
   for (const setting of ["studentPhotograph", "staffPhotograph", "birthCertificate", "identityDocument", "medicalDocument"]) {
     assert.match(sql, new RegExp(`\\"${setting}\\": false`));
   }
+});
+
+test("administration licence status is independent of academic package status", () => {
+  const now = Date.parse("2026-10-04T08:00:00.000Z");
+  const active = buildAdministrationLicenceEntitlement([
+    { featureCode: "operations.foundation", status: "active", startsAt: "2026-10-01T00:00:00.000Z", endsAt: "2026-12-01T00:00:00.000Z" },
+    { featureCode: "operations.attendance", status: "active", startsAt: "2026-10-01T00:00:00.000Z", endsAt: "2026-12-01T00:00:00.000Z" },
+  ], now);
+  assert.equal(active.status, "active");
+  assert.deepEqual(active.activeModules, ["operations.foundation", "operations.attendance"]);
+  assert.equal(buildAdministrationLicenceEntitlement([], now).status, "not_purchased");
 });
 
 test("transport schema supports uniform and varying route prices", () => {

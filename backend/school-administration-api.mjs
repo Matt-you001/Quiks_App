@@ -102,6 +102,7 @@ function normalizeSettings(row) {
 
 async function getSummary(principal, schoolId) {
   const { context, grants, activeModules } = await contextAndModules(principal, schoolId);
+  requireModule(activeModules, "operations.foundation");
   return withSchoolTransaction(schoolId, async (client) => {
     const [settingsResult, peopleResult, routesResult, vehiclesResult, assignmentsResult, attendanceResult, plansResult, timetablesResult, timetableEntriesResult, reportsResult, auditResult] = await Promise.all([
       client.query("SELECT * FROM quiks_school_admin_settings WHERE school_id = $1", [schoolId]),

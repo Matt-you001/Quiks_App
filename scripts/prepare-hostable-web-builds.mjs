@@ -24,6 +24,33 @@ const variantWebAssets = {
   },
 };
 
+const androidAppLinks = {
+  children: {
+    packageName: "com.quiks.mobile",
+    sha256CertFingerprints: [
+      "7C:D4:83:7F:6D:DC:94:C9:B4:97:F2:33:6A:86:8B:04:6A:5E:A7:CD:10:AA:4F:4B:FD:B4:B1:9D:60:54:44:96",
+    ],
+  },
+  teens: {
+    packageName: "com.quiks.teens",
+    sha256CertFingerprints: [
+      "F1:99:EE:49:6C:A0:F8:EA:45:8C:F4:F7:E8:ED:2E:6E:ED:EB:D5:84:0F:42:77:7F:74:FB:66:B4:E4:36:CF:E2",
+    ],
+  },
+  uni: {
+    packageName: "com.quiks.uni",
+    sha256CertFingerprints: [
+      "D7:65:7F:3F:9A:7F:E8:6D:36:F6:7F:A0:5F:94:09:97:E0:74:AF:7A:6F:FD:14:2E:B4:8A:19:D6:F2:B8:11:76",
+      "AA:A0:FA:E9:03:3E:42:5B:3E:BB:86:BF:4E:8B:91:BF:C1:F9:C7:AF:F8:F3:6F:EB:CA:E8:11:D6:3A:8E:0B:F1",
+    ],
+  },
+};
+
+const jsonMimeHtaccess = `<IfModule mod_mime.c>
+  AddType application/json .json
+</IfModule>
+`;
+
 const variantRouteTitles = {
   children: "Quiks Children",
   teens: "Quiks Teens",
@@ -146,6 +173,29 @@ function writeHostedRouteWrappers(targetDir, variant, entryScriptName) {
   }
 }
 
+function writeAndroidAppLinks(targetDir, variant) {
+  const appLink = androidAppLinks[variant];
+  if (!appLink) {
+    return;
+  }
+
+  const wellKnownDir = join(targetDir, ".well-known");
+  const statements = [
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: appLink.packageName,
+        sha256_cert_fingerprints: appLink.sha256CertFingerprints,
+      },
+    },
+  ];
+
+  mkdirSync(wellKnownDir, { recursive: true });
+  writeFileSync(join(wellKnownDir, "assetlinks.json"), `${JSON.stringify(statements, null, 2)}\n`, "utf8");
+  writeFileSync(join(targetDir, ".htaccess"), jsonMimeHtaccess, "utf8");
+}
+
 function injectHeadMarkup(html, variant) {
   const assets = variantWebAssets[variant];
   const faviconMarkup = [
@@ -251,6 +301,7 @@ for (const variant of variants) {
   if (entryScriptName) {
     writeHostedRouteWrappers(targetDir, variant, entryScriptName);
   }
+  writeAndroidAppLinks(targetDir, variant);
 }
 
 console.log("Prepared hostable web builds in web-hosting.");

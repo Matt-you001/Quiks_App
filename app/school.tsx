@@ -68,27 +68,23 @@ export default function QuiksSchoolScreen() {
         {!loading && memberships.length === 0 ? (
           <Text style={hasSavedSchoolAdminProfile ? styles.expiredNotice : styles.copy}>
             {hasSavedSchoolAdminProfile
-              ? "Your school's licence has expired. Renew it to view your school's portal."
+              ? "No active school membership could be restored for this administrator profile. Refresh or sign in again."
               : "You have not joined a school yet."}
           </Text>
         ) : null}
-        {!loading &&
-        memberships.some((item) => item.role === "school_admin" && item.schoolLicenceStatus === "expired") &&
-        !memberships.some((item) => item.role === "school_admin" && item.schoolLicenceStatus === "active") ? (
-          <Text style={styles.expiredNotice}>Your school's licence has expired. Renew it to view your school's portal.</Text>
-        ) : null}
         {memberships.map((item) => {
           const access = getAcademicPackageAccess(item, "academic.school");
+          const administrationActive = item.administrationLicence?.status === "active";
           return (
           <View key={item.membershipId} style={styles.membership}>
             <View style={styles.flex}>
               <Text style={styles.memberName}>{item.schoolName}</Text>
               <Text style={styles.meta}>{item.role.replace("_", " ")} · {item.status}</Text>
               {item.schoolLicenceStatus && item.schoolLicenceStatus !== "active" ? (
-                <Text style={styles.expiredLicence}>Licence {item.schoolLicenceStatus}{item.schoolLicenceExpiresAt ? ` · ended ${new Date(item.schoolLicenceExpiresAt).toLocaleDateString()}` : ""}</Text>
-              ) : item.role === "school_admin" && !item.schoolLicenceStatus ? <Text style={styles.expiredLicence}>Licence status could not be verified. Refresh or sign in again.</Text> : !access.allowed ? <Text style={access.reason === "unavailable" ? styles.unavailableLicence : styles.expiredLicence}>{access.message}</Text> : null}
+                <Text style={styles.expiredLicence}>Academic licence {item.schoolLicenceStatus}{item.schoolLicenceExpiresAt ? ` · ended ${new Date(item.schoolLicenceExpiresAt).toLocaleDateString()}` : ""}. The portal remains available; licensed sections are controlled inside.</Text>
+              ) : item.role === "school_admin" && !item.schoolLicenceStatus ? <Text style={styles.expiredLicence}>Licence status could not be verified. Refresh or sign in again.</Text> : !access.allowed ? <Text style={access.reason === "unavailable" ? styles.unavailableLicence : administrationActive ? styles.packageNotice : styles.expiredLicence}>{administrationActive ? `School Package: ${access.title}. Administration licence: Active. Open the portal to use administration functions.` : `${access.message} The portal remains available so licensed sections can be reviewed.`}</Text> : null}
             </View>
-            {item.role === "school_admin" && item.status === "active" && item.schoolLicenceStatus === "active" && access.allowed ? (
+            {item.role === "school_admin" && item.status === "active" ? (
               <Pressable style={styles.smallButton} onPress={() => router.push({ pathname: "/school-admin", params: { schoolId: item.schoolId } } as never)}><Text style={styles.smallText}>Manage</Text></Pressable>
             ) : null}
           </View>
@@ -107,5 +103,5 @@ const styles = StyleSheet.create({
   input: { backgroundColor: "#F5F8FB", borderWidth: 1, borderColor: "#D5E0E8", borderRadius: 16, padding: 16, fontSize: 16 },
   primary: { marginTop: 12, backgroundColor: palette.navy, borderRadius: 16, padding: 16, alignItems: "center" }, primaryText: { color: "white", fontWeight: "900", fontSize: 16 },
   membership: { flexDirection: "row", alignItems: "center", paddingVertical: 14, borderTopWidth: 1, borderTopColor: "#E6EDF2" }, flex: { flex: 1 }, memberName: { color: palette.navy, fontSize: 17, fontWeight: "800" }, meta: { color: "#587180", marginTop: 3, textTransform: "capitalize" },
-  smallButton: { backgroundColor: palette.navy, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12 }, smallText: { color: "white", fontWeight: "800" }, expiredNotice: { color: "#B42318", backgroundColor: "#FFF0EE", borderRadius: 12, padding: 12, fontWeight: "800", lineHeight: 21, marginBottom: 8 }, expiredLicence: { color: "#B42318", fontWeight: "800", marginTop: 4 }, unavailableLicence: { color: "#8A5A00", fontWeight: "800", marginTop: 4 }, error: { color: "#B42318", marginBottom: 8 }, ownerLink: { alignItems: "center", padding: 15 }, ownerText: { color: palette.navy, fontWeight: "800" },
+  smallButton: { backgroundColor: palette.navy, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12 }, smallText: { color: "white", fontWeight: "800" }, expiredNotice: { color: "#B42318", backgroundColor: "#FFF0EE", borderRadius: 12, padding: 12, fontWeight: "800", lineHeight: 21, marginBottom: 8 }, expiredLicence: { color: "#B42318", fontWeight: "800", marginTop: 4 }, unavailableLicence: { color: "#8A5A00", fontWeight: "800", marginTop: 4 }, packageNotice: { color: "#315E73", fontWeight: "700", marginTop: 4 }, error: { color: "#B42318", marginBottom: 8 }, ownerLink: { alignItems: "center", padding: 15 }, ownerText: { color: palette.navy, fontWeight: "800" },
 });

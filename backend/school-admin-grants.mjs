@@ -22,13 +22,53 @@ export async function listAcademicGrants(schoolId) {
   }
   return withSchoolTransaction(schoolId, async (client) => {
     const result = await client.query(
-      `SELECT feature_code AS "featureCode", status, starts_at AS "startsAt", ends_at AS "endsAt"
+      `SELECT feature_code AS "featureCode", status, starts_at AS "startsAt", ends_at AS "endsAt", metadata
        FROM quiks_school_feature_grants
        WHERE school_id = $1 AND feature_code LIKE 'academic.%'
        ORDER BY feature_code, starts_at DESC`,
       [schoolId]
     );
     return result.rows;
+  });
+}
+
+export function configuredAcademicPackageCodes(grants) {
+  const rows = Array.isArray(grants) ? grants : [];
+  if (rows.length === 0) return SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code);
+
+  const latestSelection = rows.find((grant) =>
+    grant.featureCode === "academic.selection" && grant.status !== "revoked" && Array.isArray(grant.metadata?.packages)
+  );
+  if (latestSelection) {
+    return [...new Set(latestSelection.metadata.packages.map(String))].filter((code) => academicPackageCodes.has(code));
+  }
+  if (rows.some((grant) => grant.featureCode === "academic.core" && grant.status !== "revoked")) {
+    return SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code);
+  }
+  const configured = SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code).filter((code) =>
+    rows.some((grant) => grant.featureCode === code && grant.status !== "revoked")
+  );
+  if (configured.length) return configured;
+
+  // Some early package-separation deployments wrote a selection row without
+  // metadata and revoked the former package rows. Recover that historical
+  // selection rather than silently converting a renewal into "not purchased".
+  const malformedSelection = rows.some((grant) =>
+    grant.featureCode === "academic.selection" && !Array.isArray(grant.metadata?.packages)
+  );
+  return malformedSelection
+    ? SCHOOL_ACADEMIC_PACKAGES.map((entry) => entry.code).filter((code) => rows.some((grant) => grant.featureCode === code))
+    : [];
+}
+
+export async function syncAcademicGrantsToSchoolLicence({ school, principal }) {
+  const grants = await listAcademicGrants(school.schoolId);
+  return replaceAcademicGrants({
+    school,
+    principal,
+    packages: configuredAcademicPackageCodes(grants),
+    startsAt: new Date(school.licence.startAt).toISOString(),
+    endsAt: new Date(school.licence.endAt).toISOString(),
   });
 }
 
@@ -91,7 +131,7 @@ export async function replaceAcademicGrants({ school, principal, packages, start
     );
     await client.query(
       `UPDATE quiks_school_feature_grants SET status = 'revoked', updated_at = now()
-       WHERE school_id = $1 AND feature_code LIKE 'academic.%' AND status = 'active'`,
+       WHERE school_id = $1 AND feature_code LIKE 'academic.%' AND status IN ('pending', 'active', 'expired')`,
       [school.schoolId]
     );
     await client.query(
@@ -114,7 +154,7 @@ export async function replaceAcademicGrants({ school, principal, packages, start
       [school.schoolId, principal.principalId, JSON.stringify({ packages: selected, startsAt: start.toISOString(), endsAt: end.toISOString() })]
     );
     const result = await client.query(
-      `SELECT feature_code AS "featureCode", status, starts_at AS "startsAt", ends_at AS "endsAt"
+      `SELECT feature_code AS "featureCode", status, starts_at AS "startsAt", ends_at AS "endsAt", metadata
        FROM quiks_school_feature_grants WHERE school_id = $1 AND feature_code LIKE 'academic.%'
        ORDER BY feature_code, starts_at DESC`, [school.schoolId]
     );
@@ -152,6 +192,37 @@ export async function listAdministrationGrants(schoolId) {
   });
 }
 
+export function buildAdministrationLicenceEntitlement(grants, now = Date.now()) {
+  const rows = (Array.isArray(grants) ? grants : []).filter((grant) => moduleCodes.has(grant.featureCode));
+  const activeModules = SCHOOL_ADMIN_MODULES.map((module) => module.code).filter((code) => rows.some((grant) =>
+    grant.featureCode === code && grant.status === "active" && new Date(grant.startsAt).getTime() <= now &&
+    (!grant.endsAt || new Date(grant.endsAt).getTime() > now)
+  ));
+  const foundationRows = rows.filter((grant) => grant.featureCode === "operations.foundation");
+  const activeFoundation = foundationRows.find((grant) => activeModules.includes(grant.featureCode));
+  if (activeFoundation) return {
+    status: "active",
+    startsAt: activeFoundation.startsAt ?? null,
+    expiresAt: activeFoundation.endsAt ?? null,
+    activeModules,
+  };
+  const upcoming = foundationRows.find((grant) => grant.status === "active" && new Date(grant.startsAt).getTime() > now);
+  if (upcoming) return { status: "not_started", startsAt: upcoming.startsAt ?? null, expiresAt: upcoming.endsAt ?? null, activeModules: [] };
+  const expired = foundationRows.find((grant) =>
+    grant.status === "expired" || (grant.status === "active" && grant.endsAt && new Date(grant.endsAt).getTime() <= now)
+  );
+  if (expired) return { status: "expired", startsAt: expired.startsAt ?? null, expiresAt: expired.endsAt ?? null, activeModules: [] };
+  return { status: "not_purchased", startsAt: null, expiresAt: null, activeModules: [] };
+}
+
+export async function getAdministrationLicenceEntitlement(schoolId) {
+  try {
+    return buildAdministrationLicenceEntitlement(await listAdministrationGrants(schoolId));
+  } catch {
+    return { status: "unavailable", startsAt: null, expiresAt: null, activeModules: [] };
+  }
+}
+
 export async function replaceAdministrationGrants({ school, principal, modules, startsAt, endsAt }) {
   const selected = [...new Set((Array.isArray(modules) ? modules : []).map(String))].filter((code) => moduleCodes.has(code));
   if (selected.some((code) => code !== "operations.foundation") && !selected.includes("operations.foundation")) {
@@ -172,7 +243,7 @@ export async function replaceAdministrationGrants({ school, principal, modules, 
     await client.query(
       `UPDATE quiks_school_feature_grants
        SET status = 'revoked', updated_at = now()
-       WHERE school_id = $1 AND feature_code LIKE 'operations.%' AND status = 'active'`,
+       WHERE school_id = $1 AND feature_code LIKE 'operations.%' AND status IN ('pending', 'active', 'expired')`,
       [school.schoolId]
     );
     for (const featureCode of selected) {

@@ -656,15 +656,17 @@ export async function setAuthenticatedAccount(account: AppAccount | null, isAuth
 
 export async function logoutAccount() {
   const state = await readLocalAppState();
+  const signedOutState = normalizeState({
+    ...state,
+    isAuthenticated: false,
+    currentProfileId: null,
+  });
+  await persistLocalAppState(signedOutState);
 
-  if (state.account?.uid && state.isAuthenticated && isFirebaseConfigured()) {
-    await saveCloudStateWithTimeout(state.account.uid, state);
+  if (state.account?.uid && isFirebaseConfigured()) {
+    void saveCloudStateWithTimeout(state.account.uid, state).catch(() => undefined);
   }
 
-  state.isAuthenticated = false;
-  state.currentProfileId = null;
-  const signedOutState = normalizeState(state);
-  await persistLocalAppState(signedOutState);
   return signedOutState;
 }
 

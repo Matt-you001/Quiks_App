@@ -49,7 +49,7 @@ import { schoolResultsRequest } from "./school-results-api.mjs";
 import { schoolClassroomsRequest } from "./school-classrooms-api.mjs";
 import { schoolAdministrationRequest } from "./school-administration-api.mjs";
 import { schoolAcademicPackagesRequest } from "./school-academic-packages-api.mjs";
-import { replaceAcademicGrants } from "./school-admin-grants.mjs";
+import { replaceAcademicGrants, syncAcademicGrantsToSchoolLicence } from "./school-admin-grants.mjs";
 import { getSchoolEmailDiagnostics, sendOperationalAlert, sendSchoolInvitationEmail } from "./school-email.mjs";
 import { getPostgresDiagnostics, initializePostgres } from "./postgres.mjs";
 import { filterDistinctQuestions } from "./question-diversity.mjs";
@@ -3667,6 +3667,7 @@ const server = http.createServer(async (request, response) => {
       classroomStore: getClassroomStoreDiagnostics(),
       offlineExamPackages: getOfflineExamPackageDiagnostics(),
       schoolStore: getSchoolStoreDiagnostics(),
+      schoolAccess: { version: 2, portalShellIndependentOfPackages: true, packageRenewalPreservesSelection: true },
       pastQuestionStore: getPastQuestionStoreDiagnostics(),
       schoolEmail: getSchoolEmailDiagnostics(),
       firebaseAuth: getFirebaseAuthDiagnostics(),
@@ -3999,15 +4000,20 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/school/owner/licence") {
       const principal = await requireFirebasePrincipal(request);
-      sendJson(response, 200, body.name === undefined
+      const school = body.name === undefined
         ? await updateSchoolLicence(principal, body.schoolId, body.licence)
-        : await updateSchoolRecord(principal, body.schoolId, { name: body.name, licence: body.licence }));
+        : await updateSchoolRecord(principal, body.schoolId, { name: body.name, licence: body.licence });
+      await syncAcademicGrantsToSchoolLicence({ school, principal });
+      sendJson(response, 200, school);
       return;
     }
 
 
     if (url.pathname === "/school/owner/update") {
-      sendJson(response, 200, await updateSchoolRecord(await requireFirebasePrincipal(request), body.schoolId, body.patch));
+      const principal = await requireFirebasePrincipal(request);
+      const school = await updateSchoolRecord(principal, body.schoolId, body.patch);
+      await syncAcademicGrantsToSchoolLicence({ school, principal });
+      sendJson(response, 200, school);
       return;
     }
 

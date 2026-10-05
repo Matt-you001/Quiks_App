@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getAcademicPackageEntitlements, listActiveAcademicPackageCodes } from "./school-admin-grants.mjs";
+import { getAcademicPackageEntitlements, getAdministrationLicenceEntitlement, listActiveAcademicPackageCodes } from "./school-admin-grants.mjs";
 import { sendOperationalAlert } from "./school-email.mjs";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
@@ -1154,8 +1154,11 @@ export async function listPrincipalMemberships(principal) {
     .map((membership) => buildMembership(store, membership))
     .sort((left, right) => left.schoolName.localeCompare(right.schoolName));
   return Promise.all(memberships.map(async (membership) => {
-    const academicPackageEntitlements = await getAcademicPackageEntitlements(membership.schoolId);
-    return { ...membership, academicPackages: await listActiveAcademicPackageCodes(membership.schoolId), academicPackageEntitlements };
+    const [academicPackageEntitlements, administrationLicence] = await Promise.all([
+      getAcademicPackageEntitlements(membership.schoolId),
+      getAdministrationLicenceEntitlement(membership.schoolId),
+    ]);
+    return { ...membership, academicPackages: await listActiveAcademicPackageCodes(membership.schoolId), academicPackageEntitlements, administrationLicence };
   }));
 }
 
@@ -1216,10 +1219,11 @@ export async function getSchoolDetails(principal, schoolId) {
   requireSchoolAdmin(store, schoolId, principal);
   const school = store.schools[schoolId];
   if (!school) throw new Error("School not found.");
-  // The Quiks App Owner keeps read-only visibility for renewal/support. Every
-  // school operator needs an active main licence before package checks apply.
-  if (!isOwner(principal)) requireActiveSchoolLicence(store, schoolId);
-  if (!isOwner(principal)) await requireAcademicPackage(schoolId, "academic.school");
+  if (school.archivedAt) throw Object.assign(new Error("This school has been archived."), { statusCode: 403, code: "school_archived" });
+  const [academicPackageEntitlements, administration] = await Promise.all([
+    getAcademicPackageEntitlements(schoolId),
+    getAdministrationLicenceEntitlement(schoolId),
+  ]);
   return {
     viewer: {
       displayName: principal.name || principal.email || "Quiks user",
@@ -1227,6 +1231,10 @@ export async function getSchoolDetails(principal, schoolId) {
       role: isOwner(principal) ? "app_owner" : principalIsInstitutionalOwner(store, schoolId, principal) ? "school_owner" : "school_admin",
     },
     school: buildSchoolSummary(store, school),
+    access: {
+      academicSchool: academicPackageEntitlements["academic.school"],
+      administration,
+    },
     profileFields: cloneValue(school.profileFields),
     memberships: membershipsForSchool(store, schoolId)
       .map((membership) => buildMembership(store, membership))
@@ -1243,10 +1251,7 @@ export async function getSchoolAdministrationContext(principal, schoolId) {
   requireSchoolAdmin(store, schoolId, principal);
   const school = store.schools[schoolId];
   if (!school) throw Object.assign(new Error("School not found."), { statusCode: 404 });
-  if (!isOwner(principal)) {
-    requireActiveSchoolLicence(store, schoolId);
-    await requireAcademicPackage(schoolId, "academic.school");
-  }
+  if (school.archivedAt) throw Object.assign(new Error("This school has been archived."), { statusCode: 403, code: "school_archived" });
   return {
     principal,
     isAppOwner: isOwner(principal),
@@ -1286,6 +1291,7 @@ export async function updateSchoolProfileFields(principal, schoolId, fields) {
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
     const school = requireActiveSchoolLicence(store, schoolId);
+    await requireAcademicPackage(schoolId, "academic.school");
     school.profileFields = validateProfileFields(fields);
     recordAudit(store, principal, "school.profile_fields.updated", schoolId, { fieldCount: fields.length });
     return school.profileFields;
@@ -1296,6 +1302,7 @@ export async function updateSchoolClassNaming(principal, schoolId, classNaming) 
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
     const school = requireActiveSchoolLicence(store, schoolId);
+    await requireAcademicPackage(schoolId, "academic.school");
     school.classNaming = normalizeClassNaming(classNaming);
     recordAudit(store, principal, "school.class_naming.updated", schoolId, school.classNaming);
     return buildSchoolSummary(store, school);
@@ -1306,6 +1313,7 @@ export async function updateSchoolCurriculum(principal, schoolId, curriculum) {
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
     const school = requireActiveSchoolLicence(store, schoolId);
+    await requireAcademicPackage(schoolId, "academic.school");
     const nextCurricula = Array.from(new Set(
       (Array.isArray(curriculum) ? curriculum : [curriculum])
         .map((item) => String(item ?? "").trim().slice(0, 120))
@@ -1324,6 +1332,7 @@ export async function inviteSchoolMember(principal, schoolId, email, role) {
     requireSchoolAdmin(store, schoolId, principal);
     if (role === "school_admin") requireInstitutionalOwner(store, schoolId, principal);
     const school = requireActiveSchoolLicence(store, schoolId);
+    await requireAcademicPackage(schoolId, "academic.school");
     const normalizedEmail = String(email ?? "").trim().toLowerCase();
     if (!normalizedEmail.includes("@") || !["school_admin", "teacher", "student"].includes(role)) {
       throw new Error("A valid email and school role are required.");
@@ -1351,6 +1360,7 @@ export async function enrolInSchool(principal, payload) {
     const school = Object.values(store.schools).find((entry) => entry.schoolCode === code);
     if (!school) throw new Error("School code not found.");
     requireActiveSchoolLicence(store, school.id);
+    await requireAcademicPackage(school.id, "academic.school");
     const invitationCode = String(payload.invitationCode ?? "").trim().toUpperCase();
     const invitation = invitationCode ? store.invitations[invitationCode] : null;
     const role = invitation?.role ?? (payload.role === "teacher" ? "teacher" : "student");
@@ -1410,6 +1420,7 @@ export async function updateMembershipStatus(principal, schoolId, membershipId, 
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
     const school = requireActiveSchoolLicence(store, schoolId);
+    await requireAcademicPackage(schoolId, "academic.school");
     const membership = store.memberships[membershipId];
     if (!school || !membership || membership.schoolId !== schoolId) throw new Error("School membership not found.");
     if (!['invited', 'pending', 'active', 'suspended'].includes(status)) throw new Error("Invalid membership status.");
@@ -1429,6 +1440,7 @@ export async function updateMembershipRole(principal, schoolId, membershipId, ro
   return mutateStore(async (store) => {
     requireSchoolAdmin(store, schoolId, principal);
     const school = requireActiveSchoolLicence(store, schoolId);
+    await requireAcademicPackage(schoolId, "academic.school");
     const membership = store.memberships[membershipId];
     if (!membership || membership.schoolId !== schoolId) throw Object.assign(new Error("School membership not found."), { statusCode: 404 });
     if (!["school_admin", "teacher", "student"].includes(role)) throw Object.assign(new Error("Choose a valid school role."), { statusCode: 400 });

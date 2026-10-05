@@ -14,6 +14,26 @@ export function SchoolAdministrationLicenceEditor({ schoolId }: { schoolId: stri
   const [endsAt, setEndsAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  function applySavedGrants(
+    nextModules: Array<{ code: SchoolAdministrationModuleCode; name: string }>,
+    nextGrants: SchoolAdministrationGrant[]
+  ) {
+    const moduleCodes = new Set(nextModules.map((module) => module.code));
+    const configured = nextGrants.filter((grant) => moduleCodes.has(grant.featureCode) && grant.status !== "revoked");
+    setSelected(configured.length
+      ? [...new Set(configured.map((grant) => grant.featureCode))]
+      : moduleCodes.has("operations.foundation") ? ["operations.foundation"] : []);
+    const foundation = configured
+      .filter((grant) => grant.featureCode === "operations.foundation")
+      .sort((left, right) => new Date(right.startsAt).getTime() - new Date(left.startsAt).getTime())[0];
+    const datedGrant = foundation ?? configured.sort((left, right) => new Date(right.startsAt).getTime() - new Date(left.startsAt).getTime())[0];
+    if (datedGrant) {
+      setStartsAt(datedGrant.startsAt.slice(0, 10));
+      setEndsAt(datedGrant.endsAt?.slice(0, 10) ?? "");
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -22,13 +42,7 @@ export function SchoolAdministrationLicenceEditor({ schoolId }: { schoolId: stri
         const response = await getSchoolAdministrationModules(schoolId);
         setModules(response.modules);
         setGrants(response.grants);
-        const now = Date.now();
-        const activeGrants = response.grants.filter((grant) => grant.status === "active" && new Date(grant.startsAt).getTime() <= now && (!grant.endsAt || new Date(grant.endsAt).getTime() > now));
-        setSelected(activeGrants.map((grant) => grant.featureCode));
-        if (activeGrants[0]) {
-          setStartsAt(activeGrants[0].startsAt.slice(0, 10));
-          setEndsAt(activeGrants[0].endsAt?.slice(0, 10) ?? "");
-        }
+        applySavedGrants(response.modules, response.grants);
       } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load administration modules."); }
     })();
   }, [open, schoolId]);
@@ -43,10 +57,13 @@ export function SchoolAdministrationLicenceEditor({ schoolId }: { schoolId: stri
 
   async function save() {
     if (!endsAt) { setError("Choose the administration licence expiry date."); return; }
-    setBusy(true); setError("");
+    if (!selected.includes("operations.foundation")) { setError("Select Operations Foundation or an administration add-on before saving the licence."); return; }
+    setBusy(true); setError(""); setNotice("");
     try {
       const response = await updateSchoolAdministrationModules({ schoolId, modules: selected, startsAt: `${startsAt}T00:00:00.000Z`, endsAt: `${endsAt}T23:59:59.999Z` });
       setGrants(response.grants);
+      applySavedGrants(response.modules, response.grants);
+      setNotice(`Administration licence saved through ${endsAt}.`);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to update administration modules."); }
     finally { setBusy(false); }
   }
@@ -58,12 +75,13 @@ export function SchoolAdministrationLicenceEditor({ schoolId }: { schoolId: stri
       {modules.map((module) => <Pressable key={module.code} style={[styles.module, selected.includes(module.code) && styles.moduleActive]} onPress={() => toggle(module.code)}><Text style={selected.includes(module.code) ? styles.moduleActiveText : styles.moduleText}>{selected.includes(module.code) ? "✓ " : ""}{module.name}</Text></Pressable>)}
       <CalendarDateField label="Administration starts" value={startsAt} onChange={setStartsAt}/><CalendarDateField label="Administration expires" value={endsAt} onChange={setEndsAt} minimumDate={startsAt}/>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       <Pressable disabled={busy} style={styles.save} onPress={() => void save()}><Text style={styles.saveText}>{busy ? "Saving…" : "Save administration licence"}</Text></Pressable>
-      {grants.length ? <Text style={styles.meta}>{grants.filter((grant) => grant.status === "active").length} active grant record(s)</Text> : null}
+      {grants.length ? <Text style={styles.meta}>{selected.length} configured administration module(s)</Text> : null}
     </View> : null}
   </View>;
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: 10 }, trigger: { borderWidth: 1, borderColor: palette.navy, borderRadius: 12, padding: 12, flexDirection: "row", justifyContent: "space-between" }, triggerText: { color: palette.navy, fontWeight: "900" }, panel: { backgroundColor: "#F5F9FB", padding: 12, borderRadius: 12, marginTop: 7 }, copy: { color: "#587180", lineHeight: 20, marginBottom: 8 }, module: { padding: 11, borderRadius: 10, backgroundColor: "white", marginBottom: 6 }, moduleActive: { backgroundColor: palette.navy }, moduleText: { color: palette.navy, fontWeight: "800" }, moduleActiveText: { color: "white", fontWeight: "900" }, save: { backgroundColor: palette.navy, borderRadius: 12, padding: 13, alignItems: "center", marginTop: 8 }, saveText: { color: "white", fontWeight: "900" }, error: { color: "#B42318", fontWeight: "800", marginVertical: 7 }, meta: { color: "#667E8B", marginTop: 8 },
+  wrap: { marginTop: 10 }, trigger: { borderWidth: 1, borderColor: palette.navy, borderRadius: 12, padding: 12, flexDirection: "row", justifyContent: "space-between" }, triggerText: { color: palette.navy, fontWeight: "900" }, panel: { backgroundColor: "#F5F9FB", padding: 12, borderRadius: 12, marginTop: 7 }, copy: { color: "#587180", lineHeight: 20, marginBottom: 8 }, module: { padding: 11, borderRadius: 10, backgroundColor: "white", marginBottom: 6 }, moduleActive: { backgroundColor: palette.navy }, moduleText: { color: palette.navy, fontWeight: "800" }, moduleActiveText: { color: "white", fontWeight: "900" }, save: { backgroundColor: palette.navy, borderRadius: 12, padding: 13, alignItems: "center", marginTop: 8 }, saveText: { color: "white", fontWeight: "900" }, error: { color: "#B42318", fontWeight: "800", marginVertical: 7 }, notice: { color: "#166534", fontWeight: "800", marginVertical: 7 }, meta: { color: "#667E8B", marginTop: 8 },
 });

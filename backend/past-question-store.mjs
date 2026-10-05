@@ -75,8 +75,62 @@ function fingerprintFor(payload) {
   return createHash("sha256").update(JSON.stringify({
     examTitle: normalizeSearch(payload.examTitle),
     year: normalize(payload.year),
+    subject: normalizeSearch(payload.subject),
     questions: payload.questions.map((question) => [normalizeSearch(question.prompt), normalizeSearch(question.answer)]),
   })).digest("hex");
+}
+
+function questionComparisonText(question) {
+  return normalizeSearch([
+    question.prompt,
+    ...(Array.isArray(question.options) ? question.options : []),
+  ].join(" "));
+}
+
+function questionTokens(question) {
+  return new Set(questionComparisonText(question).split(" ").filter((token) => token.length > 1));
+}
+
+function questionSimilarity(left, right) {
+  const leftText = questionComparisonText(left);
+  const rightText = questionComparisonText(right);
+  if (!leftText || !rightText) return 0;
+  if (leftText === rightText) return 1;
+
+  const leftTokens = questionTokens(left);
+  const rightTokens = questionTokens(right);
+  if (leftTokens.size < 4 || rightTokens.size < 4) return 0;
+  let shared = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) shared += 1;
+  }
+  return shared / Math.max(leftTokens.size, rightTokens.size);
+}
+
+function questionsMatch(left, right) {
+  const similarity = questionSimilarity(left, right);
+  if (similarity === 1) return true;
+  const sameNumber = normalizeSearch(left.number) && normalizeSearch(left.number) === normalizeSearch(right.number);
+  return sameNumber ? similarity >= 0.78 : similarity >= 0.92;
+}
+
+function samePaperMetadata(entry, payload) {
+  return normalizeSearch(entry.examTitle) === normalizeSearch(payload.examTitle)
+    && normalize(entry.year) === normalize(payload.year)
+    && normalizeSearch(entry.subject) === normalizeSearch(payload.subject);
+}
+
+function findQuestionMatchIndex(questions, candidate) {
+  return questions.findIndex((question) => questionsMatch(question, candidate));
+}
+
+function ensureUniqueQuestionId(questions, requestedId, fallbackIndex) {
+  const usedIds = new Set(questions.map((question) => question.id));
+  const baseId = normalize(requestedId) || `question-${fallbackIndex + 1}`;
+  if (!usedIds.has(baseId)) return baseId;
+  let suffix = 2;
+  while (usedIds.has(`${baseId}-${suffix}`)) suffix += 1;
+  return `${baseId}-${suffix}`;
 }
 
 export async function savePastQuestionSet(principal, payload) {
@@ -92,18 +146,64 @@ export async function savePastQuestionSet(principal, payload) {
     explanation: normalize(question.explanation).slice(0, 5000),
   })).filter((question) => question.prompt && question.answer) : [];
   if (!examTitle || !year || questions.length === 0) throw Object.assign(new Error("Exam title, year and at least one solved question are required."), { statusCode: 400 });
-  const fingerprint = fingerprintFor({ examTitle, year, questions });
+  const fingerprint = fingerprintFor({ examTitle, year, subject: payload.subject, questions });
   return mutate(async (store) => {
     const duplicate = Object.values(store.questionSets).find((entry) => entry.fingerprint === fingerprint);
-    if (duplicate) return { item: publicSet(duplicate), duplicate: true };
+    if (duplicate) return { item: publicSet(duplicate), duplicate: true, merged: false, addedQuestionCount: 0 };
+
+    const paperCandidates = Object.values(store.questionSets)
+      .filter((entry) => samePaperMetadata(entry, { examTitle, year, subject: payload.subject }))
+      .map((entry) => ({
+        entry,
+        overlap: questions.filter((question) => findQuestionMatchIndex(entry.questions, question) >= 0).length,
+      }))
+      .filter((candidate) => candidate.overlap > 0)
+      .sort((left, right) => right.overlap - left.overlap || right.entry.questionCount - left.entry.questionCount);
+
+    const matchingPaper = paperCandidates[0]?.entry;
+    if (matchingPaper) {
+      const mergedQuestions = matchingPaper.questions.map((question) => ({ ...question }));
+      let addedQuestionCount = 0;
+      for (const question of questions) {
+        if (findQuestionMatchIndex(mergedQuestions, question) >= 0) continue;
+        if (mergedQuestions.length >= 160) break;
+        mergedQuestions.push({
+          ...question,
+          id: ensureUniqueQuestionId(mergedQuestions, question.id, mergedQuestions.length),
+        });
+        addedQuestionCount += 1;
+      }
+
+      if (addedQuestionCount === 0) {
+        return { item: publicSet(matchingPaper), duplicate: true, merged: false, addedQuestionCount: 0 };
+      }
+
+      matchingPaper.questions = mergedQuestions;
+      matchingPaper.questionCount = matchingPaper.questions.length;
+      matchingPaper.updatedAt = Date.now();
+      matchingPaper.submissionCount = Math.max(1, Number(matchingPaper.submissionCount) || 1) + 1;
+      matchingPaper.fingerprint = fingerprintFor({
+        examTitle: matchingPaper.examTitle,
+        year: matchingPaper.year,
+        subject: matchingPaper.subject,
+        questions: matchingPaper.questions,
+      });
+      return {
+        item: publicSet(matchingPaper),
+        duplicate: false,
+        merged: true,
+        addedQuestionCount,
+      };
+    }
+
     const item = {
       id: randomUUID(), examTitle, year, subject: normalize(payload.subject),
       appVariant: ["children", "teens", "uni"].includes(payload.appVariant) ? payload.appVariant : "children",
-      questionCount: questions.length, questions, createdAt: Date.now(),
+      questionCount: questions.length, questions, createdAt: Date.now(), updatedAt: Date.now(), submissionCount: 1,
       submittedBy: String(principal.principalId ?? principal.uid ?? ""), fingerprint,
     };
     store.questionSets[item.id] = item;
-    return { item: publicSet(item), duplicate: false };
+    return { item: publicSet(item), duplicate: false, merged: false, addedQuestionCount: questions.length };
   });
 }
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { AppBackground } from "../components/AppBackground";
+import { AuthProgressOverlay } from "../components/AuthProgressOverlay";
 import { BackIconButton } from "../components/BackIconButton";
 import { DemoAdBanner } from "../components/DemoAdBanner";
 import { PremiumFeatureDialog } from "../components/PremiumFeatureDialog";
@@ -109,6 +110,7 @@ export default function ProfileScreen() {
   const [subscriptionUpdatedAt, setSubscriptionUpdatedAt] = useState(0);
   const [profileCount, setProfileCount] = useState(0);
   const [premiumPrompt, setPremiumPrompt] = useState<"profiles" | "classroom" | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const load = useCallback(async () => {
     const state = await readAppState({ awaitCloudRefresh: true });
@@ -152,10 +154,19 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = async () => {
-    await logoutAccount();
-    await signOutAccount().catch(() => undefined);
-    await syncRevenueCatIdentity(null).catch(() => undefined);
-    router.replace({ pathname: "/login" } as never);
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+    try {
+      await logoutAccount();
+      await signOutAccount().catch(() => undefined);
+      router.replace({ pathname: "/login" } as never);
+      void syncRevenueCatIdentity(null).catch(() => undefined);
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   useFocusEffect(
@@ -349,9 +360,14 @@ export default function ProfileScreen() {
               label={t(language, "createProfile")}
               onPress={() => router.push({ pathname: "/profile-editor", params: { mode: "create" } } as never)}
             />
-            <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} />
+            <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} loading={loggingOut} />
             <PrimaryButton label={t(language, "backHome")} variant="ghost" onPress={() => router.replace("/")} />
           </View>
+          <AuthProgressOverlay
+            visible={loggingOut}
+            title="Signing you out"
+            message="Closing your session securely…"
+          />
         </View>
       </AppBackground>
     );
@@ -585,7 +601,7 @@ export default function ProfileScreen() {
           style={styles.gridButton}
           compact
         />
-        <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} style={styles.gridButton} compact />
+        <PrimaryButton label={t(language, "logOut")} variant="secondary" onPress={handleLogout} loading={loggingOut} style={styles.gridButton} compact />
         {isMobile ? (
           <PrimaryButton
             label={t(language, "deleteAccount")}
@@ -610,6 +626,11 @@ export default function ProfileScreen() {
           setPremiumPrompt(null);
           router.push({ pathname: "/subscription", params: { source } } as never);
         }}
+      />
+      <AuthProgressOverlay
+        visible={loggingOut}
+        title="Signing you out"
+        message="Closing your session securely…"
       />
     </AppBackground>
   );
