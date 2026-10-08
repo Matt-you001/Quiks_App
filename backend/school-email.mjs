@@ -56,13 +56,16 @@ export async function sendOperationalAlert({ subject, message, idempotencyKey },
 
 export async function sendSchoolResultEmail(report, fetcher = fetch) {
   if (!resendApiKey || !invitationFrom) return { status: "not_configured" };
+  const fieldValue = (field) => field.source === "average" ? `${report.average}%` : field.source === "studentName" ? report.studentName : field.source === "class" ? report.studentClassName : field.source === "admissionNumber" ? report.studentAdmissionNumber : field.source === "reportTitle" ? report.title : report.customFieldValues?.[field.fieldId] ?? field.defaultValue;
+  const additionalFields = (report.template?.customFields ?? []).map((field) => `${field.label}: ${fieldValue(field) ?? ""}`);
+  const ratings = (report.template?.ratingSections ?? []).flatMap((section) => [section.title, ...section.items.map((item) => `${item.label}: ${report.ratingValues?.[`${section.sectionId}:${item.itemId}`] || "Not rated"}`)]);
   const lines = [report.schoolName, report.title, `Student: ${report.studentName}`, "",
     ...report.rows.flatMap((row) => [
       `${row.subject} | ${row.className} | ${row.title} (${row.type})`,
       `Report mark: ${row.adjustedScore ?? row.score}% | Attempt: ${row.attemptNumber}`,
       ...(row.adjustmentReason ? [`Original mark: ${row.score}% | Reviewed adjustment: ${row.adjustmentReason}`] : []), "",
-    ]), `Average: ${report.average}%`, report.calculation, "",
-    `Administrator's comment: ${report.comment || "No additional comment."}`,
+    ]), `Average: ${report.average}%`, report.calculation, "", ...additionalFields, ...(additionalFields.length ? [""] : []), ...ratings, ...(ratings.length ? [""] : []),
+    `Teacher's comment: ${report.comment || "No additional comment."}`,
     "", `Class Teacher: ${report.teacherName || "____________________________"}`,
     `Head Teacher / Principal: ${report.principalName || "____________________________"}`,
     "", "Marks have been reviewed for this report by the school. Contact the school with any questions."];

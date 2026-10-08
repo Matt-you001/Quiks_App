@@ -11,6 +11,65 @@ function percentage(value) {
 function prepare(store) {
   store.schoolResults ??= {};
   store.schoolReports ??= {};
+  store.schoolReportTemplates ??= {};
+}
+
+export const DEFAULT_SCHOOL_REPORT_TEMPLATES = Object.freeze([
+  { templateId: "classic", name: "Classic", heading: "Student Academic Report", accentColor: "#0E5C63", footerNote: "Please contact the school if you have questions about this report.", showClass: true, showStudentClass: true, showAdmissionNumber: true, showActivityType: false, showSubmittedDate: false, showCalculation: true, showTeacherComment: true, showSignatures: true, showAverage: true, orientation: "portrait", customFields: [], ratingSections: [] },
+  { templateId: "modern", name: "Modern", heading: "Learning Progress Report", accentColor: "#7C2BD1", footerNote: "Learning today, leading tomorrow.", showClass: true, showStudentClass: true, showAdmissionNumber: true, showActivityType: true, showSubmittedDate: true, showCalculation: false, showTeacherComment: true, showSignatures: true, showAverage: true, orientation: "landscape", customFields: [], ratingSections: [{ sectionId: "learner-habits", title: "Learner habits", items: [{ itemId: "attendance", label: "Attendance" }, { itemId: "punctuality", label: "Punctuality" }, { itemId: "character", label: "Character" }], scale: ["Excellent", "Very Good", "Good", "Fair", "Needs Improvement"] }] },
+  { templateId: "compact", name: "Compact", heading: "Academic Results Summary", accentColor: "#12324A", footerNote: "", showClass: false, showStudentClass: true, showAdmissionNumber: false, showActivityType: false, showSubmittedDate: false, showCalculation: false, showTeacherComment: true, showSignatures: true, showAverage: true, orientation: "portrait", customFields: [], ratingSections: [] },
+]);
+export const DEFAULT_SCHOOL_REPORT_TEMPLATE = DEFAULT_SCHOOL_REPORT_TEMPLATES[0];
+
+function normalizeReportTemplate(value = {}) {
+  value = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const color = text(value.accentColor, 7);
+  return {
+    templateId: text(value.templateId, 60) || DEFAULT_SCHOOL_REPORT_TEMPLATE.templateId,
+    name: text(value.name, 80) || DEFAULT_SCHOOL_REPORT_TEMPLATE.name,
+    heading: text(value.heading, 120) || DEFAULT_SCHOOL_REPORT_TEMPLATE.heading,
+    accentColor: /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : DEFAULT_SCHOOL_REPORT_TEMPLATE.accentColor,
+    footerNote: text(value.footerNote, 500),
+    showClass: value.showClass !== false,
+    showStudentClass: value.showStudentClass !== false,
+    showAdmissionNumber: value.showAdmissionNumber !== false,
+    showActivityType: value.showActivityType === true,
+    showSubmittedDate: value.showSubmittedDate === true,
+    showCalculation: value.showCalculation !== false,
+    showTeacherComment: value.showTeacherComment !== false,
+    showSignatures: value.showSignatures !== false,
+    showAverage: value.showAverage !== false,
+    orientation: value.orientation === "landscape" ? "landscape" : "portrait",
+    customFields: (Array.isArray(value.customFields) ? value.customFields : []).slice(0, 12).map((field, index) => ({
+      fieldId: text(field?.fieldId, 80) || `field-${index + 1}`,
+      label: text(field?.label, 100) || `Field ${index + 1}`,
+      source: ["average", "studentName", "class", "admissionNumber", "reportTitle", "custom"].includes(field?.source) ? field.source : "custom",
+      defaultValue: text(field?.defaultValue, 300),
+    })),
+    ratingSections: (Array.isArray(value.ratingSections) ? value.ratingSections : []).slice(0, 6).map((section, sectionIndex) => ({
+      sectionId: text(section?.sectionId, 80) || `section-${sectionIndex + 1}`,
+      title: text(section?.title, 120) || `Rating section ${sectionIndex + 1}`,
+      items: (Array.isArray(section?.items) ? section.items : []).slice(0, 20).map((item, itemIndex) => ({
+        itemId: text(item?.itemId, 80) || `item-${itemIndex + 1}`,
+        label: text(item?.label, 100) || `Rating ${itemIndex + 1}`,
+      })),
+      scale: (Array.isArray(section?.scale) ? section.scale : []).slice(0, 10).map((entry) => text(entry, 60)).filter(Boolean),
+    })).filter((section) => section.items.length && section.scale.length),
+  };
+}
+
+function reportTemplateConfiguration(store, schoolId) {
+  const stored = store.schoolReportTemplates[schoolId];
+  if (stored?.templates && Array.isArray(stored.templates)) {
+    const templates = stored.templates.slice(0, 12).map(normalizeReportTemplate);
+    const activeTemplateId = templates.some((template) => template.templateId === stored.activeTemplateId)
+      ? stored.activeTemplateId
+      : templates[0]?.templateId;
+    if (templates.length) return { templates, activeTemplateId };
+  }
+  const templates = DEFAULT_SCHOOL_REPORT_TEMPLATES.map((template) => normalizeReportTemplate(template));
+  if (stored && !stored.templates) templates[0] = normalizeReportTemplate({ ...templates[0], ...stored, templateId: "classic", name: "Classic" });
+  return { templates, activeTemplateId: templates[0].templateId };
 }
 
 // Called only from the teacher-controlled school publication transaction.
@@ -108,6 +167,19 @@ function email(value) {
 
 export function processSchoolResults(store, operation, scope, payload = {}) {
   backfillSchoolResults(store);
+  if (operation === "template") {
+    return clone(reportTemplateConfiguration(store, scope.school.id));
+  }
+  if (operation === "template-update") {
+    const configuration = reportTemplateConfiguration(store, scope.school.id);
+    const template = normalizeReportTemplate(payload.template);
+    const existingIndex = configuration.templates.findIndex((entry) => entry.templateId === template.templateId);
+    if (existingIndex < 0) fail("Report template not found.", 404);
+    configuration.templates[existingIndex] = template;
+    configuration.activeTemplateId = template.templateId;
+    store.schoolReportTemplates[scope.school.id] = configuration;
+    return clone(configuration);
+  }
   if (operation === "list") {
     const all = selectedResults(store, scope.school.id, { attempts: "all" });
     const rows = selectedResults(store, scope.school.id, payload.filters);
@@ -142,21 +214,54 @@ export function processSchoolResults(store, operation, scope, payload = {}) {
     const now = Date.now();
     const studentEmail = email(member.email);
     const guardianEmail = email(member.profileData?.parentEmail);
+    const configuration = reportTemplateConfiguration(store, scope.school.id);
+    const reportTemplate = configuration.templates.find((entry) => entry.templateId === configuration.activeTemplateId) ?? configuration.templates[0];
     const report = { reportId: randomUUID(), schoolId: scope.school.id, schoolName: scope.school.name,
       studentMembershipId: member.membershipId, studentName: member.displayName,
+      studentAdmissionNumber: text(member.profileData?.admissionNumber, 120),
+      studentClassName: [...new Set(rows.map((row) => row.className))].join(", "),
       studentEmail, guardianEmail, recipientType: "student", email: studentEmail,
-      title, comment: "", teacherName: "", principalName: "", rows: clone(rows), average: average(rows), status: "draft", revision: 1,
+      title, comment: "", teacherName: "", principalName: "", rows: clone(rows),
+      template: clone(reportTemplate),
+      customFieldValues: Object.fromEntries(reportTemplate.customFields.map((field) => [field.fieldId, field.defaultValue])),
+      ratingValues: {},
+      average: average(rows), status: "draft", revision: 1,
       calculation: "Unweighted mean of the latest submitted attempt for each included activity; not a weighted term grade.",
       createdAt: now, updatedAt: now, audit: [], delivery: null };
     audit(report, scope, "created"); store.schoolReports[report.reportId] = report;
     return { report: clone(report) };
   }
   const report = reportFor(store, scope, payload.reportId);
+  if (operation === "comment-context") {
+    return {
+      report: clone({
+        reportId: report.reportId,
+        title: report.title,
+        average: report.average,
+        rows: report.rows.map((row) => ({
+          subject: row.subject,
+          activity: row.title,
+          type: row.type,
+          score: row.adjustedScore ?? row.score,
+        })),
+      }),
+    };
+  }
+  if (operation === "set-generated-comment") {
+    if (report.status !== "draft") fail("AI comments can be added only to a draft report.", 409);
+    report.comment = text(payload.comment, 2000);
+    report.revision += 1;
+    report.updatedAt = Date.now();
+    audit(report, scope, payload.generatedBy === "ai" ? "teacher_comment_ai_drafted" : "teacher_comment_fallback_drafted");
+    return { report: clone(report) };
+  }
   if (operation === "export") {
-    const cells = [["School", "Student", "Report", "Class", "Subject", "Activity", "Type", "Submitted", "Attempt", "Original %", "Report %", "Adjustment reason", "Score source", "Admin comment", "Class teacher", "Head Teacher / Principal", "Recipient", "Status"]];
+    const customFields = (report.template?.customFields ?? []).map((field) => `${field.label}: ${report.customFieldValues?.[field.fieldId] ?? field.defaultValue ?? ""}`).join(" | ");
+    const ratings = (report.template?.ratingSections ?? []).flatMap((section) => section.items.map((item) => `${section.title} — ${item.label}: ${report.ratingValues?.[`${section.sectionId}:${item.itemId}`] ?? ""}`)).join(" | ");
+    const cells = [["School", "Student", "Report", "Class", "Subject", "Activity", "Type", "Submitted", "Attempt", "Original %", "Report %", "Adjustment reason", "Score source", "Teacher's comment", "Additional fields", "Ratings", "Class teacher", "Head Teacher / Principal", "Recipient", "Status"]];
     for (const row of report.rows) cells.push([report.schoolName, report.studentName, report.title, row.className, row.subject, row.title, row.type,
       new Date(row.submittedAt).toISOString(), row.attemptNumber, row.score, row.adjustedScore ?? row.score, row.adjustmentReason ?? "", row.scoreSource,
-      report.comment, report.teacherName ?? "", report.principalName ?? "", report.recipientType ?? "student", report.status]);
+      report.comment, customFields, ratings, report.teacherName ?? "", report.principalName ?? "", report.recipientType ?? "student", report.status]);
     audit(report, scope, "exported");
     return { filename: `quiks-report-${report.reportId}.csv`, csv: cells.map((row) => row.map(csvCell).join(",")).join("\r\n") };
   }
@@ -166,6 +271,18 @@ export function processSchoolResults(store, operation, scope, payload = {}) {
     report.comment = text(payload.comment, 2000);
     report.teacherName = text(payload.teacherName, 160);
     report.principalName = text(payload.principalName, 160);
+    const templateFields = new Set((report.template?.customFields ?? []).map((field) => field.fieldId));
+    const nextCustomValues = payload.customFieldValues && typeof payload.customFieldValues === "object" && !Array.isArray(payload.customFieldValues) ? payload.customFieldValues : {};
+    if (Object.keys(nextCustomValues).some((fieldId) => !templateFields.has(fieldId))) fail("A custom report field does not belong to this report.");
+    report.customFieldValues = Object.fromEntries((report.template?.customFields ?? []).map((field) => [field.fieldId, text(nextCustomValues[field.fieldId] ?? report.customFieldValues?.[field.fieldId] ?? field.defaultValue, 500)]));
+    const ratingOptions = new Map((report.template?.ratingSections ?? []).flatMap((section) => section.items.map((item) => [`${section.sectionId}:${item.itemId}`, new Set(section.scale)])));
+    const nextRatings = payload.ratingValues && typeof payload.ratingValues === "object" && !Array.isArray(payload.ratingValues) ? payload.ratingValues : {};
+    if (Object.keys(nextRatings).some((ratingId) => !ratingOptions.has(ratingId))) fail("A rating does not belong to this report.");
+    report.ratingValues = Object.fromEntries([...ratingOptions].map(([ratingId, allowed]) => {
+      const value = text(nextRatings[ratingId] ?? report.ratingValues?.[ratingId], 60);
+      if (value && !allowed.has(value)) fail("Choose a rating from the school's configured scale.");
+      return [ratingId, value];
+    }));
     const recipientType = payload.recipientType === "guardian" ? "guardian" : "student";
     const member = currentMember(scope, report.studentMembershipId);
     const studentEmail = email(member.email);

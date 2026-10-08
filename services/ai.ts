@@ -4,7 +4,7 @@ import { getFirebaseIdToken } from "../lib/firebase";
 import { getLanguageLabel, getLanguagePromptLabel, normalizeLanguage } from "../lib/i18n";
 import { getLocalQuestions } from "../lib/question-bank";
 import { filterDiverseQuestions } from "../lib/question-diversity";
-import type { SchoolResultFilters, SchoolResultsResponse, SchoolReport, SchoolReportEdit } from "../types/school-results";
+import type { SchoolResultFilters, SchoolResultsResponse, SchoolReport, SchoolReportEdit, SchoolReportCommentDraft, SchoolReportTemplate, SchoolReportTemplateCollection } from "../types/school-results";
 import type {
   BreatherContent,
   BreatherRequest,
@@ -338,6 +338,15 @@ export function sendSchoolReport(schoolId: string, report: SchoolReport): Promis
 }
 export function exportSchoolReport(schoolId: string, reportId: string): Promise<{ filename: string; csv: string }> {
   return postJson("/school/admin/results/export", { schoolId, reportId });
+}
+export function getSchoolReportTemplate(schoolId: string): Promise<SchoolReportTemplateCollection> {
+  return postJson("/school/admin/results/template", { schoolId });
+}
+export function updateSchoolReportTemplate(schoolId: string, template: SchoolReportTemplate): Promise<SchoolReportTemplateCollection> {
+  return postJson("/school/admin/results/template-update", { schoolId, template });
+}
+export function regenerateSchoolReportComment(schoolId: string, reportId: string): Promise<SchoolReportCommentDraft> {
+  return postJson("/school/admin/results/regenerate-comment", { schoolId, reportId });
 }
 
 export async function updateSchoolProfileFields(request: SchoolProfileFieldsUpdateRequest): Promise<SchoolDetailsResponse> {

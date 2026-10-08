@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -39,6 +40,12 @@ import { readAppState } from "../lib/storage";
 import { palette, shadows } from "../lib/theme";
 
 import type { AppLanguage } from "../types/app";
+
+const signupLogos = {
+  children: require("../assets/images/quiks-children-playstore-icon-512.png"),
+  teens: require("../assets/images/quiks-teens-playstore-icon-512.png"),
+  uni: require("../assets/images/quiks-uni-playstore-icon-512.png"),
+} as const;
 
 function GoogleSignupButton({
   onSuccess,
@@ -162,6 +169,7 @@ export default function SignupScreen() {
   const [schoolCode, setSchoolCode] = useState(String(params.schoolCode ?? ""));
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
   const hasGoogleConfig = hasGoogleSignInConfig();
   const nextRoute = () => getContinuationRoute({ ...params, schoolCode: schoolCode.trim() });
@@ -236,75 +244,57 @@ export default function SignupScreen() {
   return (
     <AppBackground webContentWidth="narrow">
           <View style={styles.heroCard}>
+            <Image source={signupLogos[appVariant.id]} style={styles.heroLogo} resizeMode="cover" />
             <Text style={styles.eyebrow}>{appVariant.appName}</Text>
-            <Text style={styles.title}>{t(language, "createAccount")}</Text>
-            <Text style={styles.subtitle}>{t(language, "authSubtitle")}</Text>
+            <Text style={styles.title}>Start learning with Quiks</Text>
+            <Text style={styles.subtitle}>Create your account and continue your learning journey.</Text>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.label}>{t(language, "email")}</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              placeholder={t(language, "enterEmail")}
-              placeholderTextColor="#7E93A8"
-              style={styles.input}
-              returnKeyType="next"
-            />
-
-            <Text style={styles.label}>{t(language, "password")}</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder={t(language, "enterPassword")}
-              placeholderTextColor="#7E93A8"
-              style={styles.input}
-              returnKeyType="next"
-            />
-
-            <Text style={styles.label}>{t(language, "confirmPassword")}</Text>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              placeholder={t(language, "reEnterPassword")}
-              placeholderTextColor="#7E93A8"
-              style={styles.input}
-              returnKeyType="done"
-            />
-
-            <Text style={styles.label}>School code or invitation (optional)</Text>
-            <TextInput value={schoolCode} onChangeText={setSchoolCode} autoCapitalize="characters" placeholder="Enter code to join Quiks School" placeholderTextColor="#7E93A8" style={styles.input} />
-
             <View style={styles.actionColumn}>
               {authFeedback ? (
                 <View style={styles.feedbackCard}>
                   <Text style={styles.feedbackText}>{authFeedback}</Text>
                 </View>
               ) : null}
-              <PrimaryButton label={t(language, "signUp")} onPress={handleSignup} loading={loading} />
-              {hasGoogleConfig ? (
-                <GoogleSignupButton
-                  onLoadingChange={setGoogleLoading}
-                  onError={reportAuthError}
-                  onSuccess={async (idToken, accessToken) => {
-                    try {
-                      const account = await signInWithGoogleAccount(idToken, accessToken);
-                      if (!isAccountEmailVerified(account)) {
-                        router.replace(getVerifyEmailRoute(params, schoolCode) as never);
-                        return;
-                      }
-                      await completeVerifiedAuthentication(account);
-                      router.replace(nextRoute() as never);
-                    } catch (error) {
-                      reportAuthError(formatFirebaseError(error));
-                    }
-                  }}
-                />
-              ) : null}
+              {showEmailForm ? (
+                <>
+                  <Text style={styles.formTitle}>{t(language, "createAccount")}</Text>
+                  <Text style={styles.label}>{t(language, "email")}</Text>
+                  <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder={t(language, "enterEmail")} placeholderTextColor="#7E93A8" style={styles.input} returnKeyType="next" />
+                  <Text style={styles.label}>{t(language, "password")}</Text>
+                  <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder={t(language, "enterPassword")} placeholderTextColor="#7E93A8" style={styles.input} returnKeyType="next" />
+                  <Text style={styles.label}>{t(language, "confirmPassword")}</Text>
+                  <TextInput value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry placeholder={t(language, "reEnterPassword")} placeholderTextColor="#7E93A8" style={styles.input} returnKeyType="done" />
+                  <Text style={styles.label}>School code or invitation (optional)</Text>
+                  <TextInput value={schoolCode} onChangeText={setSchoolCode} autoCapitalize="characters" placeholder="Enter code to join Quiks School" placeholderTextColor="#7E93A8" style={styles.input} />
+                  <PrimaryButton label={t(language, "signUp")} onPress={handleSignup} loading={loading} />
+                  <PrimaryButton label="Back to sign-up options" variant="ghost" onPress={() => { setShowEmailForm(false); setAuthFeedback(null); }} />
+                </>
+              ) : (
+                <>
+                  <PrimaryButton label="Create an Account" onPress={() => { setShowEmailForm(true); setAuthFeedback(null); }} />
+                  {hasGoogleConfig ? (
+                    <GoogleSignupButton
+                      onLoadingChange={setGoogleLoading}
+                      onError={reportAuthError}
+                      onSuccess={async (idToken, accessToken) => {
+                        try {
+                          const account = await signInWithGoogleAccount(idToken, accessToken);
+                          if (!isAccountEmailVerified(account)) {
+                            router.replace(getVerifyEmailRoute(params, schoolCode) as never);
+                            return;
+                          }
+                          await completeVerifiedAuthentication(account);
+                          router.replace(nextRoute() as never);
+                        } catch (error) {
+                          reportAuthError(formatFirebaseError(error));
+                        }
+                      }}
+                    />
+                  ) : null}
+                </>
+              )}
               <PrimaryButton
                 label={t(language, "alreadyHaveAccount")}
                 variant="secondary"
@@ -342,6 +332,13 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 22,
     backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+  },
+  heroLogo: {
+    width: 112,
+    height: 112,
+    borderRadius: 28,
+    marginBottom: 16,
   },
   eyebrow: {
     color: "#D8EDF8",
@@ -349,17 +346,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     textTransform: "uppercase",
+    textAlign: "center",
   },
   title: {
     marginTop: 10,
     color: palette.white,
     fontSize: 32,
     fontWeight: "900",
+    textAlign: "center",
   },
   subtitle: {
     marginTop: 10,
     color: "#E8F4FB",
     lineHeight: 22,
+    textAlign: "center",
   },
   card: {
     marginTop: 18,
@@ -373,6 +373,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     marginTop: 10,
+  },
+  formTitle: {
+    color: palette.navy,
+    fontSize: 24,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 4,
   },
   input: {
     marginTop: 8,

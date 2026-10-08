@@ -34,7 +34,7 @@ export function SchoolAcademicPackageEditor({ school }: { school: SchoolSummary 
           ?.filter((code): code is SchoolAcademicPackageCode => packageCodes.has(code)) ?? [];
         const hasLegacyCore = response.grants.some((grant) => grant.featureCode === "academic.core" && grant.status !== "revoked");
         const selectedFromHistory = response.grants
-          .filter((grant) => packageCodes.has(grant.featureCode) && grant.status !== "revoked")
+          .filter((grant) => packageCodes.has(grant.featureCode as SchoolAcademicPackageCode) && grant.status !== "revoked")
           .map((grant) => grant.featureCode as SchoolAcademicPackageCode);
         setSelected(selection
           ? selectedFromRecord

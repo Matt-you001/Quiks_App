@@ -221,6 +221,7 @@ export default function ClassroomScreen() {
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [hasStartedQuestionSelection, setHasStartedQuestionSelection] = useState(false);
   const [publishingAssignment, setPublishingAssignment] = useState(false);
+  const [activityPublishError, setActivityPublishError] = useState<string | null>(null);
   const [classActionLoading, setClassActionLoading] = useState(false);
   const [openPicker, setOpenPicker] = useState<"startDate" | "startTime" | "deadlineDate" | "deadlineTime" | null>(null);
   const [pickerMonth, setPickerMonth] = useState(() => getMonthStart(new Date()));
@@ -593,6 +594,7 @@ export default function ClassroomScreen() {
     setTopicIds([]);
     setShowCustomQuestionForm(false);
     setHasStartedQuestionSelection(false);
+    setActivityPublishError(null);
     setOpenPicker(null);
     setCustomQuestionAnswerIndex(null);
     setCustomQuestionPrompt("");
@@ -850,7 +852,12 @@ export default function ClassroomScreen() {
     }
   };
 
-  const resolveActivityTopicSelection = (alertTitle: string) => {
+  const resolveActivityTopicSelection = (alertTitle: string, onValidationError?: (message: string) => void) => {
+    const reportTopicError = (message: string) => {
+      onValidationError?.(message);
+      Alert.alert(alertTitle, message);
+    };
+
     if (focusMode !== "topic") {
       return { topicIds: [] as string[], topicLabels: [] as string[] };
     }
@@ -861,7 +868,7 @@ export default function ClassroomScreen() {
 
     if (useCustomSubject) {
       if (customTopicLabels.length === 0) {
-        Alert.alert(alertTitle, t(language, "enterCustomTopicFirst"));
+        reportTopicError(t(language, "enterCustomTopicFirst"));
         return null;
       }
       return { topicIds: [] as string[], topicLabels: customTopicLabels };
@@ -872,15 +879,14 @@ export default function ClassroomScreen() {
 
     if (useCustomTopic) {
       if (customTopicLabels.length === 0) {
-        Alert.alert(alertTitle, t(language, "enterCustomTopicFirst"));
+        reportTopicError(t(language, "enterCustomTopicFirst"));
         return null;
       }
 
       for (const customLabel of customTopicLabels) {
         const freshTopicValidation = validateTopicInput(resolvedActivitySubject, customLabel, language);
         if (freshTopicValidation.status === "wrong-subject") {
-          Alert.alert(
-            alertTitle,
+          reportTopicError(
             t(language, "customTopicWrongSubject", {
               topic: freshTopicValidation.input,
               subject: resolvedActivitySubject.name,
@@ -909,7 +915,7 @@ export default function ClassroomScreen() {
     }
 
     if (resolvedTopicIds.length === 0 && resolvedTopicLabels.length === 0) {
-      Alert.alert(alertTitle, t(language, "selectAtLeastOneTopic"));
+      reportTopicError(t(language, "selectAtLeastOneTopic"));
       return null;
     }
 
@@ -1145,12 +1151,37 @@ export default function ClassroomScreen() {
   };
 
   const publishAssignment = async () => {
-    if (!profile || !selectedClass || !resolvedActivitySubject) {
+    const publishTitle = t(language, "publishAssignmentTitle");
+    const reportPublishError = (message: string, title = publishTitle) => {
+      setActivityPublishError(message);
+      Alert.alert(title, message);
+    };
+
+    setActivityPublishError(null);
+
+    if (!profile) {
+      reportPublishError("Your teacher profile could not be loaded. Return to Home, select your teacher profile, and try again.");
+      return;
+    }
+
+    if (!selectedClass) {
+      reportPublishError("Select a class before publishing this activity.");
+      return;
+    }
+
+    if (!resolvedActivitySubject) {
+      reportPublishError(
+        useCustomSubject
+          ? "Enter the custom subject or course name before publishing."
+          : "Select a subject before publishing this activity."
+      );
       return;
     }
 
     if (acceptedQuestions.length < desiredQuestionCount) {
-      Alert.alert(t(language, "publishAssignmentTitle"), t(language, "acceptQuestionsBeforePublishing", { count: desiredQuestionCount }));
+      reportPublishError(
+        `${t(language, "acceptQuestionsBeforePublishing", { count: desiredQuestionCount })} ${acceptedQuestions.length} accepted so far.`
+      );
       return;
     }
 
@@ -1161,7 +1192,8 @@ export default function ClassroomScreen() {
       return !rawValue.trim() || !Number.isFinite(value) || value < 1 || value > 100;
     });
     if (invalidMarksQuestion) {
-      Alert.alert("Question marks", "Every question must have a mark between 1 and 100 before publishing.");
+      const questionNumber = acceptedQuestions.findIndex((question) => question.id === invalidMarksQuestion.id) + 1;
+      reportPublishError(`Question ${questionNumber} needs a valid mark between 1 and 100.`, "Question marks");
       return;
     }
     const questionsForPublishing = acceptedQuestions.map((question) => ({
@@ -1173,16 +1205,19 @@ export default function ClassroomScreen() {
     const hasObjectiveQuestions = acceptedQuestions.some((question) => question.type !== "written");
     if ((assessmentFormat === "written" && hasObjectiveQuestions) || (assessmentFormat === "objective" && hasWrittenQuestions)
       || (assessmentFormat === "mixed" && (!hasWrittenQuestions || !hasObjectiveQuestions))) {
-      Alert.alert("Assessment format", "Make the selected questions match the assessment format. Mixed activities need at least one objective and one written question.");
+      reportPublishError(
+        "Make the selected questions match the assessment format. Mixed activities need at least one objective and one written question.",
+        "Assessment format"
+      );
       return;
     }
 
     if (!assignmentTitle.trim()) {
-      Alert.alert(t(language, "publishAssignmentTitle"), t(language, "enterAssignmentTitleFirst"));
+      reportPublishError("Enter an activity title before publishing.");
       return;
     }
 
-    const topicSelection = resolveActivityTopicSelection(t(language, "publishAssignmentTitle"));
+    const topicSelection = resolveActivityTopicSelection(publishTitle, setActivityPublishError);
     if (!topicSelection) return;
     const requestTopicIds = topicSelection.topicIds;
     const requestTopicLabels = topicSelection.topicLabels;
@@ -1193,22 +1228,29 @@ export default function ClassroomScreen() {
     const parsedPackageExpiry = deliveryMode === "online" ? null : parseDateTimeInput(packageExpiryDate, packageExpiryTime);
 
     if (isTimedActivity(activityType) && !parsedStartAt) {
-      Alert.alert(t(language, "publishTestTitle"), t(language, "enterValidTestStart"));
+      reportPublishError(
+        !startDate
+          ? "Select the test or exam start date before publishing."
+          : !startTime
+            ? "Select the test or exam start time before publishing."
+            : t(language, "enterValidTestStart"),
+        t(language, "publishTestTitle")
+      );
       return;
     }
 
     if (isTimedActivity(activityType) && parsedStartAt && parsedStartAt <= Date.now()) {
-      Alert.alert(t(language, "publishTestTitle"), "Test start time must be in the future.");
+      reportPublishError("Test start time must be in the future.", t(language, "publishTestTitle"));
       return;
     }
 
     if (isTimedActivity(activityType) && !parsedEndAt) {
-      Alert.alert(t(language, "publishTestTitle"), t(language, "enterValidDurationSeconds"));
+      reportPublishError(t(language, "enterValidDurationSeconds"), t(language, "publishTestTitle"));
       return;
     }
 
     if (isTimedActivity(activityType) && parsedStartAt && parsedEndAt && parsedEndAt <= parsedStartAt) {
-      Alert.alert(t(language, "publishTestTitle"), t(language, "endTimeLaterThanStart"));
+      reportPublishError(t(language, "endTimeLaterThanStart"), t(language, "publishTestTitle"));
       return;
     }
 
@@ -1216,23 +1258,36 @@ export default function ClassroomScreen() {
       const startDateValue = formatLocalDateValue(new Date(parsedStartAt));
       const endDateValue = formatLocalDateValue(new Date(parsedEndAt));
       if (startDateValue !== endDateValue) {
-        Alert.alert(t(language, "publishTestTitle"), t(language, "testEndSameDay"));
+        reportPublishError(t(language, "testEndSameDay"), t(language, "publishTestTitle"));
         return;
       }
     }
 
     if (deliveryMode !== "online" && (!parsedPackageExpiry || (parsedEndAt && parsedPackageExpiry < parsedEndAt))) {
-      Alert.alert("Offline deployment", "Choose a package expiry date and time that is after the examination closes.");
+      reportPublishError(
+        !packageExpiryDate
+          ? "Select the offline package expiry date before publishing."
+          : !packageExpiryTime
+            ? "Select the offline package expiry time before publishing."
+            : "Choose a package expiry date and time that is after the examination closes.",
+        "Offline deployment"
+      );
       return;
     }
 
     if (activityType === "assignment" && !parsedDeadline) {
-      Alert.alert(t(language, "publishAssignmentTitle"), t(language, "enterValidDeadline"));
+      reportPublishError(
+        !deadlineDate
+          ? "Select the assignment deadline date before publishing."
+          : !deadlineTime
+            ? "Select the assignment deadline time before publishing."
+            : t(language, "enterValidDeadline")
+      );
       return;
     }
 
     if (activityType === "assignment" && parsedDeadline && parsedDeadline <= Date.now()) {
-      Alert.alert(t(language, "publishAssignmentTitle"), t(language, "deadlineMustBeFuture"));
+      reportPublishError(t(language, "deadlineMustBeFuture"));
       return;
     }
 
@@ -1316,7 +1371,7 @@ export default function ClassroomScreen() {
             : t(language, "assignmentReadyForClass")
       );
     } catch (error) {
-      Alert.alert(t(language, "publishAssignmentTitle"), error instanceof Error ? error.message : t(language, "unablePublishActivity"));
+      reportPublishError(error instanceof Error ? error.message : t(language, "unablePublishActivity"));
     } finally {
       setPublishingAssignment(false);
     }
@@ -2120,10 +2175,18 @@ export default function ClassroomScreen() {
                           </>
                         )
                       ) : (
-                        <View style={styles.inlineActions}>
-                          <PrimaryButton label={t(language, "reviewLabel")} variant="secondary" onPress={() => { setIsReviewingQuestions(true); setReviewPage(0); }} style={styles.inlineButton} />
-                          <PrimaryButton label={editingActivityId ? t(language, "saveChanges") : activityType === "exam" ? "Publish Exam" : activityType === "test" ? t(language, "publishTest") : t(language, "publishAssignment")} onPress={publishAssignment} loading={publishingAssignment} style={styles.inlineButton} />
-                        </View>
+                        <>
+                          {activityPublishError ? (
+                            <View style={styles.publishErrorCard} accessibilityRole="alert">
+                              <MaterialIcons name="error-outline" size={20} color="#B42318" />
+                              <Text style={styles.publishErrorText}>{activityPublishError}</Text>
+                            </View>
+                          ) : null}
+                          <View style={styles.inlineActions}>
+                            <PrimaryButton label={t(language, "reviewLabel")} variant="secondary" onPress={() => { setIsReviewingQuestions(true); setReviewPage(0); }} style={styles.inlineButton} />
+                            <PrimaryButton label={editingActivityId ? t(language, "saveChanges") : activityType === "exam" ? "Publish Exam" : activityType === "test" ? t(language, "publishTest") : t(language, "publishAssignment")} onPress={publishAssignment} loading={publishingAssignment} style={styles.inlineButton} />
+                          </View>
+                        </>
                       )}
 
                       {isReviewingQuestions ? (
@@ -2682,6 +2745,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 20,
     textAlign: "center",
+  },
+  publishErrorCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FDA29B",
+    backgroundColor: "#FEF3F2",
+    padding: 12,
+  },
+  publishErrorText: {
+    flex: 1,
+    color: "#B42318",
+    fontWeight: "700",
+    lineHeight: 20,
   },
   classCard: {
     borderRadius: 18,
